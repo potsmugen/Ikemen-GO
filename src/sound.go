@@ -189,7 +189,7 @@ func (bgm *Bgm) Open(filename string, loop, bgmVolume, bgmLoopStart, bgmLoopEnd,
 
 	f, err := os.Open(bgm.filename)
 	if err != nil {
-		sys.bgm = *newBgm()
+		// sys.bgm = *newBgm() // removing this gets pause step playsnd to work correctly 100% of the time
 		sys.errLog.Printf("Failed to open bgm: %v", err)
 		return
 	}
@@ -564,6 +564,14 @@ func (s *SoundChannel) Play(sound *Sound, loop int32, freqmul float32, loopStart
 }
 func (s *SoundChannel) IsPlaying() bool {
 	return s.sound != nil
+}
+func (s *SoundChannel) SetPaused(pause bool) {
+	if s.ctrl == nil || s.ctrl.Paused == pause {
+		return
+	}
+	speaker.Lock()
+	s.ctrl.Paused = pause
+	speaker.Unlock()
 }
 func (s *SoundChannel) Stop() {
 	if s.ctrl != nil {
