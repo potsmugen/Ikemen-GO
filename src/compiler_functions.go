@@ -200,18 +200,14 @@ func (c *Compiler) assertSpecial(is IniSection, sc *StateControllerBase, _ int8)
 				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_noailevel)))
 			case "nointroreset":
 				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_nointroreset)))
-			case "ignoreclsn2push":
-				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_ignoreclsn2push)))
+			case "sizepushonly":
+				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_sizepushonly)))
 			case "immovable":
 				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_immovable)))
 			case "animatehitpause":
 				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_animatehitpause)))
 			case "cornerpriority":
 				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_cornerpriority)))
-			case "drawontop":
-				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_drawontop)))
-			case "drawunder":
-				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_drawunder)))
 			case "runfirst":
 				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_runfirst)))
 			case "runlast":
@@ -777,6 +773,10 @@ func (c *Compiler) explodSub(is IniSection,
 	}); err != nil {
 		return err
 	}
+	if err := c.paramValue(is, sc, "layerno",
+		explod_layerno, VT_Int, 1, false); err != nil {
+		return err
+	}
 	if err := c.paramValue(is, sc, "shadow",
 		explod_shadow, VT_Int, 3, false); err != nil {
 		return err
@@ -1289,7 +1289,7 @@ func (c *Compiler) afterImageTime(is IniSection, sc *StateControllerBase, _ int8
 	})
 	return *ret, err
 }
-func (c *Compiler) hitDefSub(is IniSection,	sc *StateControllerBase) error {
+func (c *Compiler) hitDefSub(is IniSection, sc *StateControllerBase) error {
 	if err := c.stateParam(is, "attr", false, func(data string) error {
 		attr, err := c.attr(data, true)
 		if err != nil {
@@ -1950,7 +1950,7 @@ func (c *Compiler) modifyReversalDef(is IniSection, sc *StateControllerBase, _ i
 	return *ret, err
 }
 
-func (c *Compiler) projectileSub(is IniSection,	sc *StateControllerBase, ihp int8) error {
+func (c *Compiler) projectileSub(is IniSection, sc *StateControllerBase, ihp int8) error {
 	if err := c.paramValue(is, sc, "redirectid",
 		projectile_redirectid, VT_Int, 1, false); err != nil {
 		return err
@@ -2049,6 +2049,10 @@ func (c *Compiler) projectileSub(is IniSection,	sc *StateControllerBase, ihp int
 		projectile_projsprpriority, VT_Int, 1, false); err != nil {
 		return err
 	}
+	if err := c.paramValue(is, sc, "projlayerno",
+		projectile_projlayerno, VT_Int, 1, false); err != nil {
+		return err
+	}
 	if err := c.paramValue(is, sc, "projstagebound",
 		projectile_projstagebound, VT_Int, 1, false); err != nil {
 		return err
@@ -2111,11 +2115,9 @@ func (c *Compiler) modifyProjectile(is IniSection, sc *StateControllerBase,
 			modifyProjectile_id, VT_Int, 1, false); err != nil {
 			return err
 		}
-
 		if err := c.projectileSub(is, sc, ihp); err != nil {
 			return err
 		}
-
 		return nil
 	})
 	return *ret, err
@@ -2160,6 +2162,10 @@ func (c *Compiler) sprPriority(is IniSection, sc *StateControllerBase, _ int8) (
 	ret, err := (*sprPriority)(sc), c.stateSec(is, func() error {
 		if err := c.paramValue(is, sc, "redirectid",
 			sprPriority_redirectid, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "layerno",
+			sprPriority_layerno, VT_Int, 1, false); err != nil {
 			return err
 		}
 		return c.paramValue(is, sc, "value",
@@ -5179,7 +5185,7 @@ func (c *Compiler) assertCommand(is IniSection, sc *StateControllerBase, _ int8)
 		}); err != nil {
 			return err
 		}
-		if err := c.paramValue(is, sc, "buffertime",
+		if err := c.paramValue(is, sc, "buffer.time",
 			assertCommand_buffertime, VT_Int, 1, false); err != nil {
 			return err
 		}
