@@ -95,8 +95,10 @@ const (
 	ASF_sizepushonly
 	ASF_animatehitpause
 	ASF_cornerpriority
+	ASF_drawunder
 	ASF_runfirst
 	ASF_runlast
+	ASF_projtypecollision // TODO: Make this a parameter for normal projectiles as well?
 )
 
 type GlobalSpecialFlag uint32
@@ -553,7 +555,7 @@ type HitDef struct {
 	reversal_attr              int32
 	hitflag                    int32
 	guardflag                  int32
-	affectteam                 int32
+	affectteam                 int32 // -1F, 0B, 1E
 	teamside                   int
 	animtype                   Reaction
 	air_animtype               Reaction
@@ -1083,35 +1085,35 @@ func (ai *AfterImage) recAndCue(sd *SprData, rec bool, hitpause bool, layer int3
 }
 
 type Explod struct {
-	id                   int32
-	time                 int32
-	postype              PosType
-	space                Space
-	bindId               int32
-	bindtime             int32
-	pos                  [2]float32
-	relativePos          [2]float32
-	offset               [2]float32
-	relativef            float32
-	facing               float32
-	vfacing              float32
-	scale                [2]float32
-	removeongethit       bool
-	removeonchangestate  bool
-	statehaschanged      bool
-	removetime           int32
-	velocity             [2]float32
-	accel                [2]float32
-	sprpriority          int32
-	layerno              int32
-	shadow               [3]int32
-	supermovetime        int32
-	pausemovetime        int32
-	anim                 *Animation
-	animelem             int32
-	animfreeze           bool
+	id                  int32
+	time                int32
+	postype             PosType
+	space               Space
+	bindId              int32
+	bindtime            int32
+	pos                 [2]float32
+	relativePos         [2]float32
+	offset              [2]float32
+	relativef           float32
+	facing              float32
+	vfacing             float32
+	scale               [2]float32
+	removeongethit      bool
+	removeonchangestate bool
+	statehaschanged     bool
+	removetime          int32
+	velocity            [2]float32
+	accel               [2]float32
+	sprpriority         int32
+	layerno             int32
+	shadow              [3]int32
+	supermovetime       int32
+	pausemovetime       int32
+	anim                *Animation
+	animelem            int32
+	animfreeze          bool
 	//ontop                bool
-	//under                bool
+	under                bool
 	alpha                [2]int32
 	ownpal               bool
 	ignorehitpause       bool
@@ -1349,6 +1351,8 @@ func (e *Explod) update(oldVer bool, playerNo int) {
 		sprs = &sys.spritesLayer1
 	} else if e.layerno < 0 {
 		sprs = &sys.spritesLayerN1
+	} else if e.under {
+		sprs = &sys.spritesLayerU
 	}
 	var pfx *PalFX
 	if e.palfx != nil && (e.anim.sff != sys.ffx["f"].fsff || e.ownpal) {
@@ -1700,7 +1704,7 @@ func (p *Projectile) update(playerNo int) {
 }
 
 // This function only checks if a projectile hits another projectile
-func (p *Projectile) tradeDetection(playerNo int) {
+func (p *Projectile) tradeDetection(playerNo, index int) {
 	if p.ani == nil || len(p.ani.frames) == 0 {
 		return
 	}
@@ -1718,13 +1722,22 @@ func (p *Projectile) tradeDetection(playerNo int) {
 	}
 
 	for i := 0; i < len(sys.chars) && p.hits >= 0; i++ {
-		if len(sys.chars[i]) == 0 || i == playerNo {
+		// In Mugen projectiles could not hit projectiles from the same player
+		//if len(sys.chars[i]) == 0 {//|| i == playerNo {
+		if len(sys.chars[i]) == 0 {
 			continue
 		}
 		for j, pr := range sys.projs[i] {
-			if pr.hits < 0 || pr.id < 0 || (pr.hitdef.affectteam != 0 &&
-				(p.hitdef.teamside-1 != pr.hitdef.teamside-1) != (pr.hitdef.affectteam > 0)) ||
-				pr.ani == nil || len(pr.ani.frames) == 0 {
+			if i == playerNo && j == index { // Self
+				continue
+			}
+			if pr.hits < 0 || pr.id < 0 || pr.ani == nil || len(pr.ani.frames) == 0 {
+				continue
+			}
+			// Teamside check
+			if pr.hitdef.affectteam != 0 &&
+				((p.hitdef.teamside-1 != pr.hitdef.teamside-1) != (pr.hitdef.affectteam > 0) ||
+				(p.hitdef.teamside-1 == pr.hitdef.teamside-1) != (pr.hitdef.affectteam < 0)) {
 				continue
 			}
 			clsn1 := pr.ani.CurrentFrame().Clsn2() // Projectiles trade with their Clsn2 only
@@ -2003,7 +2016,7 @@ type Char struct {
 	teamside            int
 	keyctrl             [4]bool
 	player              bool
-	hprojectile         bool
+	hprojectile         bool // Currently unused
 	animPN              int
 	animNo              int32
 	prevAnimNo          int32
@@ -4216,7 +4229,12 @@ func (c *Char) helperInit(h *Char, st int32, pt PosType, x, y float32,
 func (c *Char) newExplod() (*Explod, int) {
 	explinit := func(expl *Explod) *Explod {
 		expl.clear()
-		expl.id, expl.playerId, expl.palfx, expl.palfxdef = -1, c.id, c.getPalfx(), PalFXDef{color: 1, hue: 0, mul: [...]int32{256, 256, 256}}
+		// Explod defaults
+		expl.id = -1
+		expl.playerId = c.id
+		expl.layerno = c.layerNo
+		expl.palfx = c.getPalfx()
+		expl.palfxdef = PalFXDef{color: 1, hue: 0, mul: [...]int32{256, 256, 256}}
 		if c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 1 && c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
 			expl.projection = Projection_Perspective
 		} else {
@@ -4506,7 +4524,9 @@ func (c *Char) newProj() *Projectile {
 	for i := c.gi().projidcount; i < len(sys.projs[c.playerNo]); i++ {
 		if sys.projs[c.playerNo][i].id < 0 {
 			sys.projs[c.playerNo][i].clear()
+			// Projectile defaults
 			sys.projs[c.playerNo][i].id = 0
+			sys.projs[c.playerNo][i].layerno = c.layerNo
 			sys.projs[c.playerNo][i].palfx = c.getPalfx()
 			c.gi().projidcount = i
 			return &sys.projs[c.playerNo][i]
@@ -4946,7 +4966,7 @@ func (c *Char) targetLifeAdd(tar []int32, add int32, kill, absolute, dizzy, redl
 				}
 			}
 			// Subtract dizzy points
-			if dizzy && !t.scf(SCF_dizzy) && !c.asf(ASF_nodizzypointsdamage) {
+			if dizzy && !t.scf(SCF_dizzy) && !t.asf(ASF_nodizzypointsdamage) {
 				if t.ghv.attr&int32(AT_AH) != 0 {
 					t.dizzyPointsAdd(-dmg*float64(c.gi().constants["super.lifetodizzypointsmul"]), true)
 				} else {
@@ -4966,21 +4986,21 @@ func (c *Char) targetPowerAdd(tar []int32, power int32) {
 }
 func (c *Char) targetDizzyPointsAdd(tar []int32, add int32, absolute bool) {
 	for _, tid := range tar {
-		if t := sys.playerID(tid); t != nil && !t.scf(SCF_dizzy) && !c.asf(ASF_nodizzypointsdamage) {
+		if t := sys.playerID(tid); t != nil && !t.scf(SCF_dizzy) && !t.asf(ASF_nodizzypointsdamage) {
 			t.dizzyPointsAdd(float64(t.computeDamage(float64(add), false, absolute, 1, c, false)), true)
 		}
 	}
 }
 func (c *Char) targetGuardPointsAdd(tar []int32, add int32, absolute bool) {
 	for _, tid := range tar {
-		if t := sys.playerID(tid); t != nil && !c.asf(ASF_noguardpointsdamage) {
+		if t := sys.playerID(tid); t != nil && !t.asf(ASF_noguardpointsdamage) {
 			t.guardPointsAdd(float64(t.computeDamage(float64(add), false, absolute, 1, c, false)), true)
 		}
 	}
 }
 func (c *Char) targetRedLifeAdd(tar []int32, add int32, absolute bool) {
 	for _, tid := range tar {
-		if t := sys.playerID(tid); t != nil && !c.asf(ASF_noredlifedamage) {
+		if t := sys.playerID(tid); t != nil && !t.asf(ASF_noredlifedamage) {
 			t.redLifeAdd(float64(t.computeDamage(float64(add), false, absolute, 1, c, true)), true)
 		}
 	}
@@ -6218,7 +6238,7 @@ func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32) bool {
 
 	// Decide which box types should collide
 	var clsn1, clsn2 []float32
-	if c.hprojectile { // Projectiles trade with their Clsn2 only
+	if c.asf(ASF_projtypecollision) { // Projectiles trade with their Clsn2 only
 		clsn1 = frm.Clsn2()
 		clsn2 = c.curFrame.Clsn2()
 	} else {
@@ -6282,7 +6302,7 @@ func (c *Char) clsnCheck(getter *Char, cbox, gbox int32) bool {
 
 	// Decide which box types should collide
 	var clsn1, clsn2 []float32
-	if c.hprojectile && getter.hprojectile { // Projectiles trade with their Clsn2 only
+	if c.asf(ASF_projtypecollision) && getter.asf(ASF_projtypecollision) { // Projectiles trade with their Clsn2 only
 		clsn1 = c.curFrame.Clsn2()
 		clsn2 = getter.curFrame.Clsn2()
 	} else {
@@ -6538,6 +6558,7 @@ func (c *Char) actionPrepare() {
 				}
 			}
 			// HitOverride timers
+			// In Mugen they decrease even during hitpause. However no issues have arised from not doing that yet
 			for i, ho := range c.ho {
 				if ho.time > 0 {
 					c.ho[i].time--
@@ -6721,29 +6742,29 @@ func (c *Char) actionRun() {
 			}
 			c.ghv.damage = 0
 		}
-		c.ghv.hitdamage = 0
-		c.ghv.guarddamage = 0
-		c.ghv.power = 0
-		c.ghv.hitpower = 0
-		c.ghv.guardpower = 0
+		if c.ghv.redlife != 0 {
+			if c.ss.moveType == MT_H || c.hoKeepState {
+				c.redLifeAdd(-float64(c.ghv.redlife), true)
+			}
+			c.ghv.redlife = 0
+		}
 		if c.ghv.dizzypoints != 0 {
-			if c.ss.moveType == MT_H && !c.inGuardState() {
+			if c.ss.moveType == MT_H || c.hoKeepState {
 				c.dizzyPointsAdd(-float64(c.ghv.dizzypoints), true)
 			}
 			c.ghv.dizzypoints = 0
 		}
 		if c.ghv.guardpoints != 0 {
-			if c.ss.moveType == MT_H && c.inGuardState() {
+			if c.ss.moveType == MT_H || c.hoKeepState {
 				c.guardPointsAdd(-float64(c.ghv.guardpoints), true)
 			}
 			c.ghv.guardpoints = 0
 		}
-		if c.ghv.redlife != 0 {
-			if c.ss.moveType == MT_H {
-				c.redLifeAdd(-float64(c.ghv.redlife), true)
-			}
-			c.ghv.redlife = 0
-		}
+		c.ghv.hitdamage = 0
+		c.ghv.guarddamage = 0
+		c.ghv.power = 0
+		c.ghv.hitpower = 0
+		c.ghv.guardpower = 0
 		// The following block used to be in char.update()
 		// That however caused a breaking difference with Mugen when checking these variables between different players
 		// https://github.com/ikemen-engine/Ikemen-GO/issues/1540
@@ -6800,8 +6821,6 @@ func (c *Char) actionRun() {
 				c.ghv.hittime--
 			}
 		}
-		c.ghv.frame = false
-		c.mhv.frame = false
 		if c.helperIndex == 0 && c.gi().pctime >= 0 {
 			c.gi().pctime++
 		}
@@ -6826,6 +6845,9 @@ func (c *Char) actionFinish() {
 		if c.palfx != nil && c.ownpal {
 			c.palfx.step()
 		}
+		// Placing these two in Finish instead of Run makes them less susceptible to processing order inconsistency
+		c.ghv.frame = false
+		c.mhv.frame = false
 	}
 	c.minus = 1
 }
@@ -7399,6 +7421,8 @@ func (c *Char) cueDraw() {
 			sprs = &sys.spritesLayer1
 		} else if c.layerNo < 0 {
 			sprs = &sys.spritesLayerN1
+		} else if c.asf(ASF_drawunder) {
+			sprs = &sys.spritesLayerU
 		}
 		if !c.asf(ASF_invisible) {
 			var sc, sa int32 = -1, 255
@@ -7578,7 +7602,7 @@ func (cl *CharList) action() {
 	// Sorting the characters first makes new helpers wait for their turn and allows RunOrder trigger accuracy
 	sortedOrder := cl.sortActionRunOrder()
 	for i := 0; i < len(sortedOrder); i++ {
-		if sortedOrder[i] <= len(cl.runOrder) {
+		if sortedOrder[i] < len(cl.runOrder) {
 			cl.runOrder[sortedOrder[i]].actionRun()
 		}
 	}
@@ -7727,7 +7751,7 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 			c.hitdefTargetsBuffer = append(c.hitdefTargetsBuffer, getter.id)
 			c.mhv.uniqhit = int32(len(c.hitdefTargets))
 		}
-		ghvset := !getter.stchtmp || p2s || !getter.csf(CSF_gethit)
+		ghvset := !getter.csf(CSF_gethit) || !getter.stchtmp || p2s
 		// Variables that are set even if Hitdef type is "None"
 		if ghvset {
 			if !proj {
@@ -7780,8 +7804,6 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 			if getter.bindToId == c.id {
 				getter.setBindTime(0)
 			}
-			var absdamage, hitdamage, guarddamage int32
-			var absredlife int32
 			if ghvset {
 				ghv := &getter.ghv
 				cmb := (getter.ss.moveType == MT_H || getter.csf(CSF_gethit)) && !ghv.guarded
@@ -7827,8 +7849,6 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 					ghv.score = hd.score[0]
 				}
 				ghv.fatal = false
-				hitdamage = hd.hitdamage
-				guarddamage = hd.guarddamage
 				// If attack is guarded
 				if hitType == 2 {
 					ghv.guarded = true
@@ -7844,10 +7864,6 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 						ghv.xvel = hd.guard_velocity * (c.localscl / getter.localscl)
 						// Mugen does not accept a Y component for ground guard velocity
 						//ghv.yvel = hd.ground_velocity[1] * c.localscl / getter.localscl
-					}
-					if !getter.asf(ASF_noguarddamage) {
-						absdamage = hd.guarddamage
-						absredlife = hd.guardredlife
 					}
 					ghv.hitcount = hc
 					ghv.guardcount = gc + 1
@@ -7899,10 +7915,6 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 					}
 					if ghv.hittime < 0 {
 						ghv.hittime = 0
-					}
-					if !getter.asf(ASF_nohitdamage) {
-						absdamage = hd.hitdamage
-						absredlife = hd.hitredlife
 					}
 					if cmb {
 						ghv.hitcount = hc + 1
@@ -8002,15 +8014,17 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 				} else if getter.bindToId == c.id {
 					getter.setBindTime(0)
 				}
-			} else if hitType == 1 {
-				if !getter.asf(ASF_nohitdamage) {
-					absdamage = hd.hitdamage
-					absredlife = hd.hitredlife
-				}
-			} else if !getter.asf(ASF_noguarddamage) {
-				absdamage = hd.guarddamage
-				absredlife = hd.guardredlife
 			}
+			// This currently seems redundant
+			//} else if hitType == 1 {
+			//	if !getter.asf(ASF_nohitdamage) {
+			//		absdamage = hd.hitdamage
+			//		absredlife = hd.hitredlife
+			//	}
+			//} else if !getter.asf(ASF_noguarddamage) {
+			//	absdamage = hd.guarddamage
+			//	absredlife = hd.guardredlife
+			//}
 			if sys.super > 0 {
 				getter.superMovetime =
 					Max(getter.superMovetime, getter.ghv.hitshaketime)
@@ -8031,30 +8045,54 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 					break
 				}
 			}
-			getter.ghv.damage += getter.computeDamage(
-				float64(absdamage)*float64(hits), getter.ghv.kill, false, attackMul, c, bnd)
-			getter.ghv.hitdamage += getter.computeDamage(
-				float64(hitdamage)*float64(hits), true, false, attackMul, c, false)
-			getter.ghv.guarddamage += getter.computeDamage(
-				float64(guarddamage)*float64(hits), true, false, attackMul, c, false)
+			// Damage on hit
+			if hitType == 1 {
+				// Life
+				if !getter.asf(ASF_nohitdamage) {
+					getter.ghv.damage += getter.computeDamage(
+						float64(hd.hitdamage)*float64(hits), getter.ghv.kill, false, attackMul, c, bnd)
+				}
+				// Red life
+				if !getter.asf(ASF_noredlifedamage) {
+					getter.ghv.redlife += getter.computeDamage(
+						float64(hd.hitredlife)*float64(hits), true, false, attackMul, c, bnd)
+				}
+				// Dizzy points
+				if !getter.asf(ASF_nodizzypointsdamage) && !getter.scf(SCF_dizzy) {
+					getter.ghv.dizzypoints += getter.computeDamage(
+						float64(hd.dizzypoints)*float64(hits), true, false, attackMul, c, false)
+				}
+			}
+			// Damage on guard
+			if hitType == 2 {
+				// Life
+				if !getter.asf(ASF_noguarddamage) {
+					getter.ghv.damage += getter.computeDamage(
+						float64(hd.guarddamage)*float64(hits), getter.ghv.kill, false, attackMul, c, bnd)
+				}
+				// Red life
+				if !getter.asf(ASF_noredlifedamage) {
+					getter.ghv.redlife += getter.computeDamage(
+						float64(hd.guardredlife)*float64(hits), true, false, attackMul, c, bnd)
+				}
+				// Guard points
+				if !getter.asf(ASF_noguardpointsdamage) {
+					getter.ghv.guardpoints += getter.computeDamage(
+						float64(hd.guardpoints)*float64(hits), true, false, attackMul, c, false)
+				}
+			}
+			// Absolute values
+			// These do not affect the player and are only used in GetHitVar
 			getter.ghv.hitpower += hd.hitgivepower
 			getter.ghv.guardpower += hd.guardgivepower
-			if !c.asf(ASF_nodizzypointsdamage) && !getter.scf(SCF_dizzy) {
-				getter.ghv.dizzypoints += getter.computeDamage(
-					float64(hd.dizzypoints)*float64(hits), true, false, attackMul, c, false)
-			}
-			if !c.asf(ASF_noguardpointsdamage) {
-				getter.ghv.guardpoints += getter.computeDamage(
-					float64(hd.guardpoints)*float64(hits), true, false, attackMul, c, false)
-			}
-			if !c.asf(ASF_noredlifedamage) {
-				getter.ghv.redlife += getter.computeDamage(
-					float64(absredlife)*float64(hits), true, false, attackMul, c, bnd)
-				getter.ghv.hitredlife += getter.computeDamage(
-					float64(hd.hitredlife)*float64(hits), true, false, attackMul, c, bnd)
-				getter.ghv.guardredlife += getter.computeDamage(
-					float64(hd.guardredlife)*float64(hits), true, false, attackMul, c, bnd)
-			}
+			getter.ghv.hitdamage += getter.computeDamage(
+				float64(hd.hitdamage)*float64(hits), true, false, attackMul, c, false)
+			getter.ghv.guarddamage += getter.computeDamage(
+				float64(hd.guarddamage)*float64(hits), true, false, attackMul, c, false)
+			getter.ghv.hitredlife += getter.computeDamage(
+				float64(hd.hitredlife)*float64(hits), true, false, attackMul, c, bnd)
+			getter.ghv.guardredlife += getter.computeDamage(
+				float64(hd.guardredlife)*float64(hits), true, false, attackMul, c, bnd)
 			// Hit behavior on KO
 			if ghvset && getter.ghv.damage >= getter.life {
 				if getter.ghv.kill || !getter.alive() {
@@ -8320,7 +8358,7 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 	if getter.scf(SCF_standby) || getter.scf(SCF_disabled) {
 		return
 	}
-	// Projectile check
+	// Projectile hitting player check
 	// TODO: Disable projectiles if player is disabled?
 	if proj {
 		for i, pr := range sys.projs {
@@ -8333,9 +8371,19 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 			ap_projhit := false
 			for j := range pr {
 				p := &pr[j]
-				if (i == getter.playerNo && getter.helperIndex == 0 && !p.platform) ||
-					p.id < 0 || p.hits < 0 || p.hitdef.affectteam != 0 &&
-					(getter.teamside != p.hitdef.teamside-1) != (p.hitdef.affectteam > 0) {
+				if p.id < 0 || p.hits < 0 {
+					continue
+				}
+				// In Mugen, projectiles couldn't hit their root even with the proper affectteam
+				if i == getter.playerNo && getter.helperIndex == 0 &&
+					(getter.teamside == p.hitdef.teamside-1) && !p.platform {
+					continue
+				}
+				// Teamside check
+				// Since the teamside parameter is new to Ikemen, we can make that one allow the projectile to hit the root
+				if p.hitdef.affectteam != 0 &&
+					((getter.teamside != p.hitdef.teamside-1) != (p.hitdef.affectteam > 0) ||
+					(getter.teamside == p.hitdef.teamside-1) != (p.hitdef.affectteam < 0)) {
 					continue
 				}
 				dist := (getter.pos[0]*getter.localscl - (p.pos[0])*p.localscl) * p.facing
