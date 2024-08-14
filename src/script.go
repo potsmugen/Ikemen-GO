@@ -4362,7 +4362,7 @@ func triggerFunctions(l *lua.LState) {
 		return 1
 	})
 	luaRegister(l, "attack", func(*lua.LState) int {
-		l.Push(lua.LNumber(sys.debugWC.attackMul * 100))
+		l.Push(lua.LNumber(sys.debugWC.attackMul[0] * 100))
 		return 1
 	})
 	luaRegister(l, "clamp", func(*lua.LState) int {
