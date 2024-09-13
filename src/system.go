@@ -1087,19 +1087,28 @@ func (s *System) nextRound() {
 func (s *System) debugPaused() bool {
 	return s.paused && !s.step && s.oldTickCount < s.tickCount
 }
+
+// "Tick frames" are the frames where most of the game logic happens
 func (s *System) tickFrame() bool {
 	return (!s.paused || s.step) && s.oldTickCount < s.tickCount
 }
+
+// "Tick next frame" is right after the "tick frame"
+// Where for instance the collision detections happen
 func (s *System) tickNextFrame() bool {
 	return int(s.tickCountF+s.nextAddTime) > s.tickCount &&
 		(!s.paused || s.step || s.oldTickCount >= s.tickCount)
 }
-func (s *System) tickInterpola() float32 {
+
+// This divides a frame into fractions for the purpose of drawing position interpolation
+func (s *System) tickInterpolation() float32 {
 	if s.tickNextFrame() {
 		return 1
+	} else {
+		return s.tickCountF - s.lastTick + s.nextAddTime
 	}
-	return s.tickCountF - s.lastTick + s.nextAddTime
 }
+
 func (s *System) addFrameTime(t float32) bool {
 	if s.debugPaused() {
 		s.oldNextAddTime = 0
@@ -1221,6 +1230,7 @@ func (s *System) posReset() {
 	}
 }
 func (s *System) action() {
+	// Clear sprite data
 	s.spritesLayerN1 = s.spritesLayerN1[:0]
 	s.spritesLayerU = s.spritesLayerU[:0]
 	s.spritesLayer0 = s.spritesLayer0[:0]
@@ -1237,6 +1247,7 @@ func (s *System) action() {
 	s.debugcsize = s.debugcsize[:0]
 	s.debugch = s.debugch[:0]
 	s.clsnText = nil
+
 	var x, y, scl float32 = s.cam.Pos[0], s.cam.Pos[1], s.cam.Scale / s.cam.BaseScale()
 	s.cam.ResetTracking()
 
@@ -1684,7 +1695,7 @@ func (s *System) action() {
 	explUpdate(&s.explodsLayer1, false)
 	if s.tickNextFrame() {
 		spd := s.gameSpeed * s.accel
-		if s.postMatchFlg {
+		if s.postMatchFlg || s.step {
 			spd = 1
 		} else if !s.gsf(GSF_nokoslow) && s.time != 0 && s.intro < 0 && s.slowtime > 0 {
 			spd *= s.lifebar.ro.slow_speed
