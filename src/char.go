@@ -9066,10 +9066,12 @@ func (cl *CharList) collisionDetection() {
 	sortedOrder = append(sortedOrder, soNum...)
 
 	// Push detection for players
-	// This must happen before hit detection
-	// https://github.com/ikemen-engine/Ikemen-GO/issues/1941
+	// The way this is set up avoids checking the same player pairs twice in the loop
+	// This must happen before hit detection - https://github.com/ikemen-engine/Ikemen-GO/issues/1941
 	for i := 0; i < len(cl.runOrder); i++ {
-		cl.pushDetection(cl.runOrder[sortedOrder[i]])
+		for j := i + 1; j < len(cl.runOrder); j++ {
+			cl.pushDetection(cl.runOrder[j])
+		}
 	}
 	// Hit detection for players
 	for i := 0; i < len(cl.runOrder); i++ {
