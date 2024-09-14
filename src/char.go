@@ -7914,9 +7914,6 @@ func (cl *CharList) action() {
 	for i := 0; i < len(cl.runOrder); i++ {
 		cl.runOrder[i].actionFinish()
 	}
-
-	// Update chars
-	sys.charUpdate()
 }
 
 func (cl *CharList) xScreenBound() {
@@ -7926,6 +7923,7 @@ func (cl *CharList) xScreenBound() {
 		c.xScreenBound()
 	}
 }
+
 func (cl *CharList) update() {
 	ro := make([]*Char, len(cl.runOrder))
 	copy(ro, cl.runOrder)
@@ -7934,6 +7932,7 @@ func (cl *CharList) update() {
 		c.track()
 	}
 }
+
 func (cl *CharList) hitDetection(getter *Char, proj bool) {
 	if getter.scf(SCF_standby) || getter.scf(SCF_disabled) {
 		return // Stop entire function if getter is disabled

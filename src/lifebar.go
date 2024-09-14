@@ -3944,10 +3944,7 @@ func (l *Lifebar) step() {
 			i-- // -1 as the slice just got shorter
 		} else {
 			l.textsprite[i].Draw()
-			// "sys.step" shouldn't be needed here in theory
-			// But it fixes text persisting between frames when framestepping in slow game speeds
-			// TODO: More definitive solution?
-			if sys.tickNextFrame() || sys.step {
+			if sys.tickNextFrame() {
 				if l.textsprite[i].removetime > 0 {
 					l.textsprite[i].removetime--
 				}
