@@ -871,9 +871,10 @@ type SprData struct {
 	fLength     float32
 	window      [4]float32
 }
+
 type DrawList []*SprData
 
-func (dl *DrawList) add(sd *SprData, sc, salp int32, so, ro [2]float32, soy, fo float32) {
+func (dl *DrawList) add(sd *SprData) {
 	if sys.frameSkip || sd.anim == nil || sd.anim.spr == nil {
 		return
 	}
@@ -899,13 +900,8 @@ func (dl *DrawList) add(sd *SprData, sc, salp int32, so, ro [2]float32, soy, fo 
 	*dl = append(*dl, nil)
 	copy((*dl)[i+1:], (*dl)[i:])
 	(*dl)[i] = sd
-	if sc != 0 {
-		if sd.oldVer {
-			soy *= 1.5
-		}
-		sys.shadows.add(&ShadowSprite{sd, sc, salp, [2]float32{so[0], soy + so[1]}, ro, fo})
-	}
 }
+
 func (dl DrawList) draw(x, y, scl float32) {
 	for _, s := range dl {
 		s.anim.srcAlpha, s.anim.dstAlpha = int16(s.alpha[0]), int16(s.alpha[1])
@@ -975,6 +971,7 @@ func (sl *ShadowList) add(ss *ShadowSprite) {
 	copy((*sl)[i+1:], (*sl)[i:])
 	(*sl)[i] = ss
 }
+
 func (sl ShadowList) draw(x, y, scl float32) {
 	for _, s := range sl {
 		intensity := sys.stage.sdw.intensity
@@ -1038,6 +1035,7 @@ func (sl ShadowList) draw(x, y, scl float32) {
 		}
 	}
 }
+
 func (sl ShadowList) drawReflection(x, y, scl float32) {
 	for _, s := range sl {
 		if s.alpha[0] < 0 {

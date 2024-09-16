@@ -1084,7 +1084,8 @@ func (ai *AfterImage) recAndCue(sd *SprData, rec bool, hitpause bool, layer int3
 			ai.palfx[i/ai.framegap-1].remap = sd.fx.remap
 			sprs.add(&SprData{&img.anim, &ai.palfx[i/ai.framegap-1], img.pos,
 				img.scl, ai.alpha, sd.priority - 2, img.rot, img.ascl,
-				false, sd.bright, sd.oldVer, sd.facing, sd.posLocalscl, img.projection, img.fLength, sd.window}, 0, 0, [2]float32{0, 0}, [2]float32{0, 0}, 0, 0)
+				false, sd.bright, sd.oldVer, sd.facing, sd.posLocalscl, img.projection, img.fLength, sd.window})
+			// Afterimages don't cast shadows or reflections
 		}
 	}
 	if rec || hitpause && ai.ignorehitpause {
@@ -1401,10 +1402,7 @@ func (e *Explod) update(oldVer bool, playerNo int) {
 		anglerot[0] *= -1
 		anglerot[2] *= -1
 	}
-	sdwalp := 255 - alp[1]
-	if sdwalp < 0 {
-		sdwalp = 256
-	}
+
 	if fLength <= 0 {
 		fLength = 2048
 	}
@@ -1415,10 +1413,20 @@ func (e *Explod) update(oldVer bool, playerNo int) {
 	rot.yangle = anglerot[2]
 	e.drawPos = [2]float32{(e.pos[0] + e.offset[0] + off[0] + e.interpolate_pos[0]) * e.localscl, (e.pos[1] + e.offset[1] + off[1] + e.interpolate_pos[1]) * e.localscl}
 	var ewin = [4]float32{e.window[0] * e.localscl * facing, e.window[1] * e.localscl * e.vfacing, e.window[2] * e.localscl * facing, e.window[3] * e.localscl * e.vfacing}
-	sprs.add(&SprData{e.anim, pfx, e.drawPos, [...]float32{(facing * scale[0]) * e.localscl,
+	// Add sprite to draw list
+	sd := &SprData{e.anim, pfx, e.drawPos, [...]float32{(facing * scale[0]) * e.localscl,
 		(e.vfacing * scale[1]) * e.localscl}, alp, e.sprpriority, rot, [...]float32{1, 1},
-		e.space == Space_screen, playerNo == sys.superplayer, oldVer, facing, 1, int32(e.projection), fLength, ewin},
-		e.shadow[0]<<16|e.shadow[1]&0xff<<8|e.shadow[2]&0xff, sdwalp, [2]float32{0, 0}, [2]float32{0, 0}, 0, 0)
+		e.space == Space_screen, playerNo == sys.superplayer, oldVer, facing, 1, int32(e.projection), fLength, ewin}
+	sprs.add(sd)
+	// Add shadow if color is not 0
+	sc := e.shadow[0]<<16|e.shadow[1]&0xff<<8|e.shadow[2]&0xff
+	if sc != 0 {
+		sdwalp := 255 - alp[1]
+		if sdwalp < 0 {
+			sdwalp = 256
+		}
+		sys.shadows.add(&ShadowSprite{sd, sc, sdwalp, [2]float32{0, 0}, [2]float32{0, 0}, 0})
+	}
 	if sys.tickNextFrame() {
 
 		//if e.space == Space_screen && e.bindtime == 0 {
@@ -1915,14 +1923,22 @@ func (p *Projectile) cueDraw(oldVer bool, playerNo int) {
 	} else if p.layerno < 0 {
 		sprs = &sys.spritesLayerN1
 	}
-	var c = sys.chars[playerNo][0]
 	if p.ani != nil {
+		// Add sprite to draw list
 		sd := &SprData{p.ani, p.palfx, [...]float32{p.drawPos[0] * p.localscl, p.drawPos[1] * p.localscl},
 			[...]float32{p.facing * p.scale[0] * p.localscl, p.scale[1] * p.localscl}, [2]int32{-1},
 			p.sprpriority, Rotation{p.facing * p.angle, 0, 0}, [...]float32{1, 1}, false, playerNo == sys.superplayer,
 			sys.cgi[playerNo].mugenver[0] != 1, p.facing, 1, 0, 0, [4]float32{0, 0, 0, 0}}
-		p.aimg.recAndCue(sd, sys.tickNextFrame() && notpause, false, p.layerno)
-		sprs.add(sd, p.shadow[0]<<16|p.shadow[1]&255<<8|p.shadow[2]&255, 256, c.shadowOffset, c.reflectOffset, 0, 0)
+		p.aimg.recAndCue(sd, sys.tickNextFrame() && notpause, false, p.layerno) // Record afterimage
+		sprs.add(sd)
+		// Add a shadow if color is not 0
+		sc := p.shadow[0]<<16|p.shadow[1]&255<<8|p.shadow[2]&255
+		if sc != 0 {
+			var c = sys.chars[playerNo][0]
+			sys.shadows.add(&ShadowSprite{sd, sc, 256, c.shadowOffset, c.reflectOffset, 0})
+			// TODO: Should projectiles use same shadow and reflection offsets as their parents?
+			//sys.shadows.add(&ShadowSprite{sd, sc, 256, [2]float32{0, 0}, [2]float32{0, 0}, 0})
+		}
 	}
 }
 
@@ -7690,17 +7706,7 @@ func (c *Char) cueDraw() {
 			}
 		}
 		rec := sys.tickNextFrame() && c.acttmp > 0
-		sdf := func() *SprData {
-			sd := &SprData{c.anim, c.getPalfx(), pos,
-				scl, c.alpha, c.sprPriority, Rotation{agl, 0, 0}, c.angleScale, false,
-				c.playerNo == sys.superplayer, c.gi().mugenver[0] != 1, c.facing,
-				c.localcoord / sys.chars[c.animPN][0].localcoord, // https://github.com/ikemen-engine/Ikemen-GO/issues/1459 and 1778
-				0, 0, [4]float32{0, 0, 0, 0}}
-			if !c.csf(CSF_trans) {
-				sd.alpha[0] = -1
-			}
-			return sd
-		}
+
 		//if rec {
 		//	c.aimg.recAfterImg(sdf(), c.hitPause())
 		//}
@@ -7709,12 +7715,22 @@ func (c *Char) cueDraw() {
 		//	c.setCSF(CSF_trans)
 		//	c.alpha = [...]int32{255, 0}
 		//}
-		sd := sdf()
-		c.aimg.recAndCue(sd, rec, sys.tickNextFrame() && c.hitPause(), c.layerNo)
+
+		// Get sprite data
+		sd := &SprData{c.anim, c.getPalfx(), pos,
+			scl, c.alpha, c.sprPriority, Rotation{agl, 0, 0}, c.angleScale, false,
+			c.playerNo == sys.superplayer, c.gi().mugenver[0] != 1, c.facing,
+			c.localcoord / sys.chars[c.animPN][0].localcoord, // https://github.com/ikemen-engine/Ikemen-GO/issues/1459 and 1778
+			0, 0, [4]float32{0, 0, 0, 0}}
+		if !c.csf(CSF_trans) {
+			sd.alpha[0] = -1
+		}
 		// Hitshake effect
 		if c.ghv.hitshaketime > 0 && c.ss.time&1 != 0 {
 			sd.pos[0] -= c.facing
 		}
+		// Record afterimage
+		c.aimg.recAndCue(sd, rec, sys.tickNextFrame() && c.hitPause(), c.layerNo)
 		// Draw char according to layer number
 		sprs := &sys.spritesLayer0
 		if c.layerNo > 0 {
@@ -7725,14 +7741,26 @@ func (c *Char) cueDraw() {
 			sprs = &sys.spritesLayerU
 		}
 		if !c.asf(ASF_invisible) {
-			var sc, sa int32 = -1, 255
+			var sc, salp int32 = -1, 255
 			if c.asf(ASF_noshadow) {
 				sc = 0
 			}
 			if c.csf(CSF_trans) {
-				sa = 255 - c.alpha[1]
+				salp = 255 - c.alpha[1]
 			}
-			sprs.add(sd, sc, sa, c.shadowOffset, c.reflectOffset, c.size.shadowoffset, c.offsetY())
+			// Add sprite to draw list
+			sprs.add(sd)
+			// Add shadow if color is not 0
+			if sc != 0 {
+				soy := c.size.shadowoffset
+				if sd.oldVer {
+					soy *= 1.5 // TODO: Test this
+				}
+				sys.shadows.add(&ShadowSprite{sd, sc, salp,
+					[2]float32{c.shadowOffset[0], c.shadowOffset[1] + soy}, // Shadow offset
+					[2]float32{0, c.size.shadowoffset}, // Reflection offset
+					c.offsetY()}) // Fade offset
+			}
 		}
 	}
 	if sys.tickNextFrame() {

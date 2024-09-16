@@ -1688,7 +1688,7 @@ func (s *System) action() {
 	if s.superanim != nil {
 		s.spritesLayer1.add(&SprData{s.superanim, &s.superpmap, s.superpos,
 			[...]float32{s.superfacing, 1}, [2]int32{-1}, 5, Rotation{}, [2]float32{},
-			false, true, s.cgi[s.superplayer].mugenver[0] != 1, 1, 1, 0, 0, [4]float32{0, 0, 0, 0}}, 0, 0, [2]float32{0, 0}, [2]float32{0, 0}, 0, 0)
+			false, true, s.cgi[s.superplayer].mugenver[0] != 1, 1, 1, 0, 0, [4]float32{0, 0, 0, 0})
 		if s.superanim.loopend {
 			s.superanim = nil
 		}
@@ -1796,8 +1796,7 @@ func (s *System) draw(x, y, scl float32) {
 		// Draw character sprites with special under flag
 		s.spritesLayerU.draw(x, y, scl*s.cam.BaseScale())
 
-		// Draw shadows
-		// Draw reflections on layer 0
+		// Draw shadows and reflections on layer 0
 		// TODO: Make shadows render in same layers as their sources?
 		if !s.gsf(GSF_globalnoshadow) {
 			if s.stage.reflection.intensity > 0 && s.stage.reflectionlayerno >= 0 {
