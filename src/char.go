@@ -8402,13 +8402,14 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 			if hd.guardflag&int32(HF_H) != 0 && getter.ss.stateType == ST_S ||
 				hd.guardflag&int32(HF_L) != 0 && getter.ss.stateType == ST_C ||
 				hd.guardflag&int32(HF_A) != 0 && getter.ss.stateType == ST_A { // Statetype L is left out here
+				// Switch kill flag to guard if attempting to guard correctly
+				getter.ghv.kill = hd.guard_kill
 				// We only switch to guard behavior if the enemy can survive guarding the attack
 				if getter.life > getter.computeDamage(float64(hd.guarddamage), hd.guard_kill, false, attackMul[0], c, true) ||
 					sys.gsf(GSF_globalnoko) || getter.asf(ASF_noko) || getter.asf(ASF_noguardko) {
 					hitType = 2
 				} else {
 					getter.ghv.cheeseKO = true // TODO: find a better name then expose this variable
-				getter.ghv.kill = hd.guard_kill
 				}
 			}
 		}
