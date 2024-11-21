@@ -3873,6 +3873,72 @@ func triggerFunctions(l *lua.LState) {
 		l.Push(lua.LNumber(sys.debugWC.helperId))
 		return 1
 	})
+	luaRegister(l, "hitbyattr", func(*lua.LState) int {
+		flg := int32(0)
+		input := strings.ToLower(strArg(l, 1))
+		// Split input at the commas
+		attr := strings.Split(input, ",")
+		if len(attr) < 2 {
+			l.RaiseError("Attribute must contain at least two flags separated by ','")
+			return 0
+		}
+		// Get SCA attribute
+		attrsca := strings.TrimSpace(attr[0])
+		for _, letter := range attrsca {
+			switch letter {
+			case 's':
+				flg |= int32(ST_S)
+			case 'c':
+				flg |= int32(ST_C)
+			case 'a':
+				flg |= int32(ST_A)
+			default:
+				l.RaiseError("Invalid attribute: %c", letter)
+				return 0
+			}
+		}
+		// Get attack type attributes
+		for i := 1; i < len(attr); i++ {
+			attrtype := strings.TrimSpace(attr[i])
+			switch attrtype {
+			case "na":
+				flg |= int32(AT_NA)
+			case "nt":
+				flg |= int32(AT_NT)
+			case "np":
+				flg |= int32(AT_NP)
+			case "sa":
+				flg |= int32(AT_SA)
+			case "st":
+				flg |= int32(AT_ST)
+			case "sp":
+				flg |= int32(AT_SP)
+			case "ha":
+				flg |= int32(AT_HA)
+			case "ht":
+				flg |= int32(AT_HT)
+			case "hp":
+				flg |= int32(AT_HP)
+			case "aa":
+				flg |= int32(AT_AA)
+			case "at":
+				flg |= int32(AT_AT)
+			case "ap":
+				flg |= int32(AT_AP)
+			case "n":
+				flg |= int32(AT_NA | AT_NT | AT_NP)
+			case "s":
+				flg |= int32(AT_SA | AT_ST | AT_SP)
+			case "h", "a":
+				flg |= int32(AT_HA | AT_HT | AT_HP)
+			default:
+				l.RaiseError("Invalid attribute: %s", attrtype)
+				return 0
+			}
+		}
+		l.Push(lua.LBool(sys.debugWC.hitByAttrTrigger(flg)))
+		return 1
+	})
 	luaRegister(l, "hitcount", func(*lua.LState) int {
 		l.Push(lua.LNumber(sys.debugWC.hitCount))
 		return 1

@@ -6901,23 +6901,11 @@ func (c *Char) clsnCheck(getter *Char, charbox, getterbox int32, reqcheck, trigg
 		getterangle)
 }
 
-func (c *Char) hitByAttrCheck(attr int32, gstyp StateType) bool {
-	// Get state type (SCA) from among the attributes
-	styp := attr & int32(ST_MASK)
-	// Note: In Mugen, invincibility is checked against both the Hitdef attribute and the enemy's actual statetype
-	// Ikemen characters work as documented. Invincibility only cares about the Hitdef's attributes (including its statetype)
-	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
-		if gstyp == ST_N {
-			styp = attr & int32(ST_MASK)
-		} else {
-			styp = int32(gstyp)
-		}
-	}
-
+func (c *Char) hitByAttrCheck(attr, attrsca int32) bool {
 	hit := true
 	for _, hb := range c.hitby {
 		if hb.time != 0 {
-			if hb.flag&styp == 0 || hb.flag&attr&^int32(ST_MASK) == 0 {
+			if hb.flag&attrsca == 0 || hb.flag&attr&^int32(ST_MASK) == 0 {
 				hit = false
 				if hb.stack { // Stack parameter makes the hit happen if any HitBy slot would allow it
 					continue
@@ -6932,6 +6920,17 @@ func (c *Char) hitByAttrCheck(attr int32, gstyp StateType) bool {
 		}
 	}
 	return hit
+}
+
+func (c *Char) hitByAttrTrigger(attr int32) bool {
+	// Unhittable timer invalidates all hits
+	if c.unhittableTime > 0 {
+		return false
+	}
+	// Get state type (SCA) from among the attributes
+	attrsca := attr & int32(ST_MASK)
+
+	return c.hitByAttrCheck(attr, attrsca)
 }
 
 func (c *Char) hitByPlayerNoCheck(getterno int) bool {
@@ -6989,8 +6988,8 @@ func (c *Char) hitByPlayerIdCheck(getterid int32) bool {
 // Check if Hitdef attributes can hit a player
 func (c *Char) attrCheck(ghd *HitDef, getter *Char, gstyp StateType) bool {
 
-	// Invalid Hitdef attributes
-	if ghd.attr <= 0 {
+	// Invalid attributes
+	if ghd.attr <= 0 && ghd.reversal_attr <= 0 {
 		return false
 	}
 
@@ -7005,6 +7004,9 @@ func (c *Char) attrCheck(ghd *HitDef, getter *Char, gstyp StateType) bool {
 			}
 		}
 	}
+
+	// https://github.com/ikemen-engine/Ikemen-GO/issues/308
+	//if ghd.chainid < 0 {
 
 	// Reversaldef vs Hitdef attributes check
 	if ghd.reversal_attr > 0 {
@@ -7036,11 +7038,21 @@ func (c *Char) attrCheck(ghd *HitDef, getter *Char, gstyp StateType) bool {
 		return false
 	}
 
-	// https://github.com/ikemen-engine/Ikemen-GO/issues/308
-	//if ghd.chainid < 0 {
+	// Get state type (SCA) from among the Hitdef attributes
+	attrsca := ghd.attr & int32(ST_MASK)
+	// Note: In Mugen, invincibility is checked against the enemy's actual statetype instead of the Hitdef's SCA attribute
+	// Exception for projectiles, where it respects the SCA attribute
+	// Ikemen characters work as documented. Invincibility only cares about the Hitdef's SCA attribute
+	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+		if gstyp == ST_N { // Projectiles mostly
+			attrsca = ghd.attr & int32(ST_MASK)
+		} else {
+			attrsca = int32(gstyp)
+		}
+	}
 
 	// HitBy and NotHitBy checks
-	if !c.hitByAttrCheck(ghd.attr, gstyp) {
+	if !c.hitByAttrCheck(ghd.attr, attrsca) {
 		return false
 	}
 	if !c.hitByPlayerNoCheck(getter.playerNo) {

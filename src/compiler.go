@@ -244,6 +244,7 @@ var triggerMap = map[string]int{
 	"gametime":          1,
 	"gamewidth":         1,
 	"gethitvar":         1,
+	"hitbyattr":        1,
 	"hitcount":          1,
 	"hitdefattr":        1,
 	"hitfall":           1,
@@ -2339,6 +2340,20 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		out.append(OC_ex_, OC_ex_helperindexexist)
 	case "hitcount":
 		out.append(OC_hitcount)
+	case "hitbyattr":
+		if err := c.checkOpeningBracket(in); err != nil {
+			return bvNone(), err
+		}
+		if attr, err := c.trgAttr(in); err != nil {
+			return bvNone(), err
+		} else {
+			out.append(OC_ex2_)
+			out.appendI32Op(OC_ex2_hitbyattr, attr)
+		}
+		c.token = c.tokenizer(in)
+		if err := c.checkClosingBracket(); err != nil {
+			return bvNone(), err
+		}
 	case "hitdefattr":
 		hda := func() error {
 			if attr, err := c.trgAttr(in); err != nil {
@@ -2895,7 +2910,6 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		out.append(be1...)
 	case "random":
 		out.append(OC_random)
-
 	case "reversaldefattr":
 		hda := func() error {
 			if attr, err := c.trgAttr(in); err != nil {
