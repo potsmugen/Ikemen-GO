@@ -2404,6 +2404,12 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			opc = OC_ex2_hitdefvar_hitdamage
 		case "guarddamage":
 			opc = OC_ex2_hitdefvar_guarddamage
+		case "p1stateno":
+			opc = OC_ex2_hitdefvar_p1stateno
+		case "p2stateno":
+			opc = OC_ex2_hitdefvar_p2stateno
+		case "priority":
+			opc = OC_ex2_hitdefvar_priority
 		default:
 			return bvNone(), Error("Invalid data: " + c.token)
 		}

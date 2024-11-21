@@ -3684,6 +3684,12 @@ func triggerFunctions(l *lua.LState) {
 			l.Push(lua.LNumber(c.hitdef.hitdamage))
 		case "guarddamage":
 			l.Push(lua.LNumber(c.hitdef.guarddamage))
+		case "p1stateno":
+			l.Push(lua.LNumber(c.hitdef.p1stateno))
+		case "p2stateno":
+			l.Push(lua.LNumber(c.hitdef.p2stateno))
+		case "priority":
+			l.Push(lua.LNumber(c.hitdef.priority))
 		default:
 			l.RaiseError("\nInvalid argument: %v\n", strArg(l, 1))
 		}
