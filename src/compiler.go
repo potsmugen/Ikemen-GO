@@ -5945,11 +5945,11 @@ func (c *Compiler) paramTrans(is IniSection, sc *StateControllerBase,
 			case TT_add:
 				exp = sc.iToExp(255, 255)
 			case TT_add1:
-				exp = sc.iToExp(255, ^255)
+				exp = sc.iToExp(255, 128)
 			case TT_sub:
-				exp = sc.iToExp(1, 255)
+				exp = sc.iToExp(255, 255)
 			default:
-				exp = sc.iToExp(-1, 0)
+				exp = sc.iToExp(255, 0)
 			}
 		}
 		sc.add(id, exp)

@@ -349,6 +349,7 @@ func readBackGround(is IniSection, link *backGround,
 	}
 	switch strings.ToLower(is["trans"]) {
 	case "add":
+		bg.anim.trans = TT_add
 		bg.anim.mask = 0
 		bg.anim.srcAlpha = 255
 		bg.anim.dstAlpha = 255
@@ -356,11 +357,9 @@ func readBackGround(is IniSection, link *backGround,
 		if is.readI32ForStage("alpha", &s, &d) {
 			bg.anim.srcAlpha = int16(Clamp(s, 0, 255))
 			bg.anim.dstAlpha = int16(Clamp(d, 0, 255))
-			if bg.anim.srcAlpha == 1 && bg.anim.dstAlpha == 255 {
-				bg.anim.srcAlpha = 0
-			}
 		}
 	case "add1":
+		bg.anim.trans = TT_add1
 		bg.anim.mask = 0
 		bg.anim.srcAlpha = 255
 		bg.anim.dstAlpha = ^255
@@ -371,20 +370,20 @@ func readBackGround(is IniSection, link *backGround,
 			bg.anim.dstAlpha = int16(Clamp(d, 0, 255))
 		}
 	case "addalpha":
+		bg.anim.trans = TT_alpha
 		bg.anim.mask = 0
 		s, d := int32(bg.anim.srcAlpha), int32(bg.anim.dstAlpha)
 		if is.readI32ForStage("alpha", &s, &d) {
 			bg.anim.srcAlpha = int16(Clamp(s, 0, 255))
 			bg.anim.dstAlpha = int16(Clamp(d, 0, 255))
-			if bg.anim.srcAlpha == 1 && bg.anim.dstAlpha == 255 {
-				bg.anim.srcAlpha = 0
-			}
 		}
 	case "sub":
+		bg.anim.trans = TT_sub
 		bg.anim.mask = 0
 		bg.anim.srcAlpha = 1
 		bg.anim.dstAlpha = 255
 	case "none":
+		bg.anim.trans = TT_none
 		bg.anim.srcAlpha = -1
 		bg.anim.dstAlpha = 0
 	}
@@ -3939,7 +3938,20 @@ func drawNode(mdl *Model, scene *Scene, layerNumber int, defaultLayerNumber int,
 	if n.meshIndex == nil || !n.visible || (nodeLayerNumber != layerNumber) {
 		return
 	}
-	neg, grayscale, padd, pmul, invblend, hue := mdl.pfx.getFcPalFx(false, -int(n.trans))
+
+	// Rough implementation
+	blending := TT_none
+	switch n.trans {
+	case TransAdd:
+		blending = TT_alpha
+	case TransReverseSubtract:
+		blending = TT_sub
+	case TransMul:
+		blending = TT_mul
+	}
+
+	neg, grayscale, padd, pmul, invblend, hue := mdl.pfx.getFcPalFx(false, blending)
+
 	blendEq := BlendAdd
 	src := BlendOne
 	dst := BlendOneMinusSrcAlpha

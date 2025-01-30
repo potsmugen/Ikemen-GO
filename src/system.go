@@ -2042,16 +2042,16 @@ func (s *System) draw(x, y, scl float32) {
 				}
 				c = uint32(rgb[2] | rgb[1]<<8 | rgb[0]<<16)
 			}
-			FillRect(s.scrrect, c, 0xff)
+			FillRect(s.scrrect, c, TT_alpha, 0xff)
 		}
 
 		// Draw normal stage background fill and elements with layerNo == -1
 		if !s.gsf(GSF_nobg) {
 			if s.stage.debugbg {
-				FillRect(s.scrrect, 0xff00ff, 0xff)
+				FillRect(s.scrrect, 0xff00ff, TT_alpha, 0xff)
 			} else {
 				c = uint32(s.stage.bgclearcolor[2]&0xff | s.stage.bgclearcolor[1]&0xff<<8 | s.stage.bgclearcolor[0]&0xff<<16)
-				FillRect(s.scrrect, c, 0xff)
+				FillRect(s.scrrect, c, TT_alpha, 0xff)
 			}
 			if s.stage.ikemenver[0] != 0 || s.stage.ikemenver[1] != 0 { // This layer did not render in Mugen
 				s.stage.draw(-1, bgx, bgy, scl)
@@ -2126,7 +2126,7 @@ func (s *System) draw(x, y, scl float32) {
 	}
 	// Draw EnvColor effect
 	if s.envcol_time != 0 {
-		FillRect(s.scrrect, ecol, 255)
+		FillRect(s.scrrect, ecol, TT_alpha, 255)
 	}
 
 	// Draw character sprites in layer 0
@@ -2154,25 +2154,25 @@ func (s *System) drawTop() {
 	// Draw Clsn boxes
 	if s.clsnDisplay {
 		s.clsnSpr.Pal[0] = 0xff0000ff
-		s.debugc1hit.draw(0x3feff)
+		s.debugc1hit.draw(TT_alpha, 0x3feff)
 		s.clsnSpr.Pal[0] = 0xff0040c0
-		s.debugc1rev.draw(0x3feff)
+		s.debugc1rev.draw(TT_alpha, 0x3feff)
 		s.clsnSpr.Pal[0] = 0xff000080
-		s.debugc1not.draw(0x3feff)
+		s.debugc1not.draw(TT_alpha, 0x3feff)
 		s.clsnSpr.Pal[0] = 0xffff0000
-		s.debugc2.draw(0x3feff)
+		s.debugc2.draw(TT_alpha, 0x3feff)
 		s.clsnSpr.Pal[0] = 0xff808000
-		s.debugc2hb.draw(0x3feff)
+		s.debugc2hb.draw(TT_alpha, 0x3feff)
 		s.clsnSpr.Pal[0] = 0xff004000
-		s.debugc2mtk.draw(0x3feff)
+		s.debugc2mtk.draw(TT_alpha, 0x3feff)
 		s.clsnSpr.Pal[0] = 0xffc00040
-		s.debugc2grd.draw(0x3feff)
+		s.debugc2grd.draw(TT_alpha, 0x3feff)
 		s.clsnSpr.Pal[0] = 0xff404040
-		s.debugc2stb.draw(0x3feff)
+		s.debugc2stb.draw(TT_alpha, 0x3feff)
 		s.clsnSpr.Pal[0] = 0xff303030
-		s.debugcsize.draw(0x3feff)
+		s.debugcsize.draw(TT_alpha, 0x3feff)
 		s.clsnSpr.Pal[0] = 0xffffffff
-		s.debugch.draw(0x3feff)
+		s.debugch.draw(TT_alpha, 0x3feff)
 	}
 }
 

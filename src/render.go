@@ -164,7 +164,8 @@ type RenderParams struct {
 	xas, yas       float32
 	rot            Rotation
 	tint           uint32 // Sprite tint for shadows
-	trans          int32  // Transparency blending
+	trans          TransType // Transparency blending
+	alpha          int32
 	mask           int32  // Mask for transparency
 	pfx            *PalFX
 	window         *[4]int32
@@ -421,17 +422,26 @@ func RenderSprite(rp RenderParams) {
 
 	rmInitSub(&rp)
 
-	neg, grayscale, padd, pmul, invblend, hue := false, float32(0), [3]float32{0, 0, 0}, [3]float32{1, 1, 1}, int32(0), float32(0)
-	tint := [4]float32{float32(rp.tint&0xff) / 255, float32(rp.tint>>8&0xff) / 255,
-		float32(rp.tint>>16&0xff) / 255, float32(rp.tint>>24&0xff) / 255}
+	neg := false
+	grayscale := float32(0)
+	padd := [3]float32{0, 0, 0}
+	pmul := [3]float32{1, 1, 1}
+	invblend := int32(0)
+	hue := float32(0)
+
+	tint := [4]float32{
+		float32(rp.tint&0xff) / 255,
+		float32(rp.tint>>8&0xff) / 255,
+		float32(rp.tint>>16&0xff) / 255,
+		float32(rp.tint>>24&0xff) / 255,
+	}
 
 	if rp.pfx != nil {
-		blending := rp.trans
-		//if rp.trans == -2 || rp.trans == -1 || (rp.trans&0xff > 0 && rp.trans>>10&0xff >= 255) {
+		//if rp.alpha == -2 || rp.alpha == -1 || (rp.alpha&0xff > 0 && rp.alpha>>10&0xff >= 255) {
 		//	blending = true
 		//}
-		neg, grayscale, padd, pmul, invblend, hue = rp.pfx.getFcPalFx(false, int(blending))
-		//if rp.trans == -2 && invblend < 1 {
+		neg, grayscale, padd, pmul, invblend, hue = rp.pfx.getFcPalFx(false, rp.trans)
+		//if rp.alpha == -2 && invblend < 1 {
 		//padd[0], padd[1], padd[2] = -padd[0], -padd[1], -padd[2]
 		//}
 	}
@@ -469,11 +479,11 @@ func RenderSprite(rp RenderParams) {
 		gfx.ReleasePipeline()
 	}
 
-	renderWithBlending(render, rp.trans, rp.paltex != nil, invblend, &neg, &padd, &pmul, rp.paltex == nil)
+	renderWithBlending(render, rp.trans, rp.alpha, rp.paltex != nil, invblend, &neg, &padd, &pmul, rp.paltex == nil)
 	gfx.DisableScissor()
 }
 
-func renderWithBlending(render func(eq BlendEquation, src, dst BlendFunc, a float32), trans int32, correctAlpha bool, invblend int32, neg *bool, acolor *[3]float32, mcolor *[3]float32, isrgba bool) {
+func renderWithBlending(render func(eq BlendEquation, src, dst BlendFunc, a float32), blend TransType, trans int32, correctAlpha bool, invblend int32, neg *bool, acolor *[3]float32, mcolor *[3]float32, isrgba bool) {
 	blendSourceFactor := BlendSrcAlpha
 	if !correctAlpha {
 		blendSourceFactor = BlendOne
@@ -485,8 +495,10 @@ func renderWithBlending(render func(eq BlendEquation, src, dst BlendFunc, a floa
 		BlendI = BlendAdd
 	}
 	switch {
-	// Add (255, 255)
-	case trans == -1:
+
+	// Add blend mode(255,255)
+	//case trans == -1:
+	case blend == TT_add:
 		if invblend >= 1 && acolor != nil {
 			(*acolor)[0], (*acolor)[1], (*acolor)[2] = -acolor[0], -acolor[1], -acolor[2]
 		}
@@ -495,8 +507,9 @@ func renderWithBlending(render func(eq BlendEquation, src, dst BlendFunc, a floa
 		}
 		render(Blend, blendSourceFactor, BlendOne, 1)
 
-	// Sub
-	case trans == -2:
+	// Sub blend mode
+	//case trans == -2:
+	case blend == TT_sub:
 		if invblend >= 1 && acolor != nil {
 			(*acolor)[0], (*acolor)[1], (*acolor)[2] = -acolor[0], -acolor[1], -acolor[2]
 		}
@@ -513,7 +526,7 @@ func renderWithBlending(render func(eq BlendEquation, src, dst BlendFunc, a floa
 		Blend = BlendAdd
 		if !isrgba && (invblend >= 2 || invblend <= -1) && acolor != nil && mcolor != nil {
 			src, dst := trans&0xff, trans>>10&0xff
-			// Summ of add components
+			// Sum of add components
 			gc := AbsF(acolor[0]) + AbsF(acolor[1]) + AbsF(acolor[2])
 			v3, al := MaxF((gc*255)-float32(dst+src), 512)/128, (float32(src+dst) / 255)
 			rM, gM, bM := mcolor[0]*al, mcolor[1]*al, mcolor[2]*al
@@ -563,7 +576,7 @@ func renderWithBlending(render func(eq BlendEquation, src, dst BlendFunc, a floa
 	}
 }
 
-func FillRect(rect [4]int32, color uint32, trans int32) {
+func FillRect(rect [4]int32, color uint32, blend TransType, trans int32) {
 	r := float32(color>>16&0xff) / 255
 	g := float32(color>>8&0xff) / 255
 	b := float32(color&0xff) / 255
@@ -588,5 +601,5 @@ func FillRect(rect [4]int32, color uint32, trans int32) {
 		gfx.SetUniformF("tint", r, g, b, a)
 		gfx.RenderQuad()
 		gfx.ReleasePipeline()
-	}, trans, true, 0, nil, nil, nil, false)
+	}, blend, trans, true, 0, nil, nil, nil, false)
 }

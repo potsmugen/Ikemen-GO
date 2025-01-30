@@ -24,6 +24,7 @@ const (
 	TT_alpha
 	TT_add1
 	TT_sub
+	TT_mul
 )
 
 type PalFXDef struct {
@@ -93,9 +94,9 @@ func (pf *PalFX) clear() {
 	pf.clear2(false)
 }
 
-func (pf *PalFX) getSynFx(blending int) *PalFX {
+func (pf *PalFX) getSynFx(blending TransType) *PalFX {
 	if pf == nil || !pf.enable {
-		if blending == -2 && sys.allPalFX.enable {
+		if blending == TT_sub && sys.allPalFX.enable {
 			if pf == nil {
 				pf = newPalFX()
 			}
@@ -169,7 +170,7 @@ func (pf *PalFX) getFxPal(pal []uint32, neg bool) []uint32 {
 	return sys.workpal
 }
 
-func (pf *PalFX) getFcPalFx(transNeg bool, blending int) (neg bool, grayscale float32,
+func (pf *PalFX) getFcPalFx(transNeg bool, blending TransType) (neg bool, grayscale float32,
 	add, mul [3]float32, invblend int32, hue float32) {
 	p := pf.getSynFx(blending)
 	if !p.enable {
@@ -307,7 +308,7 @@ func (pf *PalFX) step() {
 	}
 }
 
-func (pf *PalFX) synthesize(pfx *PalFX, blending int) {
+func (pf *PalFX) synthesize(pfx PalFX, blending TransType) {
 	if blending == -2 {
 		for i, a := range pfx.eAdd {
 			pf.eAdd[i] = Clamp(pf.eAdd[i]-Abs(a), 0, 255)
@@ -1236,17 +1237,18 @@ func (s *Sprite) Draw(x, y, xscale, yscale float32, rxadd float32, rot Rotation,
 		xbs:            xscale * sys.widthScale,
 		ys:             yscale * sys.heightScale,
 		vs:             1,
-		rxadd:          rxadd,
+		rxadd:          0,
 		xas:            1,
 		yas:            1,
-		rot:            rot,
+		rot:            Rotation{angle, 0, 0},
 		tint:           0,
-		trans:          sys.brightness*255>>8 | 1<<9,
+		trans:          TT_none,
+		alpha:          sys.brightness * 255 >> 8 | 1 << 9,
 		mask:           0,
 		pfx:            fx,
 		window:         window,
-		rcx:            rcx,
-		rcy:            rcy,
+		rcx:            0,
+		rcy:            0,
 		projectionMode: 0,
 		fLength:        0,
 		xOffset:        -xscale * float32(s.Offset[0]),
