@@ -161,17 +161,38 @@ type Texture_GL32 struct {
 	handle uint32
 }
 
-// Generate a new texture name
+// Grab a texture from the pool
 func (r *Renderer_GL32) newTexture(width, height, depth int32, filter bool) (t Texture) {
 	var h uint32
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.GenTextures(1, &h)
+	var maxpool int = 256
+	// Max pool expands automatically so that it never drops a sprite
+	// 256 is an arbitrary value. Could perhaps be a system config
+
+	// Increase pool size if it runs out
+	if len(r.texturePool) == 0 {
+		newHandles := make([]uint32, maxpool)
+		gl.GenTextures(int32(maxpool), &newHandles[0]) // Fill the pool with new textures in one go
+		r.texturePool = append(r.texturePool, newHandles...)
+	}
+
+	// Select and remove a texture from the pool
+	h = r.texturePool[len(r.texturePool)-1]
+	r.texturePool = r.texturePool[:len(r.texturePool)-1]
+
 	t = &Texture_GL32{width, height, depth, filter, h}
 	runtime.SetFinalizer(t, func(t *Texture_GL32) {
 		sys.mainThreadTask <- func() {
-			gl.DeleteTextures(1, &t.handle)
+			if len(r.texturePool) < maxpool {
+				// Return texture to pool
+				r.texturePool = append(r.texturePool, t.handle)
+			} else {
+				// Otherwise delete it
+				gl.DeleteTextures(1, &t.handle)
+			}
+			sys.appendToConsole(fmt.Sprintf("Current texture pool size: %v", len(r.texturePool)))
 		}
 	})
+
 	return
 }
 
@@ -334,6 +355,9 @@ type Renderer_GL32 struct {
 	cubemapFilteringShader  *ShaderProgram_GL32
 	stageVertexBuffer       uint32
 	stageIndexBuffer        uint32
+	texturePool             []uint32
+
+	// Exclusive to GL32
 	vao                     uint32
 
 	enableModel  bool
