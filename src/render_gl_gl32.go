@@ -63,9 +63,11 @@ func (r *Renderer_GL32) newShaderProgram(vert, frag, geo, id string, crashWhenFa
 	s.t = make(map[string]int)
 	return s, nil
 }
+
 func (r *ShaderProgram_GL32) glStr(s string) *uint8 {
 	return gl.Str(s + "\x00")
 }
+
 func (s *ShaderProgram_GL32) RegisterAttributes(names ...string) {
 	for _, name := range names {
 		s.a[name] = gl.GetAttribLocation(s.program, s.glStr(name))
@@ -161,51 +163,78 @@ type Texture_GL32 struct {
 	handle uint32
 }
 
-// Grab a texture from the pool
-func (r *Renderer_GL32) newTexture(width, height, depth int32, filter bool) (t Texture) {
-	var h uint32
-	var maxpool int = 256
-	// Max pool expands automatically so that it never drops a sprite
-	// 256 is an arbitrary value. Could perhaps be a system config
 
-	// Increase pool size if it runs out
+// Grab a texture from the pool
+func (r *Renderer_GL32) getTextureFromPool() uint32 {
+	var h uint32
+	const chunk int = 100
+
+	// Init the reference pool size if necessary
+	if r.texturePoolMax == 0 {
+		r.texturePoolMax = chunk
+	}
+
+	// Throw more textures into the pool when they run out
 	if len(r.texturePool) == 0 {
-		newHandles := make([]uint32, maxpool)
-		gl.GenTextures(int32(maxpool), &newHandles[0]) // Fill the pool with new textures in one go
+		newHandles := make([]uint32, chunk)
+		gl.GenTextures(int32(chunk), &newHandles[0]) // Fill the pool with a lot of new textures in one go
 		r.texturePool = append(r.texturePool, newHandles...)
+		r.texturePoolMiss++
+	} else {
+		r.texturePoolHit++
+	}
+
+	// Update reference size after a good sample size is reached
+	if (r.texturePoolHit + r.texturePoolMiss) > 10 * chunk {
+		if r.texturePoolMiss > 0 {
+			r.texturePoolMax += chunk
+		} else {
+			r.texturePoolMax = MaxI(chunk, r.texturePoolMax - chunk)
+		}
+		// Reset statistics
+		r.texturePoolHit = 0
+		r.texturePoolMiss = 0
+		sys.appendToConsole(fmt.Sprintf("Adjusted maximum pool size to %v", r.texturePoolMax))
 	}
 
 	// Select and remove a texture from the pool
 	h = r.texturePool[len(r.texturePool)-1]
 	r.texturePool = r.texturePool[:len(r.texturePool)-1]
 
-	t = &Texture_GL32{width, height, depth, filter, h}
+	return h
+}
+
+
+func (r *Renderer_GL32) newTexture(width, height, depth int32, filter bool) Texture {
+	h := r.getTextureFromPool()
+	t := &Texture_GL32{width, height, depth, filter, h}
+
+	// Recycle texture if it's under the current pool limit. Otherwise remove it
 	runtime.SetFinalizer(t, func(t *Texture_GL32) {
 		sys.mainThreadTask <- func() {
-			if len(r.texturePool) < maxpool {
-				// Return texture to pool
+			if len(r.texturePool) < r.texturePoolMax {
 				r.texturePool = append(r.texturePool, t.handle)
 			} else {
-				// Otherwise delete it
 				gl.DeleteTextures(1, &t.handle)
 			}
-			sys.appendToConsole(fmt.Sprintf("Current texture pool size: %v", len(r.texturePool)))
 		}
 	})
 
-	return
+	return t
 }
 
 func (r *Renderer_GL32) newDataTexture(width, height int32) (t Texture) {
-	var h uint32
 	gl.ActiveTexture(gl.TEXTURE0)
-	gl.GenTextures(1, &h)
+
+	h := r.getTextureFromPool()
 	t = &Texture_GL32{width, height, 32, false, h}
+
 	runtime.SetFinalizer(t, func(t *Texture_GL32) {
 		sys.mainThreadTask <- func() {
 			gl.DeleteTextures(1, &t.handle)
 		}
 	})
+
 	gl.BindTexture(gl.TEXTURE_2D, h)
 	//gl.TexImage2D(gl.TEXTURE_2D, 0, 32, t.width, t.height, 0, 36, gl.FLOAT, nil)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
@@ -214,11 +243,13 @@ func (r *Renderer_GL32) newDataTexture(width, height int32) (t Texture) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 	return
 }
+
 func (r *Renderer_GL32) newHDRTexture(width, height int32) (t Texture) {
-	var h uint32
 	gl.ActiveTexture(gl.TEXTURE0)
-	gl.GenTextures(1, &h)
+
+	h := r.getTextureFromPool()
 	t = &Texture_GL32{width, height, 24, false, h}
+
 	runtime.SetFinalizer(t, func(t *Texture_GL32) {
 		sys.mainThreadTask <- func() {
 			gl.DeleteTextures(1, &t.handle)
@@ -232,11 +263,13 @@ func (r *Renderer_GL32) newHDRTexture(width, height int32) (t Texture) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT)
 	return
 }
+
 func (r *Renderer_GL32) newCubeMapTexture(widthHeight int32, mipmap bool) (t Texture) {
-	var h uint32
 	gl.ActiveTexture(gl.TEXTURE0)
-	gl.GenTextures(1, &h)
+
+	h := r.getTextureFromPool()
 	t = &Texture_GL32{widthHeight, widthHeight, 24, false, h}
+
 	runtime.SetFinalizer(t, func(t *Texture_GL32) {
 		sys.mainThreadTask <- func() {
 			gl.DeleteTextures(1, &t.handle)
@@ -281,6 +314,7 @@ func (t *Texture_GL32) SetData(data []byte) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 }
+
 func (t *Texture_GL32) SetDataG(data []byte, mag, min, ws, wt int32) {
 
 	format := t.MapInternalFormat(Max(t.depth, 8))
@@ -294,12 +328,14 @@ func (t *Texture_GL32) SetDataG(data []byte, mag, min, ws, wt int32) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, ws)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wt)
 }
+
 func (t *Texture_GL32) SetPixelData(data []float32) {
 
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, t.width, t.height, 0, gl.RGBA, gl.FLOAT, unsafe.Pointer(&data[0]))
 }
+
 func (t *Texture_GL32) SetRGBPixelData(data []float32) {
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
@@ -355,13 +391,17 @@ type Renderer_GL32 struct {
 	cubemapFilteringShader  *ShaderProgram_GL32
 	stageVertexBuffer       uint32
 	stageIndexBuffer        uint32
+	// Model options
+	enableModel  bool
+	enableShadow bool
+	// Texture pool
 	texturePool             []uint32
-
+	texturePoolHit          int
+	texturePoolMiss         int
+	texturePoolMax          int
 	// Exclusive to GL32
 	vao                     uint32
 
-	enableModel  bool
-	enableShadow bool
 }
 
 func (r *Renderer_GL32) GetName() string {
@@ -670,6 +710,7 @@ func (r *Renderer_GL32) BlendReset() {
 	gl.BlendEquation(r.MapBlendEquation(BlendAdd))
 	gl.BlendFunc(r.MapBlendFunction(BlendSrcAlpha), r.MapBlendFunction(BlendOneMinusSrcAlpha))
 }
+
 func (r *Renderer_GL32) EndFrame() {
 	// tell GL to use our vertex array object
 	// this'll be where our quad is stored
@@ -848,6 +889,7 @@ func (r *Renderer_GL32) prepareShadowMapPipeline() {
 	gl.FramebufferTexture(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, r.fbo_shadow_cube_texture, 0)
 	gl.Clear(gl.DEPTH_BUFFER_BIT)
 }
+
 func (r *Renderer_GL32) setShadowMapPipeline(doubleSided, invertFrontFace, useUV, useNormal, useTangent, useVertColor, useJoint0, useJoint1 bool, numVertices, vertAttrOffset uint32) {
 	if invertFrontFace {
 		gl.FrontFace(gl.CW)
@@ -961,6 +1003,7 @@ func (r *Renderer_GL32) ReleaseShadowPipeline() {
 	gl.Disable(gl.CULL_FACE)
 	gl.Disable(gl.BLEND)
 }
+
 func (r *Renderer_GL32) prepareModelPipeline(env *Environment) {
 	gl.UseProgram(r.modelShader.program)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, r.fbo)
@@ -1017,6 +1060,7 @@ func (r *Renderer_GL32) prepareModelPipeline(env *Environment) {
 		gl.Uniform1f(loc, 0)
 	}
 }
+
 func (r *Renderer_GL32) SetModelPipeline(eq BlendEquation, src, dst BlendFunc, depthTest, depthMask, doubleSided, invertFrontFace, useUV, useNormal, useTangent, useVertColor, useJoint0, useJoint1 bool, numVertices, vertAttrOffset uint32) {
 	if depthTest {
 		gl.Enable(gl.DEPTH_TEST)
@@ -1120,6 +1164,7 @@ func (r *Renderer_GL32) SetModelPipeline(eq BlendEquation, src, dst BlendFunc, d
 		gl.VertexAttrib4f(uint32(loc), 0, 0, 0, 0)
 	}
 }
+
 func (r *Renderer_GL32) ReleaseModelPipeline() {
 	loc := r.modelShader.a["vertexId"]
 	gl.DisableVertexAttribArray(uint32(loc))
@@ -1221,6 +1266,7 @@ func (r *Renderer_GL32) SetModelUniformF(name string, values ...float32) {
 		gl.Uniform4f(loc, values[0], values[1], values[2], values[3])
 	}
 }
+
 func (r *Renderer_GL32) SetModelUniformFv(name string, values []float32) {
 	loc := r.modelShader.u[name]
 	switch len(values) {
@@ -1234,6 +1280,7 @@ func (r *Renderer_GL32) SetModelUniformFv(name string, values []float32) {
 		gl.Uniform4fv(loc, 2, &values[0])
 	}
 }
+
 func (r *Renderer_GL32) SetModelUniformMatrix(name string, value []float32) {
 	loc := r.modelShader.u[name]
 	gl.UniformMatrix4fv(loc, 1, false, &value[0])
@@ -1270,6 +1317,7 @@ func (r *Renderer_GL32) SetShadowMapUniformF(name string, values ...float32) {
 		gl.Uniform4f(loc, values[0], values[1], values[2], values[3])
 	}
 }
+
 func (r *Renderer_GL32) SetShadowMapUniformFv(name string, values []float32) {
 	loc := r.shadowMapShader.u[name]
 	switch len(values) {
@@ -1283,6 +1331,7 @@ func (r *Renderer_GL32) SetShadowMapUniformFv(name string, values []float32) {
 		gl.Uniform4fv(loc, 2, &values[0])
 	}
 }
+
 func (r *Renderer_GL32) SetShadowMapUniformMatrix(name string, value []float32) {
 	loc := r.shadowMapShader.u[name]
 	gl.UniformMatrix4fv(loc, 1, false, &value[0])
@@ -1309,10 +1358,12 @@ func (r *Renderer_GL32) SetVertexData(values ...float32) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
 	gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
 }
+
 func (r *Renderer_GL32) SetStageVertexData(values []byte) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, r.stageVertexBuffer)
 	gl.BufferData(gl.ARRAY_BUFFER, len(values), unsafe.Pointer(&values[0]), gl.STATIC_DRAW)
 }
+
 func (r *Renderer_GL32) SetStageIndexData(values ...uint32) {
 	data := new(bytes.Buffer)
 	binary.Write(data, binary.LittleEndian, values)
@@ -1324,6 +1375,7 @@ func (r *Renderer_GL32) SetStageIndexData(values ...uint32) {
 func (r *Renderer_GL32) RenderQuad() {
 	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
+
 func (r *Renderer_GL32) RenderElements(mode PrimitiveMode, count, offset int) {
 	gl.DrawElementsWithOffset(r.MapPrimitiveMode(mode), int32(count), gl.UNSIGNED_INT, uintptr(offset))
 }
@@ -1358,6 +1410,7 @@ func (r *Renderer_GL32) RenderCubeMap(envTex Texture, cubeTex Texture) {
 	gl.BindTexture(gl.TEXTURE_CUBE_MAP, cubeTexture.handle)
 	gl.GenerateMipmap(gl.TEXTURE_CUBE_MAP)
 }
+
 func (r *Renderer_GL32) RenderFilteredCubeMap(distribution int32, cubeTex Texture, filteredTex Texture, mipmapLevel, sampleCount int32, roughness float32) {
 	cubeTexture := cubeTex.(*Texture_GL32)
 	filteredTexture := filteredTex.(*Texture_GL32)
@@ -1399,6 +1452,7 @@ func (r *Renderer_GL32) RenderFilteredCubeMap(distribution int32, cubeTex Textur
 	}
 	gl.BindFramebuffer(gl.FRAMEBUFFER, r.fbo)
 }
+
 func (r *Renderer_GL32) RenderLUT(distribution int32, cubeTex Texture, lutTex Texture, sampleCount int32) {
 	cubeTexture := cubeTex.(*Texture_GL32)
 	lutTexture := lutTex.(*Texture_GL32)
