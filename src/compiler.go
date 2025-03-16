@@ -720,7 +720,7 @@ func (c *Compiler) attr(text string, hitdef bool) (int32, error) {
 				(a < 'a' || a > 'z') {
 				return flg, nil
 			}
-			return 0, Error("Invalid value: " + string(a))
+			return 0, Error("Invalid attr value: " + string(a))
 		}
 	}
 	//hitdefflg := flg
@@ -767,7 +767,7 @@ func (c *Compiler) attr(text string, hitdef bool) (int32, error) {
 				//}
 				return flg, nil
 			}
-			return 0, Error("Invalid value: " + a)
+			return 0, Error("Invalid attr value: " + a)
 		}
 		//if i == 0 {
 		//	hitdefflg = flg
@@ -803,7 +803,7 @@ func (c *Compiler) trgAttr(in *string) (int32, error) {
 		case 'A', 'a':
 			flg |= int32(ST_A)
 		default:
-			return 0, Error("Invalid attribute value: " + att)
+			return 0, Error("Invalid attr value: " + att)
 		}
 	}
 	for len(*in) > 0 && (*in)[0] == ',' {
@@ -911,7 +911,7 @@ func (c *Compiler) intRange(in *string) (minop OpCode, maxop OpCode,
 	case "[":
 		minop = OC_ge
 	default:
-		err = Error("Missing '[' or '('")
+		err = Error("Range missing '[' or '('")
 		return
 	}
 	var intf func(in *string) (int32, error)
@@ -924,7 +924,7 @@ func (c *Compiler) intRange(in *string) (minop OpCode, maxop OpCode,
 				c.token = c.tokenizer(in)
 			}
 			if len(c.token) == 0 || c.token[0] < '0' || c.token[0] > '9' {
-				return 0, Error("Error reading number")
+				return 0, Error("Error reading range number")
 			}
 			i := Atoi(c.token)
 			if minus {
@@ -947,7 +947,7 @@ func (c *Compiler) intRange(in *string) (minop OpCode, maxop OpCode,
 		c.token = c.tokenizer(in)
 	}
 	if c.token != "," {
-		err = Error("Missing ','")
+		err = Error("Range missing ','")
 		return
 	}
 	if max, err = intf(in); err != nil {
@@ -967,7 +967,7 @@ func (c *Compiler) intRange(in *string) (minop OpCode, maxop OpCode,
 	case "]":
 		maxop = OC_le
 	default:
-		err = Error("Missing ']' or ')'")
+		err = Error("Range missing ']' or ')'")
 		return
 	}
 	c.token = c.tokenizer(in)
@@ -1190,7 +1190,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		*in = (*in)[i+1:]
 		return nil
 	}
-	eqne := func(f func() error) error {
+	eqne := func(f func() error) error { // Equal, not equal
 		not, err := c.checkEquality(in)
 		if err != nil {
 			return err
@@ -1286,7 +1286,20 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		}
 		c.token = c.tokenizer(in)
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			switch opc {
+			case OC_partner, OC_enemy, OC_enemynear:
+				be1.appendValue(BytecodeInt(0))
+			case OC_root:
+				return bvNone(), Error("Missing ',' after Root")
+			case OC_parent:
+				return bvNone(), Error("Missing ',' after Parent")
+			case OC_p2:
+				return bvNone(), Error("Missing ',' after P2")
+			case OC_stateowner:
+				return bvNone(), Error("Missing ',' after StateOwner")
+			default:
+				return bvNone(), Error("Missing ','")
+			}
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expValue(&be2, in, true); err != nil {
@@ -1328,15 +1341,15 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		} else {
 			switch opc {
 			case OC_partner, OC_enemy, OC_enemynear:
-				be1.appendValue(BytecodeInt(0))
+				be1.appendValue(BytecodeInt(0)) // Argument is optional for these
 			case OC_player:
-				return bvNone(), Error("Missing '(' after player")
+				return bvNone(), Error("Missing '(' after Player")
 			case OC_playerid:
-				return bvNone(), Error("Missing '(' after playerid")
+				return bvNone(), Error("Missing '(' after PlayerID")
 			case OC_playerindex:
-				return bvNone(), Error("Missing '(' after playerindex")
+				return bvNone(), Error("Missing '(' after PlayerIndex")
 			case OC_helperindex:
-				return bvNone(), Error("Missing '(' after helperindex")
+				return bvNone(), Error("Missing '(' after HelperIndex")
 			}
 		}
 		if rd {
@@ -1344,7 +1357,24 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		}
 		out.append(be1...)
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			switch opc {
+			case OC_partner:
+				return bvNone(), Error("Missing ',' after Partner")
+			case OC_enemy:
+				return bvNone(), Error("Missing ',' after Enemy")
+			case OC_enemynear:
+				return bvNone(), Error("Missing ',' after EnemyNear")
+			case OC_player:
+				return bvNone(), Error("Missing ',' after Player")
+			case OC_playerid:
+				return bvNone(), Error("Missing '(' after PlayerID")
+			case OC_playerindex:
+				return bvNone(), Error("Missing '(' after PlayerIndex")
+			case OC_helperindex:
+				return bvNone(), Error("Missing '(' after HelperIndex")
+			default:
+				return bvNone(), Error("Missing ','")
+			}
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expValue(&be2, in, true); err != nil {
@@ -1395,7 +1425,14 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		}
 		out.append(be1...)
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			switch opc {
+			case OC_helper:
+				return bvNone(), Error("Missing ',' after Helper")
+			case OC_target:
+				return bvNone(), Error("Missing ',' after Target")
+			default:
+				return bvNone(), Error("Missing ','")
+			}
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expValue(&be2, in, true); err != nil {
@@ -1490,14 +1527,22 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			if cond {
+				return bvNone(), Error("Missing ',' in Cond")
+			} else {
+				return bvNone(), Error("Missing ',' in IfElse")
+			}
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			if cond {
+				return bvNone(), Error("Missing ',' in Cond")
+			} else {
+				return bvNone(), Error("Missing ',' in IfElse")
+			}
 		}
 		c.token = c.tokenizer(in)
 		if bv3, err = c.expBoolOr(&be3, in); err != nil {
@@ -1638,7 +1683,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "y":
 			out.append(OC_camerapos_y)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid CameraPos argument: " + c.token)
 		}
 	case "camerazoom":
 		out.append(OC_camerazoom)
@@ -1661,14 +1706,14 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		}
 		c.token = c.tokenizer(in)
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in ClsnOverlap")
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in ClsnOverlap")
 		}
 		c.token = c.tokenizer(in)
 		c2type := c.token
@@ -1716,7 +1761,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		c.token = c.tokenizer(in)
 
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in ClsnVar")
 		}
 		c.token = c.tokenizer(in)
 
@@ -1736,7 +1781,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "bottom":
 			opc = OC_ex2_clsnvar_bottom
 		default:
-			return bvNone(), Error(fmt.Sprint("Invalid argument: %s", vname))
+			return bvNone(), Error(fmt.Sprint("Invalid ClsnVar argument: %s", vname))
 		}
 		c.token = c.tokenizer(in)
 
@@ -2110,14 +2155,14 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in ExplodVar")
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in ExplodVar")
 		}
 		c.token = c.tokenizer(in)
 
@@ -2153,7 +2198,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "z":
 				opc = OC_ex2_explodvar_pos_z
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ExplodVar pos argument: %s", c.token))
 			}
 		case "vel":
 			c.token = c.tokenizer(in)
@@ -2166,7 +2211,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "z":
 				opc = OC_ex2_explodvar_vel_z
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ExplodVar vel argument: %s", c.token))
 			}
 		case "accel":
 			c.token = c.tokenizer(in)
@@ -2179,7 +2224,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "z":
 				opc = OC_ex2_explodvar_accel_z
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ExplodVar accel argument: %s", c.token))
 			}
 		case "friction":
 			c.token = c.tokenizer(in)
@@ -2192,7 +2237,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "z":
 				opc = OC_ex2_explodvar_friction_z
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ExplodVar friction argument: %s", c.token))
 			}
 		case "scale":
 			c.token = c.tokenizer(in)
@@ -2203,7 +2248,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "y":
 				opc = OC_ex2_explodvar_scale_y
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ExplodVar scale argument: %s", c.token))
 			}
 		case "angle":
 			c.token = c.tokenizer(in)
@@ -2216,10 +2261,10 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case ")":
 				opc = OC_ex2_explodvar_angle
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ExplodVar angle argument: %s", c.token))
 			}
 		default:
-			return bvNone(), Error(fmt.Sprint("Invalid argument: %s", vname))
+			return bvNone(), Error(fmt.Sprint("Invalid ExplodVar angle argument: %s", vname))
 		}
 		if opc != OC_ex2_explodvar_angle {
 			c.token = c.tokenizer(in)
@@ -2441,7 +2486,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 				opc = OC_ex_gethitvar_guardflag
 				isFlag = 2
 			default:
-				return bvNone(), Error("Invalid data: " + c.token)
+				return bvNone(), Error("Invalid GetHitVar argument: " + c.token)
 			}
 		}
 		c.token = c.tokenizer(in)
@@ -2590,7 +2635,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "guardsound.number":
 			opc = OC_ex2_hitdefvar_guardsound_number
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid HitDefVar argument: " + c.token)
 		}
 		if isFlag {
 			if err := eqne(func() error {
@@ -2626,7 +2671,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "z":
 			out.append(OC_hitvel_z)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid HitVel argument: " + c.token)
 		}
 	case "id":
 		out.append(OC_id)
@@ -2674,7 +2719,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		trname := c.token
 		if err := eqne2(func(not bool) error {
 			if len(c.token) == 0 {
-				return Error(trname + " value is not specified")
+				return Error(trname + " trigger requires a comparison")
 			}
 			var mt MoveType
 			switch c.token[0] {
@@ -2685,7 +2730,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case 'h':
 				mt = MT_H
 			default:
-				return Error("Invalid value: " + c.token)
+				return Error("Invalid MoveType: " + c.token)
 			}
 			if trname == "prevmovetype" {
 				out.append(OC_ex_, OC_ex_prevmovetype, OpCode(mt>>15))
@@ -2773,7 +2818,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "all.invertblend":
 			out.append(OC_ex2_palfxvar_all_invertblend)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid PalFXVar argument: " + c.token)
 		}
 		c.token = c.tokenizer(in)
 		if err := c.checkClosingBracket(); err != nil {
@@ -2843,7 +2888,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "z":
 			out.append(OC_ex_, OC_ex_pos_z)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid Pos argument: " + c.token)
 		}
 	case "power":
 		out.append(OC_power)
@@ -2886,14 +2931,14 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in ProjVar")
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in ProjVar")
 		}
 		c.token = c.tokenizer(in)
 
@@ -2916,7 +2961,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "b":
 				opc = OC_ex2_projvar_projshadow_b
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ProjVar shadow argument: %s", c.token))
 			}
 		case "projmisstime":
 			opc = OC_ex2_projvar_projmisstime
@@ -2945,7 +2990,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "z":
 				opc = OC_ex2_projvar_vel_z
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ProjVar vel argument: %s", c.token))
 			}
 		case "velmul":
 			c.token = c.tokenizer(in)
@@ -2958,7 +3003,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "z":
 				opc = OC_ex2_projvar_velmul_z
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ProjVar velmul argument: %s", c.token))
 			}
 		case "remvelocity":
 			c.token = c.tokenizer(in)
@@ -2971,7 +3016,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "z":
 				opc = OC_ex2_projvar_remvelocity_z
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ProjVar remvelocity argument: %s", c.token))
 			}
 		case "accel":
 			c.token = c.tokenizer(in)
@@ -2984,7 +3029,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "z":
 				opc = OC_ex2_projvar_accel_z
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ProjVar accel argument: %s", c.token))
 			}
 		case "scale":
 			c.token = c.tokenizer(in)
@@ -2995,7 +3040,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "y":
 				opc = OC_ex2_projvar_projscale_y
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ProjVar scale argument: %s", c.token))
 			}
 		case "angle":
 			opc = OC_ex2_projvar_projangle
@@ -3010,7 +3055,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "z":
 				opc = OC_ex2_projvar_pos_z
 			default:
-				return bvNone(), Error(fmt.Sprint("Invalid argument: %s", c.token))
+				return bvNone(), Error(fmt.Sprint("Invalid ProjVar angle argument: %s", c.token))
 			}
 		case "projsprpriority":
 			opc = OC_ex2_projvar_projsprpriority
@@ -3043,7 +3088,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "facing":
 			opc = OC_ex2_projvar_facing
 		default:
-			return bvNone(), Error(fmt.Sprint("Invalid argument: %s", vname))
+			return bvNone(), Error(fmt.Sprint("Invalid ProjVar argument: %s", vname))
 		}
 
 		c.token = c.tokenizer(in)
@@ -3138,7 +3183,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "y":
 			out.append(OC_screenpos_y)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid ScreenPos argument: " + c.token)
 		}
 	case "screenwidth":
 		out.append(OC_screenwidth)
@@ -3155,7 +3200,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in SoundVar")
 		}
 		c.token = c.tokenizer(in)
 
@@ -3190,7 +3235,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "volumescale":
 			opc = OC_ex2_soundvar_volumescale
 		default:
-			return bvNone(), Error(fmt.Sprint("Invalid argument: %s", vname))
+			return bvNone(), Error(fmt.Sprint("Invalid SoundVar argument: %s", vname))
 		}
 
 		c.token = c.tokenizer(in)
@@ -3233,7 +3278,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		trname := c.token
 		if err := eqne2(func(not bool) error {
 			if len(c.token) == 0 {
-				return Error(trname + " value is not specified")
+				return Error(trname + " trigger requires a comparison")
 			}
 			var st StateType
 			switch c.token[0] {
@@ -3246,7 +3291,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case 'l':
 				st = ST_L
 			default:
-				return Error("Invalid value: " + c.token)
+				return Error("Invalid StateType: " + c.token)
 			}
 			if trname == "prevstatetype" {
 				out.append(OC_ex_, OC_ex_prevstatetype, OpCode(st))
@@ -3273,7 +3318,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in StageBGVar")
 		}
 		// Second argument
 		c.token = c.tokenizer(in)
@@ -3282,7 +3327,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in StageBGVar")
 		}
 		// Third argument
 		c.token = c.tokenizer(in)
@@ -3466,7 +3511,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "reflection.color.b":
 			opc = OC_const_stagevar_reflection_color_b
 		default:
-			return bvNone(), Error("Invalid data: " + svname)
+			return bvNone(), Error("Invalid StageVar argument: " + svname)
 		}
 		if isStr {
 			if err := nameSub(OC_const_, opc); err != nil {
@@ -3479,7 +3524,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 	case "teammode":
 		if err := eqne(func() error {
 			if len(c.token) == 0 {
-				return Error("teammode value is not specified")
+				return Error("TeamMode trigger requires a comparison")
 			}
 			var tm TeamMode
 			switch c.token {
@@ -3492,7 +3537,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case "tag":
 				tm = TM_Tag
 			default:
-				return Error("Invalid value: " + c.token)
+				return Error("Invalid TeamMode: " + c.token)
 			}
 			out.append(OC_teammode, OpCode(tm))
 			return nil
@@ -3523,7 +3568,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "z":
 			out.append(OC_ex_, OC_ex_vel_z)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid Vel argument: " + c.token)
 		}
 	case "win":
 		out.append(OC_ex_, OC_ex_win)
@@ -3541,7 +3586,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		if not, err := c.checkEquality(in); err != nil {
 			return bvNone(), err
 		} else if not && !sys.ignoreMostErrors {
-			return bvNone(), Error("animelem doesn't support '!='")
+			return bvNone(), Error("AnimElem doesn't support '!='")
 		}
 		if c.token == "-" {
 			return bvNone(), Error("'-' should not be used")
@@ -3550,7 +3595,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if n <= 0 {
-			return bvNone(), Error("animelem must be greater than 0")
+			return bvNone(), Error("AnimElem must be greater than 0")
 		}
 		be1.appendValue(BytecodeInt(n))
 		if rd {
@@ -3568,7 +3613,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		if not, err := c.checkEquality(in); err != nil {
 			return bvNone(), err
 		} else if not && !sys.ignoreMostErrors {
-			return bvNone(), Error("timemod doesn't support '!='")
+			return bvNone(), Error("TimeMod doesn't support '!='")
 		}
 		if c.token == "-" {
 			return bvNone(), Error("'-' should not be used")
@@ -3577,7 +3622,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if n <= 0 {
-			return bvNone(), Error("timemod must be greater than 0")
+			return bvNone(), Error("TimeMod must be greater than 0")
 		}
 		out.append(OC_time)
 		out.appendValue(BytecodeInt(n))
@@ -3596,7 +3641,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "z":
 			out.append(OC_ex_, OC_ex_p2dist_z)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid P2Dist argument: " + c.token)
 		}
 	case "p2bodydist":
 		c.token = c.tokenizer(in)
@@ -3608,7 +3653,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "z":
 			out.append(OC_ex_, OC_ex_p2bodydist_z)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid P2BodyDist argument: " + c.token)
 		}
 	case "rootdist":
 		c.token = c.tokenizer(in)
@@ -3620,7 +3665,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "z":
 			out.append(OC_ex_, OC_ex_rootdist_z)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid RootDist argument: " + c.token)
 		}
 	case "parentdist":
 		c.token = c.tokenizer(in)
@@ -3632,7 +3677,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "z":
 			out.append(OC_ex_, OC_ex_parentdist_z)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid ParentDist argument: " + c.token)
 		}
 	case "pi":
 		bv = BytecodeFloat(float32(math.Pi))
@@ -3658,7 +3703,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in Log")
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
@@ -3725,7 +3770,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in Max")
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
@@ -3755,7 +3800,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in Min")
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
@@ -3785,7 +3830,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in RandomRange")
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
@@ -3810,7 +3855,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in Round")
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
@@ -3840,14 +3885,14 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in Clamp")
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in Clamp")
 		}
 		c.token = c.tokenizer(in)
 		if bv3, err = c.expBoolOr(&be3, in); err != nil {
@@ -3879,7 +3924,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in ATan2")
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
@@ -3924,14 +3969,14 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in Lerp")
 		}
 		c.token = c.tokenizer(in)
 		if bv2, err = c.expBoolOr(&be2, in); err != nil {
 			return bvNone(), err
 		}
 		if c.token != "," {
-			return bvNone(), Error("Missing ','")
+			return bvNone(), Error("Missing ',' in Lerp")
 		}
 		c.token = c.tokenizer(in)
 		if bv3, err = c.expBoolOr(&be3, in); err != nil {
@@ -4029,7 +4074,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "roundrestarted":
 			out.append(OC_ex2_debug_roundrestarted)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid Debug trigger argument: " + c.token)
 		}
 		c.token = c.tokenizer(in)
 		if err := c.checkClosingBracket(); err != nil {
@@ -4359,7 +4404,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "skipwindisplay":
 			out.appendI32Op(OC_ex_isassertedglobal, int32(GSF_skipwindisplay))
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid AssertSpecial flag: " + c.token)
 		}
 		c.token = c.tokenizer(in)
 		if err := c.checkClosingBracket(); err != nil {
@@ -4431,7 +4476,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "winscreen":
 			opc = OC_ex2_motifstate_winscreen
 		default:
-			return bvNone(), Error("Invalid data: " + msname)
+			return bvNone(), Error("Invalid MotifState argument: " + msname)
 		}
 		out.append(OC_ex2_)
 		out.append(opc)
@@ -4475,7 +4520,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 	case "physics":
 		if err := eqne(func() error {
 			if len(c.token) == 0 {
-				return Error("physics value not specified")
+				return Error("Physics trigger requires a comparison")
 			}
 			var st StateType
 			switch c.token[0] {
@@ -4488,7 +4533,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			case 'n':
 				st = ST_N
 			default:
-				return Error("Invalid value: " + c.token)
+				return Error("Invalid Physics type: " + c.token)
 			}
 			out.append(OC_ex_, OC_ex_physics, OpCode(st))
 			return nil
@@ -4541,7 +4586,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			strings.ToLower(c.token))))
 		*in = strings.TrimSpace(*in)
 		if len(*in) == 0 || (!sys.ignoreMostErrors && (*in)[0] != ')') {
-			return bvNone(), Error("Missing ')' before " + c.token)
+			return bvNone(), Error("StageConst missing ')' before " + c.token)
 		}
 		*in = (*in)[1:]
 	case "stagefrontedgedist", "stagefrontedge": // Latter is deprecated
@@ -4597,7 +4642,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "z":
 			out.append(OC_ex_, OC_ex_scale_z)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid Scale trigger argument: " + c.token)
 		}
 	case "offset":
 		c.token = c.tokenizer(in)
@@ -4607,7 +4652,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "y":
 			out.append(OC_ex_, OC_ex_offset_y)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid Offset trigger argument: " + c.token)
 		}
 	case "alpha":
 		c.token = c.tokenizer(in)
@@ -4617,7 +4662,7 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 		case "dest":
 			out.append(OC_ex_, OC_ex_alpha_d)
 		default:
-			return bvNone(), Error("Invalid data: " + c.token)
+			return bvNone(), Error("Invalid Alpha trigger argument: " + c.token)
 		}
 	case "=", "!=", ">", ">=", "<", "<=", "&", "&&", "^", "^^", "|", "||",
 		"+", "*", "**", "/", "%":
@@ -4701,14 +4746,13 @@ func (c *Compiler) contiguousOperator(in *string) error {
 			}
 			fallthrough
 		case '=', '<', '>', '|', '&', '+', '*', '/', '%', '^':
-			return Error("Invalid data: " + c.tokenizer(in))
+			return Error("Contiguous operator: " + c.tokenizer(in))
 		}
 	}
 	return nil
 }
 
-func (c *Compiler) expPostNot(out *BytecodeExp, in *string) (BytecodeValue,
-	error) {
+func (c *Compiler) expPostNot(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	bv, err := c.expValue(out, in, false)
 	if err != nil {
 		return bvNone(), err
@@ -4758,8 +4802,7 @@ func (c *Compiler) expPostNot(out *BytecodeExp, in *string) (BytecodeValue,
 	return bv, nil
 }
 
-func (c *Compiler) expPow(out *BytecodeExp, in *string) (BytecodeValue,
-	error) {
+func (c *Compiler) expPow(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	bv, err := c.expPostNot(out, in)
 	if err != nil {
 		return bvNone(), err
@@ -4791,8 +4834,7 @@ func (c *Compiler) expPow(out *BytecodeExp, in *string) (BytecodeValue,
 	return bv, nil
 }
 
-func (c *Compiler) expMldv(out *BytecodeExp, in *string) (BytecodeValue,
-	error) {
+func (c *Compiler) expMldv(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	bv, err := c.expPow(out, in)
 	if err != nil {
 		return bvNone(), err
@@ -4820,8 +4862,7 @@ func (c *Compiler) expMldv(out *BytecodeExp, in *string) (BytecodeValue,
 	}
 }
 
-func (c *Compiler) expAdsb(out *BytecodeExp, in *string) (BytecodeValue,
-	error) {
+func (c *Compiler) expAdsb(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	bv, err := c.expMldv(out, in)
 	if err != nil {
 		return bvNone(), err
@@ -4846,8 +4887,7 @@ func (c *Compiler) expAdsb(out *BytecodeExp, in *string) (BytecodeValue,
 	}
 }
 
-func (c *Compiler) expGrls(out *BytecodeExp, in *string) (BytecodeValue,
-	error) {
+func (c *Compiler) expGrls(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	bv, err := c.expAdsb(out, in)
 	if err != nil {
 		return bvNone(), err
@@ -4967,8 +5007,7 @@ func (c *Compiler) expRange(out *BytecodeExp, in *string,
 	return true, nil
 }
 
-func (c *Compiler) expEqne(out *BytecodeExp, in *string) (BytecodeValue,
-	error) {
+func (c *Compiler) expEqne(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	bv, err := c.expGrls(out, in)
 	if err != nil {
 		return bvNone(), err
@@ -5053,13 +5092,11 @@ func (c *Compiler) expOneOp(out *BytecodeExp, in *string, ef expFunc,
 	}
 }
 
-func (c *Compiler) expAnd(out *BytecodeExp, in *string) (BytecodeValue,
-	error) {
+func (c *Compiler) expAnd(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	return c.expOneOp(out, in, c.expEqne, "&", out.and, OC_and)
 }
 
-func (c *Compiler) expXor(out *BytecodeExp, in *string) (BytecodeValue,
-	error) {
+func (c *Compiler) expXor(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	return c.expOneOp(out, in, c.expAnd, "^", out.xor, OC_xor)
 }
 
@@ -5067,8 +5104,7 @@ func (c *Compiler) expOr(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	return c.expOneOp(out, in, c.expXor, "|", out.or, OC_or)
 }
 
-func (c *Compiler) expBoolAnd(out *BytecodeExp, in *string) (BytecodeValue,
-	error) {
+func (c *Compiler) expBoolAnd(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	if c.block != nil {
 		return c.expOneOp(out, in, c.expOr, "&&", out.bland, OC_bland)
 	}
@@ -5108,13 +5144,11 @@ func (c *Compiler) expBoolAnd(out *BytecodeExp, in *string) (BytecodeValue,
 	return bv, nil
 }
 
-func (c *Compiler) expBoolXor(out *BytecodeExp, in *string) (BytecodeValue,
-	error) {
+func (c *Compiler) expBoolXor(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	return c.expOneOp(out, in, c.expBoolAnd, "^^", out.blxor, OC_blxor)
 }
 
-func (c *Compiler) expBoolOr(out *BytecodeExp, in *string) (BytecodeValue,
-	error) {
+func (c *Compiler) expBoolOr(out *BytecodeExp, in *string) (BytecodeValue, error) {
 	defer func(omp string) { c.previousOperator = omp }(c.previousOperator)
 	if c.block != nil {
 		return c.expOneOp(out, in, c.expBoolXor, "||", out.blor, OC_blor)
@@ -5177,8 +5211,7 @@ func (c *Compiler) typedExp(ef expFunc, in *string,
 	return be, nil
 }
 
-func (c *Compiler) argExpression(in *string, vt ValueType) (BytecodeExp,
-	error) {
+func (c *Compiler) argExpression(in *string, vt ValueType) (BytecodeExp, error) {
 	be, err := c.typedExp(c.expBoolOr, in, vt)
 	if err != nil {
 		return nil, err
@@ -5197,8 +5230,7 @@ func (c *Compiler) argExpression(in *string, vt ValueType) (BytecodeExp,
 	return be, nil
 }
 
-func (c *Compiler) fullExpression(in *string, vt ValueType) (BytecodeExp,
-	error) {
+func (c *Compiler) fullExpression(in *string, vt ValueType) (BytecodeExp, error) {
 	be, err := c.typedExp(c.expBoolOr, in, vt)
 	if err != nil {
 		return nil, err
@@ -5387,7 +5419,7 @@ func (c *Compiler) paramPostype(is IniSection, sc *StateControllerBase,
 	id byte) error {
 	return c.stateParam(is, "postype", false, func(data string) error {
 		if len(data) == 0 {
-			return Error("Value not specified")
+			return Error("postype not specified")
 		}
 		var pt PosType
 		if len(data) >= 2 && strings.ToLower(data[:2]) == "p2" {
@@ -5407,7 +5439,7 @@ func (c *Compiler) paramPostype(is IniSection, sc *StateControllerBase,
 			case 'n':
 				pt = PT_None
 			default:
-				return Error("Invalid value: " + data)
+				return Error("Invalid postype: " + data)
 			}
 		}
 		sc.add(id, sc.iToExp(int32(pt)))
@@ -5419,13 +5451,13 @@ func (c *Compiler) paramSpace(is IniSection, sc *StateControllerBase,
 	id byte) error {
 	return c.stateParam(is, "space", false, func(data string) error {
 		if len(data) <= 1 {
-			return Error("Value not specified")
+			return Error("space not specified")
 		}
 		var sp Space
 		if len(data) >= 2 {
-			if strings.ToLower(data[:2]) == "st" {
+			if strings.ToLower(data[:2]) == "stage" {
 				sp = Space_stage
-			} else if strings.ToLower(data[:2]) == "sc" {
+			} else if strings.ToLower(data[:2]) == "screen" {
 				sp = Space_screen
 			}
 		}
@@ -5438,7 +5470,7 @@ func (c *Compiler) paramProjection(is IniSection, sc *StateControllerBase,
 	id byte) error {
 	return c.stateParam(is, "projection", false, func(data string) error {
 		if len(data) <= 1 {
-			return Error("Value not specified")
+			return Error("projection not specified")
 		}
 		var proj Projection
 		if len(data) >= 2 {
@@ -5462,7 +5494,7 @@ func (c *Compiler) paramSaveData(is IniSection, sc *StateControllerBase,
 	id byte) error {
 	return c.stateParam(is, "savedata", false, func(data string) error {
 		if len(data) <= 1 {
-			return Error("Value not specified")
+			return Error("savedata not specified")
 		}
 		var sv SaveData
 		switch strings.ToLower(data) {
@@ -5473,7 +5505,7 @@ func (c *Compiler) paramSaveData(is IniSection, sc *StateControllerBase,
 		case "fvar":
 			sv = SaveData_fvar
 		default:
-			return Error("Invalid value: " + data)
+			return Error("Invalid savedata type: " + data)
 		}
 		sc.add(id, sc.iToExp(int32(sv)))
 		return nil
@@ -5484,7 +5516,7 @@ func (c *Compiler) paramTrans(is IniSection, sc *StateControllerBase,
 	prefix string, id byte, afterImage bool) error {
 	return c.stateParam(is, prefix+"trans", false, func(data string) error {
 		if len(data) == 0 {
-			return Error("Value not specified")
+			return Error("trans type not specified")
 		}
 		tt := TT_default
 		data = strings.ToLower(data)
@@ -5516,7 +5548,7 @@ func (c *Compiler) paramTrans(is IniSection, sc *StateControllerBase,
 				}
 			}
 			if _error && (!afterImage || !sys.ignoreMostErrors) {
-				return Error("Invalid value: " + data)
+				return Error("Invalid trans type: " + data)
 			}
 		}
 		var exp []BytecodeExp
@@ -5604,7 +5636,7 @@ func (c *Compiler) stateDef(is IniSection, sbc *StateBytecode) error {
 		sc := newStateControllerBase()
 		if err := c.stateParam(is, "type", false, func(data string) error {
 			if len(data) == 0 {
-				return Error("Value not specified")
+				return Error("statetype not specified")
 			}
 			switch strings.ToLower(data)[0] {
 			case 's':
@@ -5618,7 +5650,7 @@ func (c *Compiler) stateDef(is IniSection, sbc *StateBytecode) error {
 			case 'u':
 				sbc.stateType = ST_U
 			default:
-				return Error("Invalid value: " + data)
+				return Error("Invalid statetype: " + data)
 			}
 			return nil
 		}); err != nil {
@@ -5626,7 +5658,7 @@ func (c *Compiler) stateDef(is IniSection, sbc *StateBytecode) error {
 		}
 		if err := c.stateParam(is, "movetype", false, func(data string) error {
 			if len(data) == 0 {
-				return Error("Value not specified")
+				return Error("movetype not specified")
 			}
 			switch strings.ToLower(data)[0] {
 			case 'i':
@@ -5638,7 +5670,7 @@ func (c *Compiler) stateDef(is IniSection, sbc *StateBytecode) error {
 			case 'u':
 				sbc.moveType = MT_U
 			default:
-				return Error("Invalid value: " + data)
+				return Error("Invalid movetype: " + data)
 			}
 			return nil
 		}); err != nil {
@@ -5646,7 +5678,7 @@ func (c *Compiler) stateDef(is IniSection, sbc *StateBytecode) error {
 		}
 		if err := c.stateParam(is, "physics", false, func(data string) error {
 			if len(data) == 0 {
-				return Error("Value not specified")
+				return Error("physics not specified")
 			}
 			switch strings.ToLower(data)[0] {
 			case 's':
@@ -5660,7 +5692,7 @@ func (c *Compiler) stateDef(is IniSection, sbc *StateBytecode) error {
 			case 'u':
 				sbc.physics = ST_U
 			default:
-				return Error("Invalid value: " + data)
+				return Error("Invalid physics type: " + data)
 			}
 			return nil
 		}); err != nil {
@@ -5756,17 +5788,17 @@ func cnsStringArray(arg string) ([]string, error) {
 			}
 		}
 
-		// Do the string was closed?
+		// Was the string closed?
 		if inString != 2 {
 			if inString%2 != 0 {
-				return nil, Error("String not closed.")
+				return nil, Error("String not closed")
 			} else if inString > 2 { // Do we have more than 1 string without using ','?
-				return nil, Error("Lack of ',' separator.")
+				return nil, Error("Lack of ',' separator")
 			} else {
-				return nil, Error("Unknown string array error.")
+				return nil, Error("Unknown string array error")
 			}
 		} else if formatError {
-			return nil, Error("Wrong format on string array.")
+			return nil, Error("Wrong format on string array")
 		} else { // All's good.
 			inString = 0
 		}
@@ -5820,7 +5852,7 @@ func (c *Compiler) stateCompile(states map[int32]StateBytecode,
 	c.vars = make(map[string]uint8)
 	// Loop through state file lines
 	for ; c.i < len(c.lines); c.i++ {
-		/* Find a statedef, skipping over other lines until finding one */
+		// Find a statedef, skipping over other lines until finding one
 		// Get the current line, without comments
 		line := strings.ToLower(strings.TrimSpace(
 			strings.SplitN(c.lines[c.i], ";", 2)[0]))
@@ -5978,7 +6010,7 @@ func (c *Compiler) stateCompile(states map[int32]StateBytecode,
 
 			// Check that the sctrl has a valid type parameter
 			if scf == nil {
-				return errmes(Error("type parameter not specified"))
+				return errmes(Error("State controller type not specified"))
 			}
 			if len(trexist) == 0 || (!allUtikiri && trexist[0] == 0) {
 				return errmes(Error("Missing trigger1"))
@@ -6099,9 +6131,9 @@ func (c *Compiler) stateCompile(states map[int32]StateBytecode,
 
 func (c *Compiler) wrongClosureToken() error {
 	if c.token == "" {
-		return Error("Missing token")
+		return Error("Missing closure token")
 	}
-	return Error("Unexpected token: " + c.token)
+	return Error("Unexpected closure token: " + c.token)
 }
 
 func (c *Compiler) nextLine() (string, bool) {
@@ -6142,7 +6174,7 @@ func (c *Compiler) needToken(t string) error {
 func (c *Compiler) readString(line *string) (string, error) {
 	i := strings.Index(*line, "\"")
 	if i < 0 {
-		return "", Error("Not enclosed in \"")
+		return "", Error("String not enclosed in \"")
 	}
 	s := (*line)[:i]
 	*line = (*line)[i+1:]
@@ -6259,7 +6291,7 @@ func (c *Compiler) varNames(end string, line *string) ([]string, error) {
 			if name != "_" {
 				for _, nm := range names {
 					if nm == name {
-						return nil, Error("Duplicated name: " + name)
+						return nil, Error("Duplicate name: " + name)
 					}
 				}
 			}
@@ -6348,10 +6380,10 @@ func (c *Compiler) blockAttribSet(line *string, bl *StateBlock, sbc *StateByteco
 			continue
 		case "persistent":
 			if sbc == nil {
-				return Error("persistent cannot be used in a function")
+				return Error("Persistent cannot be used in a function")
 			}
 			if c.stateNo < 0 {
-				return Error("persistent cannot be used in a negative state")
+				return Error("Persistent cannot be used in a negative state")
 			}
 			if bl.persistentIndex >= 0 {
 				return c.wrongClosureToken()
@@ -6369,7 +6401,7 @@ func (c *Compiler) blockAttribSet(line *string, bl *StateBlock, sbc *StateByteco
 				return err
 			}
 			if bl.persistent == 1 {
-				return Error("persistent(1) is meaningless")
+				return Error("Persistent(1) is meaningless") // TODO: Do we really need to crash here?
 			}
 			if bl.persistent <= 0 {
 				bl.persistent = math.MaxInt32
@@ -6589,14 +6621,14 @@ func (c *Compiler) loopBlock(line *string, root bool, bl *StateBlock,
 		for ; i < 3; i++ {
 			if c.token == "{" {
 				if i < 2 {
-					return Error("For needs more than one expression")
+					return Error("For loop needs more than one expression")
 				} else {
 					// For only has begin/end expressions, so we stop compiling the header
 					break
 				}
 			}
 			if c.token == ";" && i < 1 {
-				return Error("Misplaced ;")
+				return Error("Misplaced ';' in for loop")
 			}
 			expr, _, err := c.readSentence(line)
 			if err != nil {
@@ -7079,7 +7111,7 @@ func (c *Compiler) stateCompileZ(states map[int32]StateBytecode,
 					if r == "_" {
 						return errmes(Error("The return value name is _"))
 					} else if _, ok := c.vars[r]; ok {
-						return errmes(Error("Duplicated name: " + r))
+						return errmes(Error("Duplicate name: " + r))
 					} else {
 						c.vars[r] = uint8(fun.numVars)
 					}
