@@ -74,7 +74,7 @@ const (
 	VT_Float
 	VT_Int
 	VT_Bool
-	VT_SFalse
+	VT_SFalse // Special false
 )
 
 type OpCode byte
@@ -104,9 +104,9 @@ const (
 	OC_eq
 	OC_ne
 	OC_gt
-	OC_le
-	OC_lt
 	OC_ge
+	OC_lt
+	OC_le
 	OC_neg
 	OC_blnot
 	OC_bland
@@ -1059,7 +1059,14 @@ func (bs BytecodeStack) Top() *BytecodeValue {
 }
 
 func (bs *BytecodeStack) Pop() (bv BytecodeValue) {
+	// This should only happen during development
+	if len(*bs) < 1 {
+		panic(Error("Attempted to pop from an empty ByteCode stack.\n"))
+	}
+
+	// Set value to what's at the top of stack. Shift stack
 	bv, *bs = *bs.Top(), (*bs)[:len(*bs)-1]
+
 	return
 }
 
