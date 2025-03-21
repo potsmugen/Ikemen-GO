@@ -74,7 +74,7 @@ const (
 	VT_Float
 	VT_Int
 	VT_Bool
-	VT_SFalse
+	VT_SFalse // Special false (NaN)
 )
 
 type OpCode byte
@@ -104,9 +104,9 @@ const (
 	OC_eq
 	OC_ne
 	OC_gt
-	OC_le
-	OC_lt
 	OC_ge
+	OC_lt
+	OC_le
 	OC_neg
 	OC_blnot
 	OC_bland
@@ -958,6 +958,7 @@ func (bv BytecodeValue) IsSF() bool {
 func (bv BytecodeValue) ToF() float32 {
 	if bv.IsSF() {
 		return 0
+		// This is not ideal. Makes for instance NaN * 100 return 0. But Mugen does the same
 	}
 	return float32(bv.value)
 }
@@ -1059,8 +1060,22 @@ func (bs BytecodeStack) Top() *BytecodeValue {
 }
 
 func (bs *BytecodeStack) Pop() (bv BytecodeValue) {
+	// Set value to what's at the top of stack. Shift stack
 	bv, *bs = *bs.Top(), (*bs)[:len(*bs)-1]
-	return
+
+	// Handle VT_SFalse
+	// We use NaN, while Mugen calls it Bottom instead
+	if bv.IsSF() {
+		pn := sys.cgi[sys.workingChar.ss.sb.playerNo]
+		if pn.ikemenver[0] == 0 && pn.ikemenver[1] == 0 && pn.mugenver[0] < 1 {
+			// WinMugen used 0 instead of NaN
+			return BytecodeValue{VT_Int, 0}
+		} else {
+			return BytecodeValue{VT_Float, math.NaN()}
+		}
+	}
+
+	return bv
 }
 
 func (bs *BytecodeStack) Dup() {
@@ -1122,7 +1137,11 @@ func (be *BytecodeExp) appendValue(bv BytecodeValue) (ok bool) {
 			be.append(OC_int8, 0)
 		}
 	case VT_SFalse:
-		be.append(OC_int8, 0)
+		// WinMugen uses 0 here, but 1.0 and up use bottom
+		//be.append(OC_int8, 0)
+		be.append(OC_float)
+		nan := float32(math.NaN())
+		be.append((*(*[4]OpCode)(unsafe.Pointer(&nan)))[:]...)
 	default:
 		return false
 	}
