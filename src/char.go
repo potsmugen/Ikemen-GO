@@ -2380,6 +2380,7 @@ type Char struct {
 	name                string
 	palfx               *PalFX
 	anim                *Animation
+	drawAnim            *Animation
 	curFrame            *AnimFrame
 	cmd                 []CommandList
 	ss                  StateState
@@ -3478,13 +3479,14 @@ func (c *Char) changeAnimEx(animNo int32, playerNo int, ffx string, alt bool) {
 		c.animPN = c.playerNo
 		c.prevAnimNo = c.animNo
 		c.animNo = animNo
-		// If using ChangeAnim2, the animation is changed but the sff is kept
+
+		// If using ChangeAnim2, the animation is changed but the SFF is kept
 		if alt {
 			c.animPN = playerNo
 			a.sff = sys.cgi[c.playerNo].sff
 			a.palettedata = &sys.cgi[c.playerNo].palettedata.palList
-			// Fix palette if anim doesn't belong to char and sff header version is 1.x
 		} else if c.playerNo != playerNo && c.anim.sff.header.Ver0 == 1 {
+			// Fix palette if anim doesn't belong to char and SFF header version is 1.x
 			di := c.anim.palettedata.PalTable[[...]int16{1, 1}]
 			spr := c.anim.sff.GetSprite(0, 0)
 			if spr != nil {
@@ -3499,9 +3501,8 @@ func (c *Char) changeAnimEx(animNo int32, playerNo int, ffx string, alt bool) {
 		c.animlocalscl = 320 / sys.chars[c.animPN][0].localcoord
 		// Clsn scale depends on the animation owner's scale, so it must be updated
 		c.updateClsnScale()
-		if c.hitPause() {
-			c.curFrame = a.CurrentFrame()
-		}
+		// Update reference frame
+		c.curFrame = a.CurrentFrame()
 	}
 }
 
@@ -3800,6 +3801,10 @@ func (c *Char) animTime() int32 {
 		return c.anim.AnimTime()
 	}
 	return 0
+}
+
+func (c *Char) canAnimate() bool {
+	return c.acttmp > 0 || !c.pauseBool && (!c.hitPause() || c.asf(ASF_animatehitpause))
 }
 
 func (c *Char) backEdge() float32 {
@@ -8185,13 +8190,6 @@ func (c *Char) actionRun() {
 			if c.mctime > 0 {
 				c.mctime++
 			}
-			// Commit current animation frame to memory
-			// This frame will be used for drawing, hit detection and as reference for Lua scripts
-			if c.anim != nil {
-				c.curFrame = c.anim.CurrentFrame()
-			} else {
-				c.curFrame = nil
-			}
 		}
 		if c.ghv.damage != 0 {
 			// HitOverride KeepState flag still allows damage to get through
@@ -8295,6 +8293,15 @@ func (c *Char) actionRun() {
 			c.gi().pctime++
 		}
 		c.dustTime++
+	}
+	// Commit current animation frame to memory
+	// This frame will be used for drawing, hit detection, and as reference for Lua scripts
+	if c.canAnimate() {
+		if c.anim != nil {
+			c.curFrame = c.anim.CurrentFrame()
+		} else {
+			c.curFrame = nil
+		}
 	}
 	c.xScreenBound()
 	c.zDepthBound()
@@ -8429,7 +8436,8 @@ func (c *Char) update() {
 				c.setSCF(SCF_guard)
 			}
 			if c.anim != nil {
-				c.anim.UpdateSprite()
+				//c.anim.UpdateSprite()
+				c.drawAnim.UpdateSprite()
 			}
 			if c.ss.moveType == MT_H {
 				if c.ghv.xoff != 0 {
@@ -8542,10 +8550,16 @@ func (c *Char) tick() {
 	if c.scf(SCF_disabled) {
 		return
 	}
-	if c.acttmp > 0 || (!c.pauseBool && c.hitPause() && c.asf(ASF_animatehitpause)) {
+	// Step animation
+	if c.canAnimate() {
 		if c.anim != nil && !c.asf(ASF_animfreeze) {
 			c.anim.Action()
 		}
+		c.drawAnim = c.anim
+		// Save valid frame as drawing frame
+		// This step prevents the char from disappearing when changing animation during hitpause
+		// Because the whole c.anim is used for rendering, saving just the sprite is not enough
+		// https://github.com/ikemen-engine/Ikemen-GO/issues/1550
 	}
 	if c.bindTime > 0 {
 		if c.isTargetBound() {
@@ -8940,7 +8954,7 @@ func (c *Char) cueDraw() {
 		}
 		// Define sprite data
 		sd := &SprData{
-			anim:         c.anim,
+			anim:         c.drawAnim,
 			fx:           c.getPalfx(),
 			pos:          pos,
 			scl:          scl,
