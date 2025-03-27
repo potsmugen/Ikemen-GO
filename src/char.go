@@ -1373,7 +1373,7 @@ func (e *Explod) setPos(c *Char) {
 	case PT_P1:
 		pPos(c)
 	case PT_P2:
-		if p2 := sys.charList.enemyNear(c, 0, true, false); p2 != nil {
+		if p2 := c.p2(); p2 != nil {
 			pPos(p2)
 		}
 	case PT_Front, PT_Back:
@@ -2434,6 +2434,7 @@ type Char struct {
 	hitdefTargetsBuffer []int32
 	enemyNearList       []*Char // Enemies retrieved by EnemyNear
 	p2EnemyList         []*Char // Enemies retrieved by P2, P4, P6 and P8
+	lastP2Enemy         *Char
 	pos                 [3]float32
 	interPos            [3]float32 // Interpolated position. For the visuals when game and logic speed are different
 	oldPos              [3]float32
@@ -3758,7 +3759,13 @@ func (c *Char) enemyNearTrigger(n int32) *Char {
 
 // Get the "P2" enemy reference
 func (c *Char) p2() *Char {
-	return sys.charList.enemyNear(c, 0, true, false)
+	p := sys.charList.enemyNear(c, 0, true, false)
+	// Cache last valid P2 enemy
+	// Mugen seems to do this for the sake of auto turning before win poses
+	if p != nil {
+		c.lastP2Enemy = p
+	}
+	return p
 }
 
 func (c *Char) aiLevel() float32 {
@@ -4822,7 +4829,15 @@ func (c *Char) autoTurn() {
 
 // Check if P2 enemy is behind the player and the player is allowed to face them
 func (c *Char) shouldFaceP2() bool {
+	// Face P2 normally
 	e := c.p2()
+
+	// If P2 was not found, fall back to the last valid one
+	// Maybe this should only happen during win poses?
+	if e == nil {
+		e = c.lastP2Enemy
+	}
+
 	if e != nil && !e.asf(ASF_noturntarget) {
 		distX := c.rdDistX(e, c).ToF()
 		if sys.zEnabled() {
@@ -5129,7 +5144,7 @@ func (c *Char) helperPos(pt PosType, pos [3]float32, facing int32,
 		p[2] = c.pos[2]*(c.localscl/localscl) + pos[2]
 		*dstFacing *= c.facing
 	case PT_P2:
-		if p2 := sys.charList.enemyNear(c, 0, true, false); p2 != nil {
+		if p2 := c.p2(); p2 != nil {
 			p[0] = p2.pos[0]*(p2.localscl/localscl) + pos[0]*p2.facing
 			p[1] = p2.pos[1]*(p2.localscl/localscl) + pos[1]
 			p[2] = p2.pos[2]*(p2.localscl/localscl) + pos[2]
