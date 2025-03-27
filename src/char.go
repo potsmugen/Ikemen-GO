@@ -2582,7 +2582,7 @@ func (c *Char) clsnOverlapTrigger(box1, pid, box2 int32) bool {
 	if getter == nil {
 		return false
 	}
-	return c.clsnCheck(getter, box1, box2, false, true)
+	return c.clsnCheck(getter, box1, box2, false)
 }
 
 func (c *Char) copyParent(p *Char) {
@@ -3498,12 +3498,11 @@ func (c *Char) changeAnimEx(animNo int32, playerNo int, ffx string, alt bool) {
 				c.anim.palettedata.Remap(spr.palidx, di)
 			}
 		}
+		c.updateCurFrame()
 		// Update animation local scale
 		c.animlocalscl = 320 / sys.chars[c.animPN][0].localcoord
 		// Clsn scale depends on the animation owner's scale, so it must be updated
 		c.updateClsnScale()
-		// Update reference frame
-		c.curFrame = a.CurrentFrame()
 	}
 }
 
@@ -3529,13 +3528,13 @@ func (c *Char) changeAnim2(animNo int32, playerNo int, ffx string) {
 func (c *Char) setAnimElem(e int32) {
 	if c.anim != nil {
 		c.anim.SetAnimElem(e)
-		c.curFrame = c.anim.CurrentFrame()
 		if int(e) < 0 {
 			sys.appendToConsole(c.warn() + fmt.Sprintf("changed to negative animelem"))
 		} else if int(e) > len(c.anim.frames) {
 			sys.appendToConsole(c.warn() + fmt.Sprintf("changed to invalid animelem %v within action %v", e, c.animNo))
 		}
 	}
+	c.updateCurFrame()
 }
 
 func (c *Char) setCtrl(ctrl bool) {
@@ -3811,7 +3810,17 @@ func (c *Char) animTime() int32 {
 }
 
 func (c *Char) canAnimate() bool {
-	return c.acttmp > 0 || !c.pauseBool && (!c.hitPause() || c.asf(ASF_animatehitpause))
+	return !c.pauseBool && (!c.hitPause() || c.asf(ASF_animatehitpause))
+}
+
+// Update reference animation frame
+// This saves calls to anim.CurrentFrame() and avoids nil anim crashes
+func (c *Char) updateCurFrame() {
+	if c.anim != nil {
+		c.curFrame = c.anim.CurrentFrame()
+	} else {
+		c.curFrame = nil
+	}
 }
 
 func (c *Char) backEdge() float32 {
@@ -7535,11 +7544,18 @@ func (c *Char) offsetY() float32 {
 }
 
 func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32) bool {
-	if p.ani == nil || c.curFrame == nil || c.scf(SCF_standby) || c.scf(SCF_disabled) {
+	if p.ani == nil || c.anim == nil || c.scf(SCF_standby) || c.scf(SCF_disabled) {
 		return false
 	}
+
+	// Check if projectile frame is valid
 	frm := p.ani.CurrentFrame()
 	if frm == nil {
+		return false
+	}
+
+	// Check if character frame is valid
+	if c.curFrame == nil {
 		return false
 	}
 
@@ -7572,7 +7588,10 @@ func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32) bool {
 			}
 		} else if cbox == 3 {
 			clsn2 = c.sizeBox
-			// Size box always exists
+			if clsn2 == nil && p.hitdef.p2clsnrequire == 3 {
+				// Size box should alway exist, but...
+				return false
+			}
 		} else {
 			clsn2 = c.curFrame.Clsn2()
 			if clsn2 == nil && p.hitdef.p2clsnrequire == 2 {
@@ -7606,16 +7625,11 @@ func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32) bool {
 		charangle)
 }
 
-func (c *Char) clsnCheck(getter *Char, charbox, getterbox int32, reqcheck, trigger bool) bool {
+func (c *Char) clsnCheck(getter *Char, charbox, getterbox int32, reqcheck bool) bool {
 
-	// What this does is normally check the Clsn in the currently displayed frame
-	// But in the ClsnOverlap trigger, we must check the frame that *will* be displayed instead
+	// Get animation frames
 	charframe := c.curFrame
 	getterframe := getter.curFrame
-	if trigger {
-		charframe = c.anim.CurrentFrame()
-		getterframe = getter.anim.CurrentFrame()
-	}
 
 	// Nil anim & standby check.
 	if charframe == nil || getterframe == nil ||
@@ -7887,7 +7901,7 @@ func (c *Char) hittableByChar(getter *Char, ghd *HitDef, gst StateType, proj boo
 			return (getter.atktmp >= 0 || !c.hasTarget(getter.id)) &&
 				!getter.hasTargetOfHitdef(c.id) &&
 				getter.attrCheck(c, hd, c.ss.stateType) &&
-				c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true, false) &&
+				c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true) &&
 				sys.zAxisOverlap(c.pos[2], c.hitdef.attack_depth[0], c.hitdef.attack_depth[1], c.localscl,
 					getter.pos[2], getter.depth[0], getter.depth[1], getter.localscl)
 		}
@@ -7960,6 +7974,15 @@ func (c *Char) actionPrepare() {
 	// Due to the nature of how pauses are processed, these are needed to fix an "off by 1" error in the PauseTime trigger
 	c.prevSuperMovetime = c.superMovetime
 	c.prevPauseMovetime = c.pauseMovetime
+	// Step animation
+	// Needs to be placed before AnimFreeze is cleared
+	// This used to happen at the end of each frame instead. But that requires more workarounds and seems less accurate
+	if c.canAnimate() {
+		if c.anim != nil && !c.asf(ASF_animfreeze) {
+			c.anim.Action()
+		}
+		c.updateCurFrame()
+	}
 	if !c.pauseBool {
 		// Perform basic actions
 		if c.keyctrl[0] && c.cmd != nil && (c.helperIndex == 0 || c.controller >= 0) {
@@ -8303,15 +8326,6 @@ func (c *Char) actionRun() {
 		}
 		c.dustTime++
 	}
-	// Commit current animation frame to memory
-	// This frame will be used for drawing, hit detection, and as reference for Lua scripts
-	if c.canAnimate() {
-		if c.anim != nil {
-			c.curFrame = c.anim.CurrentFrame()
-		} else {
-			c.curFrame = nil
-		}
-	}
 	c.xScreenBound()
 	c.zDepthBound()
 	if !c.pauseBool {
@@ -8375,6 +8389,12 @@ func (c *Char) actionFinish() {
 	}
 	if c.ss.no == 5150 && !c.scf(SCF_over_ko) { // Actual KO is not required in Mugen
 		c.setSCF(SCF_over_ko)
+	}
+	// Save valid frame as drawing frame
+	// This step prevents the char from disappearing when changing animation during hitpause
+	// https://github.com/ikemen-engine/Ikemen-GO/issues/1550
+	if c.canAnimate() {
+		c.drawAnim = c.anim
 	}
 	c.minus = 1
 }
@@ -8557,16 +8577,6 @@ func (c *Char) update() {
 func (c *Char) tick() {
 	if c.scf(SCF_disabled) {
 		return
-	}
-	// Step animation
-	if c.canAnimate() {
-		if c.anim != nil && !c.asf(ASF_animfreeze) {
-			c.anim.Action()
-		}
-		c.drawAnim = c.anim
-		// Save valid frame as drawing frame
-		// This step prevents the char from disappearing when changing animation during hitpause
-		// https://github.com/ikemen-engine/Ikemen-GO/issues/1550
 	}
 	if c.bindTime > 0 {
 		if c.isTargetBound() {
@@ -10379,7 +10389,7 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 					}
 
 					// If collision OK then get the hit type and act accordingly
-					if zok && c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true, false) {
+					if zok && c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true) {
 						if ht := hitTypeGet(c, &c.hitdef, [3]float32{}, 0, c.attackMul); ht != 0 {
 							mvc := ht > 0 || c.hitdef.reversal_attr > 0
 							if Abs(ht) == 1 {
@@ -10539,7 +10549,7 @@ func (cl *CharList) pushDetection(getter *Char) {
 			}
 
 			// Push characters away from each other
-			if c.asf(ASF_sizepushonly) || getter.clsnCheck(c, 2, 2, false, false) {
+			if c.asf(ASF_sizepushonly) || getter.clsnCheck(c, 2, 2, false) {
 
 				getter.pushed, c.pushed = true, true
 

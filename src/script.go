@@ -3162,16 +3162,15 @@ func triggerFunctions(l *lua.LState) {
 	})
 	// animelem (deprecated by animelemtime)
 	luaRegister(l, "animelemno", func(*lua.LState) int {
-		l.Push(lua.LNumber(sys.debugWC.animElemNo(int32(numArg(l, 1)) - 1).ToI())) // Offset by 1 because animations step before scripts run
+		l.Push(lua.LNumber(sys.debugWC.animElemNo(int32(numArg(l, 1))).ToI()))
 		return 1
 	})
 	luaRegister(l, "animelemtime", func(*lua.LState) int {
-		l.Push(lua.LNumber(sys.debugWC.animElemTime(int32(numArg(l, 1))).ToI()) - 1) // Offset by 1 because animations step before scripts run
+		l.Push(lua.LNumber(sys.debugWC.animElemTime(int32(numArg(l, 1))).ToI()))
 		return 1
 	})
 	luaRegister(l, "animexist", func(*lua.LState) int {
-		l.Push(lua.LBool(sys.debugWC.animExist(sys.debugWC,
-			BytecodeInt(int32(numArg(l, 1)))).ToB()))
+		l.Push(lua.LBool(sys.debugWC.animExist(sys.debugWC, BytecodeInt(int32(numArg(l, 1)))).ToB()))
 		return 1
 	})
 	luaRegister(l, "animtime", func(*lua.LState) int {
@@ -3305,12 +3304,12 @@ func triggerFunctions(l *lua.LState) {
 			case "size":
 				v = lua.LNumber(sys.debugWC.sizeBox[offset])
 			case "clsn1":
-				clsn := sys.debugWC.anim.CurrentFrame().Clsn1()
+				clsn := sys.debugWC.curFrame.Clsn1()
 				if idx >= 0 && idx < len(clsn)/4 {
 					v = lua.LNumber(clsn[idx*4+offset])
 				}
 			case "clsn2":
-				clsn := sys.debugWC.anim.CurrentFrame().Clsn2()
+				clsn := sys.debugWC.curFrame.Clsn2()
 				if idx >= 0 && idx < len(clsn)/4 {
 					v = lua.LNumber(clsn[idx*4+offset])
 				}
@@ -5202,8 +5201,6 @@ func triggerFunctions(l *lua.LState) {
 	luaRegister(l, "animelemvar", func(l *lua.LState) int {
 		vname := strings.ToLower(strArg(l, 1))
 		var ln lua.LNumber
-		// Because the char's animation steps at the end of each frame, before the scripts run,
-		// AnimElemVar Lua version uses curFrame instead of anim.CurrentFrame()
 		f := sys.debugWC.curFrame
 		if f != nil {
 			switch vname {
