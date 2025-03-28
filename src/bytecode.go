@@ -2771,7 +2771,7 @@ func (be BytecodeExp) run_ex(c *Char, i *int, oc *Char) {
 		OC_ex_animelemvar_xscale, OC_ex_animelemvar_yoffset, OC_ex_animelemvar_yscale,
 		OC_ex_animelemvar_numclsn1, OC_ex_animelemvar_numclsn2:
 		// Check for valid animation frame
-		f := c.anim.CurrentFrame()
+		f := c.curFrame
 		// Handle output
 		if f != nil {
 			switch opc {
@@ -3284,12 +3284,12 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 		case 3: // DON'T ASK WHY BUT 0 CAUSES ERRORS, 3 DOES NOT
 			v = c.sizeBox[0]
 		case 1:
-			cf1 := c.anim.CurrentFrame().Clsn1()
+			cf1 := c.curFrame.Clsn1()
 			if idx >= 0 && idx < len(cf1)/4 {
 				v = cf1[idx*4]
 			}
 		case 2:
-			cf2 := c.anim.CurrentFrame().Clsn2()
+			cf2 := c.curFrame.Clsn2()
 			if idx >= 0 && idx < len(cf2)/4 {
 				v = cf2[idx*4]
 			}
@@ -3303,12 +3303,12 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 		case 3: // DON'T ASK WHY BUT 0 CAUSES ERRORS, 3 DOES NOT
 			v = c.sizeBox[1]
 		case 1:
-			cf1 := c.anim.CurrentFrame().Clsn1()
+			cf1 := c.curFrame.Clsn1()
 			if idx >= 0 && idx < len(cf1)/4 {
 				v = cf1[idx*4+1]
 			}
 		case 2:
-			cf2 := c.anim.CurrentFrame().Clsn2()
+			cf2 := c.curFrame.Clsn2()
 			if idx >= 0 && idx < len(cf2)/4 {
 				v = cf2[idx*4+1]
 			}
@@ -3322,12 +3322,12 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 		case 3: // DON'T ASK WHY BUT 0 CAUSES ERRORS, 3 DOES NOT
 			v = c.sizeBox[2]
 		case 1:
-			cf1 := c.anim.CurrentFrame().Clsn1()
+			cf1 := c.curFrame.Clsn1()
 			if idx >= 0 && idx < len(cf1)/4 {
 				v = cf1[idx*4+2]
 			}
 		case 2:
-			cf2 := c.anim.CurrentFrame().Clsn2()
+			cf2 := c.curFrame.Clsn2()
 			if idx >= 0 && idx < len(cf2)/4 {
 				v = cf2[idx*4+2]
 			}
@@ -3341,12 +3341,12 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 		case 3: // DON'T ASK WHY BUT 0 CAUSES ERRORS, 3 DOES NOT
 			v = c.sizeBox[3]
 		case 1:
-			cf1 := c.anim.CurrentFrame().Clsn1()
+			cf1 := c.curFrame.Clsn1()
 			if idx >= 0 && idx < len(cf1)/4 {
 				v = cf1[idx*4+3]
 			}
 		case 2:
-			cf2 := c.anim.CurrentFrame().Clsn2()
+			cf2 := c.curFrame.Clsn2()
 			if idx >= 0 && idx < len(cf2)/4 {
 				v = cf2[idx*4+3]
 			}

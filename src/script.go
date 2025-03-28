@@ -3305,12 +3305,12 @@ func triggerFunctions(l *lua.LState) {
 			case "size":
 				v = lua.LNumber(sys.debugWC.sizeBox[offset])
 			case "clsn1":
-				clsn := sys.debugWC.anim.CurrentFrame().Clsn1()
+				clsn := sys.debugWC.curFrame.Clsn1()
 				if idx >= 0 && idx < len(clsn)/4 {
 					v = lua.LNumber(clsn[idx*4+offset])
 				}
 			case "clsn2":
-				clsn := sys.debugWC.anim.CurrentFrame().Clsn2()
+				clsn := sys.debugWC.curFrame.Clsn2()
 				if idx >= 0 && idx < len(clsn)/4 {
 					v = lua.LNumber(clsn[idx*4+offset])
 				}
@@ -5202,8 +5202,6 @@ func triggerFunctions(l *lua.LState) {
 	luaRegister(l, "animelemvar", func(l *lua.LState) int {
 		vname := strings.ToLower(strArg(l, 1))
 		var ln lua.LNumber
-		// Because the char's animation steps at the end of each frame, before the scripts run,
-		// AnimElemVar Lua version uses curFrame instead of anim.CurrentFrame()
 		f := sys.debugWC.curFrame
 		if f != nil {
 			switch vname {

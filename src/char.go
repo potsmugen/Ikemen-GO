@@ -2582,7 +2582,7 @@ func (c *Char) clsnOverlapTrigger(box1, pid, box2 int32) bool {
 	if getter == nil {
 		return false
 	}
-	return c.clsnCheck(getter, box1, box2, false, true)
+	return c.clsnCheck(getter, box1, box2, false)
 }
 
 func (c *Char) copyParent(p *Char) {
@@ -3503,7 +3503,7 @@ func (c *Char) changeAnimEx(animNo int32, playerNo int, ffx string, alt bool) {
 		// Clsn scale depends on the animation owner's scale, so it must be updated
 		c.updateClsnScale()
 		// Update reference frame
-		c.curFrame = a.CurrentFrame()
+		c.updateCurFrame()
 	}
 }
 
@@ -3529,7 +3529,7 @@ func (c *Char) changeAnim2(animNo int32, playerNo int, ffx string) {
 func (c *Char) setAnimElem(e int32) {
 	if c.anim != nil {
 		c.anim.SetAnimElem(e)
-		c.curFrame = c.anim.CurrentFrame()
+		c.updateCurFrame()
 		if int(e) < 0 {
 			sys.appendToConsole(c.warn() + fmt.Sprintf("changed to negative animelem"))
 		} else if int(e) > len(c.anim.frames) {
@@ -3812,6 +3812,16 @@ func (c *Char) animTime() int32 {
 
 func (c *Char) canAnimate() bool {
 	return c.acttmp > 0 || !c.pauseBool && (!c.hitPause() || c.asf(ASF_animatehitpause))
+}
+
+// Update reference animation frame
+// This saves calls to anim.CurrentFrame() and avoids nil anim crashes
+func (c *Char) updateCurFrame() {
+	if c.anim != nil {
+		c.curFrame = c.anim.CurrentFrame()
+	} else {
+		c.curFrame = nil
+	}
 }
 
 func (c *Char) backEdge() float32 {
@@ -7606,16 +7616,11 @@ func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32) bool {
 		charangle)
 }
 
-func (c *Char) clsnCheck(getter *Char, charbox, getterbox int32, reqcheck, trigger bool) bool {
+func (c *Char) clsnCheck(getter *Char, charbox, getterbox int32, reqcheck bool) bool {
 
-	// What this does is normally check the Clsn in the currently displayed frame
-	// But in the ClsnOverlap trigger, we must check the frame that *will* be displayed instead
+	// Get animation frames
 	charframe := c.curFrame
 	getterframe := getter.curFrame
-	if trigger {
-		charframe = c.anim.CurrentFrame()
-		getterframe = getter.anim.CurrentFrame()
-	}
 
 	// Nil anim & standby check.
 	if charframe == nil || getterframe == nil ||
@@ -7887,7 +7892,7 @@ func (c *Char) hittableByChar(getter *Char, ghd *HitDef, gst StateType, proj boo
 			return (getter.atktmp >= 0 || !c.hasTarget(getter.id)) &&
 				!getter.hasTargetOfHitdef(c.id) &&
 				getter.attrCheck(c, hd, c.ss.stateType) &&
-				c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true, false) &&
+				c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true) &&
 				sys.zAxisOverlap(c.pos[2], c.hitdef.attack_depth[0], c.hitdef.attack_depth[1], c.localscl,
 					getter.pos[2], getter.depth[0], getter.depth[1], getter.localscl)
 		}
@@ -8306,11 +8311,7 @@ func (c *Char) actionRun() {
 	// Commit current animation frame to memory
 	// This frame will be used for drawing, hit detection, and as reference for Lua scripts
 	if c.canAnimate() {
-		if c.anim != nil {
-			c.curFrame = c.anim.CurrentFrame()
-		} else {
-			c.curFrame = nil
-		}
+		c.updateCurFrame()
 	}
 	c.xScreenBound()
 	c.zDepthBound()
@@ -10381,7 +10382,7 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 					}
 
 					// If collision OK then get the hit type and act accordingly
-					if zok && c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true, false) {
+					if zok && c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true) {
 						if ht := hitTypeGet(c, &c.hitdef, [3]float32{}, 0, c.attackMul); ht != 0 {
 							mvc := ht > 0 || c.hitdef.reversal_attr > 0
 							if Abs(ht) == 1 {
@@ -10541,7 +10542,7 @@ func (cl *CharList) pushDetection(getter *Char) {
 			}
 
 			// Push characters away from each other
-			if c.asf(ASF_sizepushonly) || getter.clsnCheck(c, 2, 2, false, false) {
+			if c.asf(ASF_sizepushonly) || getter.clsnCheck(c, 2, 2, false) {
 
 				getter.pushed, c.pushed = true, true
 
