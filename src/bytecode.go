@@ -7019,6 +7019,7 @@ type reversalDef hitDef
 
 const (
 	reversalDef_reversal_attr = iota + hitDef_last + 1
+	reversalDef_reversal_guardflag
 	reversalDef_redirectid
 )
 
@@ -7030,6 +7031,8 @@ func (sc reversalDef) Run(c *Char, _ []int32) bool {
 		switch paramID {
 		case reversalDef_reversal_attr:
 			crun.hitdef.reversal_attr = exp[0].evalI(c)
+		case reversalDef_reversal_guardflag:
+			crun.hitdef.reversal_guardflag = exp[0].evalI(c)
 		case reversalDef_redirectid:
 			if rid := sys.playerID(exp[0].evalI(c)); rid != nil {
 				crun = rid

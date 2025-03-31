@@ -1456,43 +1456,16 @@ func (c *Compiler) hitDefSub(is IniSection, sc *StateControllerBase) error {
 	}); err != nil {
 		return err
 	}
-	hflg := func(id byte, data string) error {
-		var flg int32
-		for _, c := range data {
-			switch c {
-			case 'H', 'h':
-				flg |= int32(HF_H)
-			case 'L', 'l':
-				flg |= int32(HF_L)
-			case 'M', 'm':
-				flg |= int32(HF_H | HF_L)
-			case 'A', 'a':
-				flg |= int32(HF_A)
-			case 'F', 'f':
-				flg |= int32(HF_F)
-			case 'D', 'd':
-				flg |= int32(HF_D)
-			case 'P', 'p':
-				flg |= int32(HF_P)
-			case '-':
-				flg |= int32(HF_MNS)
-			case '+':
-				flg |= int32(HF_PLS)
-			}
-		}
-		sc.add(id, sc.iToExp(flg))
-		return nil
-	}
-	if err := c.stateParam(is, "guardflag", false, func(data string) error {
-		return hflg(hitDef_guardflag, data)
-	}); err != nil {
-		return err
-	}
-	if err := c.stateParam(is, "hitflag", false, func(data string) error {
-		return hflg(hitDef_hitflag, data)
-	}); err != nil {
-		return err
-	}
+    if err := c.stateParam(is, "guardflag", false, func(data string) error {
+        return c.paramHitFlag(sc, hitDef_guardflag, data)
+    }); err != nil {
+        return err
+    }
+    if err := c.stateParam(is, "hitflag", false, func(data string) error {
+        return c.paramHitFlag(sc, hitDef_hitflag, data)
+    }); err != nil {
+        return err
+    }
 	htyp := func(id byte, data string) error {
 		if len(data) == 0 {
 			return Error("hit type not specified")
@@ -2129,8 +2102,14 @@ func (c *Compiler) reversalDef(is IniSection, sc *StateControllerBase, _ int8) (
 		}
 		if attr == -1 {
 			return Error("ReversalDef reversal.attr not specified")
+		} else {
+			sc.add(reversalDef_reversal_attr, sc.iToExp(attr))
 		}
-		sc.add(reversalDef_reversal_attr, sc.iToExp(attr))
+		if err := c.stateParam(is, "reversal.guardflag", false, func(data string) error {
+			return c.paramHitFlag(sc, reversalDef_reversal_guardflag, data)
+		}); err != nil {
+			return err
+		}
 		return c.hitDefSub(is, sc)
 	})
 	return *ret, err

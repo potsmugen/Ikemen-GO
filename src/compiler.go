@@ -5454,6 +5454,34 @@ func (c *Compiler) paramValue(is IniSection, sc *StateControllerBase,
 	return nil
 }
 
+func (c *Compiler) paramHitFlag(sc *StateControllerBase, id byte, data string) error {
+    var flg int32
+    for _, char := range data {
+        switch char {
+        case 'H', 'h':
+            flg |= int32(HF_H)
+        case 'L', 'l':
+            flg |= int32(HF_L)
+        case 'M', 'm':
+            flg |= int32(HF_H | HF_L)
+        case 'A', 'a':
+            flg |= int32(HF_A)
+        case 'F', 'f':
+            flg |= int32(HF_F)
+        case 'D', 'd':
+            flg |= int32(HF_D)
+        case 'P', 'p':
+            flg |= int32(HF_P)
+        case '-':
+            flg |= int32(HF_MNS)
+        case '+':
+            flg |= int32(HF_PLS)
+        }
+    }
+    sc.add(id, sc.iToExp(flg))
+    return nil
+}
+
 func (c *Compiler) paramPostype(is IniSection, sc *StateControllerBase, id byte) error {
 	return c.stateParam(is, "postype", false, func(data string) error {
 		if len(data) == 0 {

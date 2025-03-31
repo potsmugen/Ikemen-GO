@@ -511,6 +511,7 @@ type HitDef struct {
 	reversal_attr              int32
 	hitflag                    int32
 	guardflag                  int32
+	reversal_guardflag         int32
 	affectteam                 int32 // -1F, 0B, 1E
 	teamside                   int
 	animtype                   Reaction
@@ -637,6 +638,7 @@ func (hd *HitDef) clear(c *Char, localscl float32) {
 		playerNo:           -1,
 		hitflag:            int32(HF_H | HF_L | HF_A | HF_F),
 		guardflag:          0,
+		reversal_guardflag: -1,
 		affectteam:         1,
 		teamside:           -1,
 		animtype:           RA_Light,
@@ -5745,7 +5747,7 @@ func (c *Char) setHitdefDefault(hd *HitDef) {
 	if hd.teamside == -1 {
 		hd.teamside = c.teamside + 1
 	}
-	if hd.p2clsncheck == -1 {
+	if hd.p2clsncheck <= 0 {
 		if hd.reversal_attr != 0 {
 			hd.p2clsncheck = 1
 		} else {
@@ -7852,10 +7854,30 @@ func (c *Char) attrCheck(getter *Char, ghd *HitDef, gstyp StateType) bool {
 	//if ghd.chainid < 0 {
 
 	// Reversaldef vs Hitdef attributes check
-	if ghd.reversal_attr > 0 {
-		return c.atktmp != 0 && c.hitdef.attr > 0 &&
-			(c.hitdef.attr&ghd.reversal_attr&int32(ST_MASK)) != 0 &&
-			(c.hitdef.attr&ghd.reversal_attr&^int32(ST_MASK)) != 0
+	if ghd.reversal_attr > 0 && c.hitdef.attr > 0 && c.atktmp != 0 {
+		var attrok, gfok bool
+
+		// Attribute check
+		if (c.hitdef.attr&ghd.reversal_attr&int32(ST_MASK)) != 0 &&
+			(c.hitdef.attr&ghd.reversal_attr&^int32(ST_MASK)) != 0 {
+			attrok = true
+		}
+
+		// Guardflag check
+		if ghd.reversal_guardflag >= 0 {
+			//if ghd.reversal_guardflag == c.hitdef.guardflag {
+			if ghd.reversal_guardflag == c.hitdef.guardflag || // Covers both empty case
+				ghd.reversal_guardflag&int32(HF_H) != 0 && c.hitdef.guardflag&int32(HF_H) != 0 ||
+				ghd.reversal_guardflag&int32(HF_L) != 0 && c.hitdef.guardflag&int32(HF_L) != 0 ||
+				ghd.reversal_guardflag&int32(HF_A) != 0 && c.hitdef.guardflag&int32(HF_A) != 0 ||
+				ghd.reversal_guardflag&int32(HF_D) != 0 && c.hitdef.guardflag&int32(HF_D) != 0 { // Why not
+				gfok = true
+			}
+		} else {
+			gfok = true
+		}
+
+		return attrok && gfok
 	}
 
 	// Main hitflag checks
@@ -10431,7 +10453,7 @@ func (cl *CharList) hitDetection(getter *Char, proj bool) {
 					getter.hittableByChar(c, &c.hitdef, c.ss.stateType, false) {
 
 					// Z axis check
-					// Reversaldef checks attack depth vs attack depth
+					// ReversalDef checks attack depth vs attack depth
 					zok := true
 					if c.hitdef.reversal_attr > 0 {
 						zok = sys.zAxisOverlap(c.pos[2], c.hitdef.attack_depth[0], c.hitdef.attack_depth[1], c.localscl,
