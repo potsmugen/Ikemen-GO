@@ -2130,8 +2130,8 @@ func (s *System) fight() (reload bool) {
 	var life, lifeMax, power, powerMax [len(s.chars)]int32
 	var guardPoints, guardPointsMax, dizzyPoints, dizzyPointsMax, redLife [len(s.chars)]int32
 	var teamside [len(s.chars)]int
-	var ivar [len(s.chars)][]int32
-	var fvar [len(s.chars)][]float32
+	var cnsvar [len(s.chars)][]int32
+	var cnsfvar [len(s.chars)][]float32
 	var dialogue [len(s.chars)][]string
 	var mapArray [len(s.chars)]map[string]float32
 	var remapSpr [len(s.chars)]RemapPreset
@@ -2148,14 +2148,14 @@ func (s *System) fight() (reload bool) {
 		dizzyPointsMax[pn] = s.chars[pn][0].dizzyPointsMax
 		redLife[pn] = s.chars[pn][0].redLife
 		teamside[pn] = s.chars[pn][0].teamside
-		if len(ivar[pn]) < len(s.chars[pn][0].ivar) {
-			ivar[pn] = make([]int32, len(s.chars[pn][0].ivar))
+		if len(cnsvar[pn]) < len(s.chars[pn][0].cnsvar) {
+			cnsvar[pn] = make([]int32, len(s.chars[pn][0].cnsvar))
 		}
-		copy(ivar[pn], s.chars[pn][0].ivar[:])
-		if len(fvar[pn]) < len(s.chars[pn][0].fvar) {
-			fvar[pn] = make([]float32, len(s.chars[pn][0].fvar))
+		copy(cnsvar[pn], s.chars[pn][0].cnsvar[:])
+		if len(cnsfvar[pn]) < len(s.chars[pn][0].cnsfvar) {
+			cnsfvar[pn] = make([]float32, len(s.chars[pn][0].cnsfvar))
 		}
-		copy(fvar[pn], s.chars[pn][0].fvar[:])
+		copy(cnsfvar[pn], s.chars[pn][0].cnsfvar[:])
 		copy(dialogue[pn], s.chars[pn][0].dialogue[:])
 		mapArray[pn] = make(map[string]float32)
 		for k, v := range s.chars[pn][0].mapArray {
@@ -2344,8 +2344,8 @@ func (s *System) fight() (reload bool) {
 				p[0].dizzyPointsMax = dizzyPointsMax[i]
 				p[0].redLife = redLife[i]
 				p[0].teamside = teamside[i]
-				copy(p[0].ivar[:], ivar[i])
-				copy(p[0].fvar[:], fvar[i])
+				copy(p[0].cnsvar[:], cnsvar[i])
+				copy(p[0].cnsfvar[:], cnsfvar[i])
 				copy(p[0].dialogue[:], dialogue[i])
 				p[0].mapArray = make(map[string]float32)
 				for k, v := range mapArray[i] {
@@ -3371,8 +3371,7 @@ func (l *Loader) loadChar(pn int) int {
 	p.selectNo = sys.sel.selected[pn&1][memberNo][0]
 	p.teamside = p.playerNo & 1
 	if !p.ocd().existed {
-		p.varRangeSet(0, int32(NumVar)-1, 0)
-		p.fvarRangeSet(0, int32(NumFvar)-1, 0)
+		p.initCnsVar()
 		p.ocd().existed = true
 	}
 	sys.chars[pn] = make([]*Char, 1)
@@ -3446,8 +3445,7 @@ func (l *Loader) loadAttachedChar(pn int) int {
 	p.selectNo = -atcpn
 	p.teamside = -1
 	if !p.ocd().existed {
-		p.varRangeSet(0, int32(NumVar)-1, 0)
-		p.fvarRangeSet(0, int32(NumFvar)-1, 0)
+		p.initCnsVar()
 		p.ocd().existed = true
 	}
 	sys.com[pn] = 8

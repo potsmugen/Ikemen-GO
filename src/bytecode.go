@@ -921,13 +921,6 @@ const (
 	OC_ex2_numstagebg
 )
 
-const (
-	NumVar     = 60
-	NumSysVar  = 5
-	NumFvar    = 40
-	NumSysFvar = 5
-)
-
 type StringPool struct {
 	List []string
 	Map  map[string]int
@@ -10024,30 +10017,37 @@ const (
 
 func (sc varRangeSet) Run(c *Char, _ []int32) bool {
 	crun := c
-	var first, last int32 = 0, 0
+	first := 0
+	ilast := len(crun.cnsvar)
+	flast := len(crun.cnsfvar)
+
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
 		case varRangeSet_first:
-			first = exp[0].evalI(c)
+			first = int(exp[0].evalI(c))
 		case varRangeSet_last:
-			last = exp[0].evalI(c)
+			v := int(exp[0].evalI(c))
+			ilast = v
+			flast = v
 		case varRangeSet_value:
 			v := exp[0].evalI(c)
-			if first >= 0 && last < int32(NumVar) {
-				for i := first; i <= last; i++ {
-					crun.ivar[i] = v
+			if first >= 0 && ilast < len(crun.cnsvar) {
+				for i := first; i <= ilast; i++ {
+					crun.cnsvar[i] = v
 				}
 			}
 		case varRangeSet_fvalue:
 			fv := exp[0].evalF(c)
-			if first >= 0 && last < int32(NumFvar) {
-				for i := first; i <= last; i++ {
-					crun.fvar[i] = fv
+			if first >= 0 && flast < len(crun.cnsfvar) {
+				for i := first; i <= flast; i++ {
+					crun.cnsfvar[i] = fv
 				}
 			}
 		case varRangeSet_redirectid:
 			if rid := sys.playerID(exp[0].evalI(c)); rid != nil {
 				crun = rid
+				ilast = len(crun.cnsvar)
+				flast = len(crun.cnsfvar)
 			} else {
 				return false
 			}
@@ -10940,11 +10940,11 @@ func (sc loadFile) Run(c *Char, _ []int32) bool {
 				panic(err)
 			}
 		case SaveData_var:
-			if err := decoder.Decode(&crun.ivar); err != nil {
+			if err := decoder.Decode(&crun.cnsvar); err != nil {
 				panic(err)
 			}
 		case SaveData_fvar:
-			if err := decoder.Decode(&crun.fvar); err != nil {
+			if err := decoder.Decode(&crun.cnsfvar); err != nil {
 				panic(err)
 			}
 		}
@@ -11263,11 +11263,11 @@ func (sc saveFile) Run(c *Char, _ []int32) bool {
 				panic(err)
 			}
 		case SaveData_var:
-			if err := encoder.Encode(crun.ivar); err != nil {
+			if err := encoder.Encode(crun.cnsvar); err != nil {
 				panic(err)
 			}
 		case SaveData_fvar:
-			if err := encoder.Encode(crun.fvar); err != nil {
+			if err := encoder.Encode(crun.cnsfvar); err != nil {
 				panic(err)
 			}
 		}
