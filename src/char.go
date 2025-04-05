@@ -2569,10 +2569,6 @@ func (c *Char) init(n int, idx int32) {
 		c.playerFlag = false
 		c.kovelocity = false
 		c.keyctrl = [4]bool{false, false, false, true}
-		// These are handled elsewhere for root players
-		c.initCnsVar()
-		c.mapArray = make(map[string]float32)
-		c.remapSpr = make(RemapPreset)
 	}
 
 	// Set controller to CPU if applicable
@@ -2608,25 +2604,6 @@ func (c *Char) clsnOverlapTrigger(box1, pid, box2 int32) bool {
 		return false
 	}
 	return c.clsnCheck(getter, box1, box2, false, true)
-}
-
-func (c *Char) copyParent(p *Char) {
-	c.name = p.name + "'s helper"
-	c.parentIndex = p.helperIndex
-	c.controller = p.controller
-	c.teamside = p.teamside
-	c.size = p.size
-	c.life, c.lifeMax = p.lifeMax, p.lifeMax
-	c.powerMax = p.powerMax
-	if sys.maxPowerMode {
-		c.power = c.powerMax
-	} else {
-		c.power = 0
-	}
-	c.dizzyPoints, c.dizzyPointsMax = p.dizzyPointsMax, p.dizzyPointsMax
-	c.guardPoints, c.guardPointsMax = p.guardPointsMax, p.guardPointsMax
-	c.redLife = c.lifeMax
-	c.clearNextRound()
 }
 
 func (c *Char) addChild(ch *Char) {
@@ -5098,8 +5075,9 @@ func (c *Char) destroySelf(recursive, removeexplods, removetexts bool) bool {
 	return true
 }
 
+// Make a new helper before reading the bytecode parameters
 func (c *Char) newHelper() (h *Char) {
-	// If any existing helper entries are valid for overwriting, use that one
+	// If any existing helper entry is valid for overwriting, use that one
 	i := int32(0)
 	for ; int(i) < len(sys.chars[c.playerNo]); i++ {
 		if sys.chars[c.playerNo][i].helperIndex < 0 {
@@ -5116,15 +5094,40 @@ func (c *Char) newHelper() (h *Char) {
 		h = newChar(c.playerNo, i)
 		sys.chars[c.playerNo] = append(sys.chars[c.playerNo], h)
 	}
+
+	// Init default helper parameters
+	h.name = c.name + "'s helper"
 	h.id = sys.newCharId()
 	h.helperId = 0
 	h.ownpal = false
-	h.copyParent(c)
+	h.initCnsVar()
+	h.mapArray = make(map[string]float32)
+	h.remapSpr = make(RemapPreset)
+
+	// Copy some parent parameters
+	h.parentIndex = c.helperIndex
+	h.controller = c.controller
+	h.teamside = c.teamside
+	h.size = c.size
+	h.life, h.lifeMax = c.lifeMax, c.lifeMax
+	h.powerMax = c.powerMax
+	if sys.maxPowerMode {
+		h.power = h.powerMax
+	} else {
+		h.power = 0
+	}
+	h.dizzyPoints, h.dizzyPointsMax = c.dizzyPointsMax, c.dizzyPointsMax
+	h.guardPoints, h.guardPointsMax = c.guardPointsMax, c.guardPointsMax
+	h.redLife = h.lifeMax
+	h.clearNextRound()
+
+	// Add to player lists
 	c.addChild(h)
 	sys.charList.add(h)
 	return
 }
 
+// Init helper after reading the bytecode parameters
 func (c *Char) helperInit(h *Char, st int32, pt PosType, x, y, z float32,
 	facing int32, rp [2]int32, extmap bool) {
 	p := c.helperPos(pt, [...]float32{x, y, z}, facing, &h.facing, h.localscl, false)
