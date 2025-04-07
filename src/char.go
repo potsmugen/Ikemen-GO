@@ -7156,7 +7156,7 @@ func (c *Char) forceRemapPal(pfx *PalFX, dst [2]int32) {
 
 	// Reset remaps
 	//pfx.remap = make([]int, len(c.gi().palettedata.palList.paletteMap))
-	pfx.remap = c.gi().palettedata.palList.GetPalMap()
+	pfx.remap = *plist.GetPalMap()
 
 	// Apply the new remaps
 	for i := range pfx.remap {
