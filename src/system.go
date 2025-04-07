@@ -1181,8 +1181,6 @@ func (s *System) nextRound() {
 			s.nextCharId = Max(s.nextCharId, p[0].id+1) // nextCharId can't be this char's ID
 			s.clearPlayerAssets(i, false)
 			p[0].posReset()
-			p[0].setCtrl(false)
-			p[0].clearState()
 			p[0].prepareNextRound()
 			for j := range p[0].cmd {
 				p[0].cmd[j].BufReset()

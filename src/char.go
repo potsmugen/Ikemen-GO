@@ -2693,6 +2693,8 @@ func (c *Char) prepareNextRound() {
 	c.enemyNearP2Clear()
 	c.targets = c.targets[:0]
 	c.cpucmd = -1
+	c.clearState()
+	c.setCtrl(false)
 
 	// Selectively clear variables
 	c.varRangeSet(0, c.gi().data.intpersistindex-1, 0)
