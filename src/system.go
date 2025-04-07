@@ -1183,9 +1183,7 @@ func (s *System) nextRound() {
 			p[0].posReset()
 			p[0].setCtrl(false)
 			p[0].clearState()
-			p[0].clearNextRound()
-			p[0].varRangeSet(0, s.cgi[i].data.intpersistindex-1, 0)
-			p[0].fvarRangeSet(0, s.cgi[i].data.floatpersistindex-1, 0)
+			p[0].prepareNextRound()
 			for j := range p[0].cmd {
 				p[0].cmd[j].BufReset()
 			}
@@ -2188,7 +2186,6 @@ func (s *System) fight() (reload bool) {
 	var level [len(s.chars)]int32
 	for i, p := range s.chars {
 		if len(p) > 0 && p[0].teamside != -1 {
-			p[0].clearNextRound()
 			level[i] = s.wincnt.getLevel(i)
 			if s.cfg.Options.Team.PowerShare {
 				pmax := Max(s.cgi[i&1].data.power, s.cgi[i].data.power)
@@ -2279,44 +2276,10 @@ func (s *System) fight() (reload bool) {
 			p[0].lifeMax = Max(1, int32(math.Floor(foo*float64(lm))))
 
 			if p[0].roundsExisted() > 0 {
-				// If character already existed for a round, presumably because of turns mode, just update life
+				// If character already existed for a round, presumably because of Turns mode, just update life
 				p[0].life = Min(p[0].lifeMax, int32(math.Ceil(foo*float64(p[0].life))))
 			} else if s.round == 1 || s.tmode[i&1] == TM_Turns {
-				// If round 1 or a new character in Turns mode, initialize values
-				if p[0].ocd().life != -1 {
-					p[0].life = Clamp(p[0].ocd().life, 0, p[0].lifeMax)
-					p[0].redLife = p[0].life
-				} else {
-					p[0].life = p[0].lifeMax
-					p[0].redLife = p[0].lifeMax
-				}
-				if s.round == 1 {
-					if s.maxPowerMode {
-						p[0].power = p[0].powerMax
-					} else if p[0].ocd().power != -1 {
-						p[0].power = Clamp(p[0].ocd().power, 0, p[0].powerMax)
-					} else if !sys.consecutiveRounds || sys.consecutiveWins[0] == 0 {
-						p[0].power = 0
-					}
-				}
-				p[0].power = Clamp(p[0].power, 0, p[0].powerMax) // Because of previous partner in Turns mode
-				p[0].mapArray = make(map[string]float32)
-				for k, v := range p[0].mapDefault {
-					p[0].mapArray[k] = v
-				}
-				p[0].dialogue = []string{}
-				p[0].remapSpr = make(RemapPreset)
-			}
-
-			if p[0].ocd().guardPoints != -1 {
-				p[0].guardPoints = Clamp(p[0].ocd().guardPoints, 0, p[0].guardPointsMax)
-			} else {
-				p[0].guardPoints = p[0].guardPointsMax
-			}
-			if p[0].ocd().dizzyPoints != -1 {
-				p[0].dizzyPoints = Clamp(p[0].ocd().dizzyPoints, 0, p[0].dizzyPointsMax)
-			} else {
-				p[0].dizzyPoints = p[0].dizzyPointsMax
+				p[0].prepareFirstRound()
 			}
 			copyVar(i)
 		}
@@ -2442,7 +2405,6 @@ func (s *System) fight() (reload bool) {
 						} else if p[0].life <= 0 {
 							p[0].life = 1
 						}
-						p[0].redLife = p[0].life // TODO: This doesn't truly need to be hardcoded
 						copyVar(i)
 					}
 				}
@@ -2450,7 +2412,7 @@ func (s *System) fight() (reload bool) {
 				oldStageVars.copyStageVars(s.stage)
 				reset()
 			} else {
-				// End match, or prepare for a new character in turns mode
+				// End match, or prepare a new character in Turns mode
 				for i, tm := range s.tmode {
 					if s.chars[i][0].win() || !s.chars[i][0].lose() && tm != TM_Turns {
 						for j := i; j < len(s.chars); j += 2 {
@@ -2465,13 +2427,13 @@ func (s *System) fight() (reload bool) {
 						}
 					}
 				}
-				// If match isn't over, presumably this is turns mode,
+				// If match isn't over, presumably this is Turns mode,
 				// so break to restart fight for the next character
 				if !s.matchOver() {
 					break
 				}
 
-				// Otherwise match is over
+				// Otherwise the match is over
 				s.postMatchFlg = true
 				fin = true
 			}
@@ -3267,49 +3229,57 @@ func newLoader() *Loader {
 	return &Loader{state: LS_NotYet, loadExit: make(chan LoaderState, 1)}
 }
 
-func (l *Loader) loadChar(pn int) int {
-	if sys.roundsExisted[pn&1] > 0 {
+func (l *Loader) loadPlayerChar(pn int) int {
+	return l.loadCharacter(pn, false)
+}
+
+func (l *Loader) loadAttachedChar(pn int) int {
+	return l.loadCharacter(pn, true)
+}
+
+func (l *Loader) loadCharacter(pn int, attached bool) int {
+	if !attached && sys.roundsExisted[pn&1] > 0 {
 		return 1
 	}
+	if attached && sys.round != 1 {
+		return 1
+	}
+
 	sys.loadMutex.Lock()
-	result := -1
 
 	// Get number of selected characters in team
+	memberNo := pn >> 1
 	nsel := len(sys.sel.selected[pn&1])
 
-	// Check if player number is acceptable for Simul and Tag
-	if sys.tmode[pn&1] == TM_Simul || sys.tmode[pn&1] == TM_Tag {
-		if pn>>1 >= int(sys.numSimul[pn&1]) {
-			sys.cgi[pn].states = nil
-			sys.chars[pn] = nil
-			result = 1
+	// Check if player number is acceptable for selected team mode
+	if !attached {
+		if sys.tmode[pn&1] == TM_Simul || sys.tmode[pn&1] == TM_Tag {
+			if memberNo >= int(sys.numSimul[pn&1]) {
+				sys.cgi[pn].states = nil
+				sys.chars[pn] = nil
+				return 1
+			}
+		} else if pn >= 2 {
+			return 0
 		}
-	} else if pn >= 2 {
-		result = 0
-	}
 
-	// Check if player number is acceptable for Turns
-	if sys.tmode[pn&1] == TM_Turns && nsel < int(sys.numTurns[pn&1]) {
-		result = 0
-	}
-	memberNo := pn >> 1
-	if sys.tmode[pn&1] == TM_Turns {
-		memberNo = int(sys.wins[^pn&1])
-	}
-	if result < 0 && nsel <= memberNo {
-		result = 0
-	}
-	if result >= 0 {
-		sys.loadMutex.Unlock()
-		return result
+		if sys.tmode[pn&1] == TM_Turns && nsel < int(sys.numTurns[pn&1]) {
+			return 0
+		}
+
+		if sys.tmode[pn&1] == TM_Turns {
+			memberNo = int(sys.wins[^pn&1])
+		}
+
+		if nsel <= memberNo {
+			return 0
+		}
 	}
 
 	idx := make([]int, nsel)
 	for i := range idx {
 		idx[i] = sys.sel.selected[pn&1][i][0]
 	}
-
-	sys.loadMutex.Unlock()
 
 	// Prepare loading time clipboard message
 	var tstr string
@@ -3333,33 +3303,37 @@ func (l *Loader) loadChar(pn int) int {
 	var cdef string
 	var cdefOWnumber int
 
-	if sys.tmode[pn&1] == TM_Turns {
-		cdefOWnumber = memberNo*2 + pn&1
+	if attached {
+		atcpn := pn - MaxSimul*2
+		cdef = sys.stageList[0].attachedchardef[atcpn]
 	} else {
-		cdefOWnumber = pn
-	}
-	if sys.sel.cdefOverwrite[cdefOWnumber] != "" {
-		cdef = sys.sel.cdefOverwrite[cdefOWnumber]
-	} else {
-		cdef = sys.sel.charlist[idx[memberNo]].def
+		if sys.tmode[pn&1] == TM_Turns {
+			cdefOWnumber = memberNo*2 + pn&1
+		} else {
+			cdefOWnumber = pn
+		}
+		if sys.sel.cdefOverwrite[cdefOWnumber] != "" {
+			cdef = sys.sel.cdefOverwrite[cdefOWnumber]
+		} else {
+			cdef = sys.sel.charlist[idx[memberNo]].def
+		}
 	}
 
-	// Reuse character or create a new one
 	var p *Char
-	sys.workingChar = p // This should help compiler and bytecode stay consistent
+	sys.workingChar = p
 
+	// Reuse existing character or create a new one
 	if len(sys.chars[pn]) > 0 && cdef == sys.cgi[pn].def {
 		p = sys.chars[pn][0]
-		p.controller = pn
-		if sys.com[pn] != 0 {
-			p.controller ^= -1
+		if !attached {
+			p.controller = pn
+			if sys.com[pn] != 0 {
+				p.controller ^= -1
+			}
 		}
 		p.clearCachedData()
 	} else {
 		p = newChar(pn, 0)
-		if sys.cgi[pn].sff != nil {
-			sys.cgi[pn].sff.sprites = nil
-		}
 		sys.cgi[pn].sff = nil
 		sys.cgi[pn].palettedata = nil
 		if len(sys.chars[pn]) > 0 {
@@ -3370,9 +3344,18 @@ func (l *Loader) loadChar(pn int) int {
 	}
 
 	// Set new character parameters
-	p.memberNo = memberNo
-	p.selectNo = sys.sel.selected[pn&1][memberNo][0]
-	p.teamside = p.playerNo & 1
+	if attached {
+		atcpn := pn - MaxSimul*2
+		p.memberNo = -atcpn
+		p.selectNo = -atcpn
+		p.teamside = -1
+		sys.com[pn] = 8
+	} else {
+		p.memberNo = memberNo
+		p.selectNo = sys.sel.selected[pn&1][memberNo][0]
+		p.teamside = p.playerNo & 1
+	}
+
 	if !p.ocd().existed {
 		p.initCnsVar()
 		p.ocd().existed = true
@@ -3385,93 +3368,50 @@ func (l *Loader) loadChar(pn int) int {
 	if sys.cgi[pn].sff == nil {
 		if l.err = p.load(cdef); l.err != nil {
 			sys.chars[pn] = nil
-			tstr = fmt.Sprintf("WARNING: Failed to load new char: %v", cdef)
+			if attached {
+				tstr = fmt.Sprintf("WARNING: Failed to load new attached char: %v", cdef)
+			} else {
+				tstr = fmt.Sprintf("WARNING: Failed to load new char: %v", cdef)
+			}
 			return -1
 		}
-		if sys.cgi[pn].states, l.err =
-			newCompiler().Compile(p.playerNo, cdef, p.gi().constants); l.err != nil {
+		if sys.cgi[pn].states, l.err = newCompiler().Compile(p.playerNo, cdef, p.gi().constants); l.err != nil {
 			sys.chars[pn] = nil
-			tstr = fmt.Sprintf("WARNING: Failed to compile new char states: %v", cdef)
+			if attached {
+				tstr = fmt.Sprintf("WARNING: Failed to compile new attached char states: %v", cdef)
+			} else {
+				tstr = fmt.Sprintf("WARNING: Failed to compile new char states: %v", cdef)
+			}
 			return -1
 		}
-		tstr = fmt.Sprintf("New char loaded: %v", cdef)
+		if attached {
+			tstr = fmt.Sprintf("New attached char loaded: %v", cdef)
+		} else {
+			tstr = fmt.Sprintf("New char loaded: %v", cdef)
+		}
 	} else {
-		tstr = fmt.Sprintf("Cached char loaded: %v", cdef)
+		if attached {
+			tstr = fmt.Sprintf("Cached attached char loaded: %v", cdef)
+		} else {
+			tstr = fmt.Sprintf("Cached char loaded: %v", cdef)
+		}
 	}
 
 	// Get palette number from select screen choice
-	sys.cgi[pn].palno = int32(sys.sel.selected[pn&1][memberNo][1])
-
-	// Get portraits for Turns mode
-	if pn < len(sys.lifebar.fa[sys.tmode[pn&1]]) &&
-		sys.tmode[pn&1] == TM_Turns && sys.round == 1 {
-		fa := sys.lifebar.fa[sys.tmode[pn&1]][pn]
-		fa.numko, fa.teammate_face, fa.teammate_scale = 0, make([]*Sprite, nsel), make([]float32, nsel)
-		sys.lifebar.nm[sys.tmode[pn&1]][pn].numko = 0
-		for i, ci := range idx {
-			fa.teammate_scale[i] = sys.sel.charlist[ci].portrait_scale
-			fa.teammate_face[i] = sys.sel.charlist[ci].sff.GetSprite(int16(fa.teammate_face_spr[0]),
-				int16(fa.teammate_face_spr[1]))
-		}
-	}
-
-	return 1
-}
-
-func (l *Loader) loadAttachedChar(pn int) int {
-	if sys.round != 1 {
-		return 1
-	}
-	atcpn := pn - MaxSimul*2
-	var tstr string
-	tnow := time.Now()
-	defer func() {
-		sys.loadTime(tnow, tstr, false, true)
-	}()
-	sys.sel.ocd[2] = append(sys.sel.ocd[2], *newOverrideCharData())
-	cdef := sys.stageList[0].attachedchardef[atcpn]
-	var p *Char
-	if len(sys.chars[pn]) > 0 && cdef == sys.cgi[pn].def {
-		p = sys.chars[pn][0]
-		//p.controller = -pn
-		p.clearCachedData()
+	if attached {
+		sys.cgi[pn].palno = 1
 	} else {
-		p = newChar(pn, 0)
-		sys.cgi[pn].sff = nil
-		sys.cgi[pn].palettedata = nil
-		if len(sys.chars[pn]) > 0 {
-			p.power = sys.chars[pn][0].power
-			p.guardPoints = sys.chars[pn][0].guardPoints
-			p.dizzyPoints = sys.chars[pn][0].dizzyPoints
+		sys.cgi[pn].palno = int32(sys.sel.selected[pn&1][memberNo][1])
+		if pn < len(sys.lifebar.fa[sys.tmode[pn&1]]) && sys.tmode[pn&1] == TM_Turns && sys.round == 1 {
+			fa := sys.lifebar.fa[sys.tmode[pn&1]][pn]
+			fa.numko, fa.teammate_face, fa.teammate_scale = 0, make([]*Sprite, nsel), make([]float32, nsel)
+			sys.lifebar.nm[sys.tmode[pn&1]][pn].numko = 0
+			for i, ci := range idx {
+				fa.teammate_scale[i] = sys.sel.charlist[ci].portrait_scale
+				fa.teammate_face[i] = sys.sel.charlist[ci].sff.GetSprite(int16(fa.teammate_face_spr[0]), int16(fa.teammate_face_spr[1]))
+			}
 		}
 	}
-	p.memberNo = -atcpn
-	p.selectNo = -atcpn
-	p.teamside = -1
-	sys.com[pn] = 8
-	sys.chars[pn] = make([]*Char, 1)
-	sys.chars[pn][0] = p
-	if sys.cgi[pn].sff == nil {
-		if l.err = p.load(cdef); l.err != nil {
-			sys.chars[pn] = nil
-			tstr = fmt.Sprintf("WARNING: Failed to load new attached char: %v", cdef)
-			return -1
-		}
-		if sys.cgi[pn].states, l.err =
-			newCompiler().Compile(p.playerNo, cdef, p.gi().constants); l.err != nil {
-			sys.chars[pn] = nil
-			tstr = fmt.Sprintf("WARNING: Failed to compile new attached char states: %v", cdef)
-			return -1
-		}
-		tstr = fmt.Sprintf("New attached char loaded: %v", cdef)
-	} else {
-		tstr = fmt.Sprintf("Cached attached char loaded: %v", cdef)
-	}
-	if !p.ocd().existed {
-		p.initCnsVar()
-		p.ocd().existed = true
-	}
-	sys.cgi[pn].palno = 1
 	return 1
 }
 
@@ -3555,9 +3495,9 @@ func (l *Loader) load() {
 				result := -1
 				if i < len(sys.chars)-MaxAttachedChar ||
 					len(sys.stageList[0].attachedchardef) <= i-MaxSimul*2 {
-					result = l.loadChar(i)
+					result = l.loadCharacter(i, false)
 				} else {
-					result = l.loadAttachedChar(i)
+					result = l.loadCharacter(i, true)
 				}
 				if result > 0 {
 					charDone[i] = true

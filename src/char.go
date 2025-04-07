@@ -2624,10 +2624,43 @@ func (c *Char) enemyNearP2Clear() {
 	c.p2EnemyList = c.p2EnemyList[:0]
 }
 
+// If round 1 or a new character in Turns mode, initialize values
+func (c *Char) prepareFirstRound() {
+	// Life
+	if c.ocd().life != -1 {
+		c.life = Clamp(c.ocd().life, 0, c.lifeMax)
+		c.redLife = c.life
+	} else {
+		c.life = c.lifeMax
+		c.redLife = c.lifeMax
+	}
+
+	// Power
+	if sys.round == 1 {
+		if sys.maxPowerMode {
+			c.power = c.powerMax
+		} else if c.ocd().power != -1 {
+			c.power = Clamp(c.ocd().power, 0, c.powerMax)
+		} else if !sys.consecutiveRounds || sys.consecutiveWins[0] == 0 {
+			c.power = 0
+		}
+	}
+
+	// Clamp power in case the previous Turns mode partner had a higher powerMax
+	c.power = Clamp(c.power, 0, c.powerMax)
+
+	c.mapArray = make(map[string]float32)
+	for k, v := range c.mapDefault {
+		c.mapArray[k] = v
+	}
+	c.dialogue = []string{}
+	c.remapSpr = make(RemapPreset)
+
+	c.prepareNextRound()
+}
+
 // Clear character variables upon a new round or creation of a new helper
-func (c *Char) clearNextRound() {
-	c.sysVarRangeSet(0, math.MaxInt32, 0)
-	c.sysFvarRangeSet(0, math.MaxInt32, 0)
+func (c *Char) prepareNextRound() {
 	atk := float32(c.gi().data.attack) * c.ocd().attackRatio / 100
 	c.CharSystemVar = CharSystemVar{
 		bindToId:        -1,
@@ -2660,6 +2693,32 @@ func (c *Char) clearNextRound() {
 	c.enemyNearP2Clear()
 	c.targets = c.targets[:0]
 	c.cpucmd = -1
+
+	// Selectively clear variables
+	c.varRangeSet(0, c.gi().data.intpersistindex-1, 0)
+	c.fvarRangeSet(0, c.gi().data.floatpersistindex-1, 0)
+	c.sysVarRangeSet(0, math.MaxInt32, 0)
+	c.sysFvarRangeSet(0, math.MaxInt32, 0)
+
+	// Note: Life resetting is handled by system.go because it depends on team mode
+
+	// Restore red life
+	// TODO: Maybe this doesn't need to be hardcoded
+	c.redLife = c.life
+
+	// Restore dizzy points
+	if c.ocd().dizzyPoints != -1 {
+		c.dizzyPoints = Clamp(c.ocd().dizzyPoints, 0, c.dizzyPointsMax)
+	} else {
+		c.dizzyPoints = c.dizzyPointsMax
+	}
+
+	// Restore guard points
+	if c.ocd().guardPoints != -1 {
+		c.guardPoints = Clamp(c.ocd().guardPoints, 0, c.guardPointsMax)
+	} else {
+		c.guardPoints = c.guardPointsMax
+	}
 }
 
 // Clear data when loading a new instance of the same character
@@ -5147,7 +5206,9 @@ func (c *Char) newHelper() (h *Char) {
 	h.dizzyPoints, h.dizzyPointsMax = c.dizzyPointsMax, c.dizzyPointsMax
 	h.guardPoints, h.guardPointsMax = c.guardPointsMax, c.guardPointsMax
 	h.redLife = h.lifeMax
-	h.clearNextRound()
+
+	// Prepare helper since it wasn't present at start of round
+	h.prepareNextRound()
 
 	// Add to player lists
 	c.addChild(h)
