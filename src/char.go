@@ -5147,6 +5147,7 @@ func (c *Char) newHelper() (h *Char) {
 	h.dizzyPoints, h.dizzyPointsMax = c.dizzyPointsMax, c.dizzyPointsMax
 	h.guardPoints, h.guardPointsMax = c.guardPointsMax, c.guardPointsMax
 	h.redLife = h.lifeMax
+
 	h.prepareNextRound()
 
 	// Add to player lists
@@ -7123,6 +7124,7 @@ func (c *Char) remapPal(pfx *PalFX, src [2]int32, dst [2]int32) {
 		plist.Remap(si, di)
 
 		// Remap palette 1, 1 in SFF v1
+		// Apply it to sprites 0,0 and 9000,0
 		if src[0] == 1 && src[1] == 1 && c.gi().sff.header.Ver0 == 1 {
 			if spr := c.gi().sff.GetSprite(0, 0); spr != nil {
 				plist.Remap(spr.palidx, di)
@@ -7144,18 +7146,23 @@ func (c *Char) forceRemapPal(pfx *PalFX, dst [2]int32) {
 		return
 	}
 
-	// Get new palette
-	di, ok := c.gi().palettedata.palList.PalTable[[...]int16{int16(dst[0]), int16(dst[1])}]
+	plist := c.gi().palettedata.palList
+
+	// Get destination palette index
+	di, ok := plist.PalTable[[...]int16{int16(dst[0]), int16(dst[1])}]
 	if !ok || di < 0 {
 		return
 	}
 
-	// Clear previous remaps
-	pfx.remap = make([]int, len(c.gi().palettedata.palList.paletteMap))
+	// Reset remaps
+	//pfx.remap = make([]int, len(c.gi().palettedata.palList.paletteMap))
+	pfx.remap = c.gi().palettedata.palList.GetPalMap()
 
-	// Apply the new remap
+	// Apply the new remaps
 	for i := range pfx.remap {
-		pfx.remap[i] = di
+		if len(plist.palettes[i]) == len(plist.palettes[di]) {
+			pfx.remap[i] = di
+		}
 	}
 }
 

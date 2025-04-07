@@ -4836,7 +4836,7 @@ func (sc helper) Run(c *Char, _ []int32) bool {
 	var f, st int32 = 1, 0
 	var extmap bool
 	var x, y, z float32 = 0, 0, 0
-	rp := [...]int32{-1, 0}
+	rp := [2]int32{-1, 0}
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		if h == nil {
 			if paramID == helper_redirectid {
@@ -5514,7 +5514,7 @@ func (sc explod) Run(c *Char, _ []int32) bool {
 	var e *Explod
 	var i int
 	//e, i := crun.newExplod()
-	rp := [...]int32{-1, 0}
+	rp := [2]int32{-1, 0}
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		if e == nil {
 			if paramID == explod_redirectid {
@@ -5843,7 +5843,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 	eid := int32(-1)
 	idx := int32(-1)
 	var expls []*Explod
-	rp := [...]int32{-1, 0}
+	rp := [2]int32{-1, 0}
 	remap := false
 	ptexists := false
 
@@ -7137,7 +7137,7 @@ func (sc projectile) Run(c *Char, _ []int32) bool {
 	var x, y, z float32 = 0, 0, 0
 	op := false
 	clsnscale := false
-	rp := [...]int32{-1, 0}
+	rp := [2]int32{-1, 0}
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		if p == nil {
 			if paramID == projectile_redirectid {
