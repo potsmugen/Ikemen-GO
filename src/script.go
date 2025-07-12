@@ -742,7 +742,9 @@ func systemScriptInit(l *lua.LState) {
 		if err != nil {
 			l.RaiseError(err.Error())
 		}
-		time, buftime := cl.DefaultTime, cl.DefaultBufferTime
+		time := cl.DefaultTime
+		buftime := cl.DefaultBufferTime
+		hitpausebuffer := cl.DefaultHitpauseBuffer
 		pausebuffer := cl.DefaultPauseBuffer
 		if !nilArg(l, 4) {
 			time = int32(numArg(l, 4))
@@ -751,10 +753,14 @@ func systemScriptInit(l *lua.LState) {
 			buftime = Max(1, int32(numArg(l, 5)))
 		}
 		if !nilArg(l, 6) {
-			pausebuffer = boolArg(l, 6)
+			hitpausebuffer = boolArg(l, 6)
+		}
+		if !nilArg(l, 7) {
+			pausebuffer = boolArg(l, 7)
 		}
 		cm.time = time
 		cm.buftime = buftime
+		cm.hitpausebuffer = hitpausebuffer
 		cm.pausebuffer = pausebuffer
 		cl.Add(*cm)
 		return 0
@@ -781,7 +787,7 @@ func systemScriptInit(l *lua.LState) {
 			userDataError(l, 1, cl)
 		}
 		if cl.InputUpdate(int(numArg(l, 2))-1, 1, 0, 0, true) {
-			cl.Step(1, false, false, false, 0)
+			cl.Step(1, false, false, false, false, 0)
 		}
 		return 0
 	})

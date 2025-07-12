@@ -1575,6 +1575,7 @@ type Command struct {
 	buftime, curbuftime int32
 	completeflag        bool
 	hasSlash            bool
+	hitpausebuffer      bool
 	pausebuffer         bool
 }
 
@@ -2074,17 +2075,26 @@ func (c *Command) bufTest(ibuf *InputBuffer, ai bool, isHelper bool, holdTemp *[
 }
 
 // Update an individual command
-func (c *Command) Step(ibuf *InputBuffer, ai, isHelper, hitpause bool, buftime int32) {
-	if !c.pausebuffer {
-		hitpause = false
-		buftime = 0
+func (c *Command) Step(ibuf *InputBuffer, ai, isHelper, hpbuf, pausebuf bool, extratime int32) {
+	// Skip hitpause buffering
+	if !c.hitpausebuffer {
+		hpbuf = false
+		extratime = 0
 	}
-	if !hitpause && c.curbuftime > 0 {
+	// Skip Pause/SuperPause buffering
+	if !c.pausebuffer {
+		pausebuf = false
+		extratime = 0
+	}
+	// Decrease current buffer timer if not paused
+	if c.curbuftime > 0 && !hpbuf && !pausebuf {
 		c.curbuftime--
 	}
+	// Skip blank input commands
 	if len(c.cmd) == 0 {
 		return
 	}
+	// Make sure current buffer timer doesn't accidentally decrease
 	ocbt := c.curbuftime
 	defer func() {
 		if c.curbuftime < ocbt {
@@ -2105,6 +2115,7 @@ func (c *Command) Step(ibuf *InputBuffer, ai, isHelper, hitpause bool, buftime i
 	} else {
 		c.curtime++
 	}
+	// Check if command input was completed in this frame
 	c.completeflag = (c.cmdidx == len(c.cmd))
 	if !c.completeflag && (ai || c.curtime <= c.time) {
 		return
@@ -2112,7 +2123,7 @@ func (c *Command) Step(ibuf *InputBuffer, ai, isHelper, hitpause bool, buftime i
 	c.Clear(false)
 	if c.completeflag {
 		// Update buffer time only if it's lower. Mugen doesn't do this but it seems like the right thing to do
-		c.curbuftime = Max(c.curbuftime, c.buftime+buftime)
+		c.curbuftime = Max(c.curbuftime, c.buftime+extratime)
 	}
 }
 
@@ -2124,7 +2135,8 @@ type CommandList struct {
 	Commands           [][]Command
 	DefaultTime        int32
 	DefaultBufferTime  int32
-	DefaultPauseBuffer bool
+	DefaultHitpauseBuffer bool
+	DefaultPauseBuffer    bool
 }
 
 func NewCommandList(cb *InputBuffer) *CommandList {
@@ -2133,6 +2145,7 @@ func NewCommandList(cb *InputBuffer) *CommandList {
 		Names:              make(map[string]int),
 		DefaultTime:        15,
 		DefaultBufferTime:  1,
+		DefaultHitpauseBuffer: true,
 		DefaultPauseBuffer: true,
 	}
 }
@@ -2273,11 +2286,11 @@ func (cl *CommandList) ClearName(name string) {
 }
 
 // Used when updating commands in each frame
-func (cl *CommandList) Step(facing int32, ai, isHelper, hitpause bool, buftime int32) {
+func (cl *CommandList) Step(facing int32, ai, isHelper, hpbuf, pausebuf bool, extratime int32) {
 	if cl.Buffer != nil {
 		for i := range cl.Commands {
 			for j := range cl.Commands[i] {
-				cl.Commands[i][j].Step(cl.Buffer, ai, isHelper, hitpause, buftime)
+				cl.Commands[i][j].Step(cl.Buffer, ai, isHelper, hpbuf, pausebuf, extratime)
 			}
 		}
 		// Find completed commands and reset all duplicate instances
