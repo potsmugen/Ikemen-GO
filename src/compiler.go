@@ -4475,6 +4475,8 @@ func (c *Compiler) expValue(out *BytecodeExp, in *string,
 			out.appendI64Op(OC_ex_isassertedchar, int64(ASF_nocrouch))
 		case "nodizzypointsdamage":
 			out.appendI64Op(OC_ex_isassertedchar, int64(ASF_nodizzypointsdamage))
+		case "noendcmdbuftime":
+			out.appendI64Op(OC_ex_isassertedchar, int64(ASF_noendcmdbuftime))
 		case "nofacedisplay":
 			out.appendI64Op(OC_ex_isassertedchar, int64(ASF_nofacedisplay))
 		case "nofacep2":
@@ -7484,7 +7486,7 @@ func (c *Compiler) Compile(pn int, def string, constants map[string]float32) (ma
 				if is.ReadI32("command.buffer.time", &i32) {
 					c.cmdl.DefaultBufferTime = Max(1, i32)
 				}
-				is.ReadBool("command.pausebuffer", &c.cmdl.DefaultPauseBuffer)
+				is.ReadBool("command.hitpausebuffer", &c.cmdl.DefaultHitpauseBuffer)
 			}
 		default:
 			// Read input commands
@@ -7505,14 +7507,17 @@ func (c *Compiler) Compile(pn int, def string, constants map[string]float32) (ma
 			return nil, Error(cmd + ":\nname = " + is["name"] +
 				"\ncommand = " + is["command"] + "\n" + err.Error())
 		}
-		cm.time, cm.buftime = c.cmdl.DefaultTime, c.cmdl.DefaultBufferTime
-		cm.pausebuffer = c.cmdl.DefaultPauseBuffer
+		// Default parameters
+		cm.time = c.cmdl.DefaultTime
+		cm.buftime = c.cmdl.DefaultBufferTime
+		cm.hitpausebuffer = c.cmdl.DefaultHitpauseBuffer
+		// Read specific parameters
 		is.ReadI32("time", &cm.time)
 		var i32 int32
 		if is.ReadI32("buffer.time", &i32) {
 			cm.buftime = Max(1, i32)
 		}
-		is.ReadBool("pausebuffer", &cm.pausebuffer)
+		is.ReadBool("hitpausebuffer", &cm.hitpausebuffer)
 		c.cmdl.Add(*cm)
 	}
 

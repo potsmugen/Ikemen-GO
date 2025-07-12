@@ -174,6 +174,8 @@ func (c *Compiler) assertSpecial(is IniSection, sc *StateControllerBase, _ int8)
 				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_nocrouch)))
 			case "nodizzypointsdamage":
 				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_nodizzypointsdamage)))
+			case "noendcmdbuftime":
+				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_noendcmdbuftime)))
 			case "nofacedisplay":
 				sc.add(assertSpecial_flag, sc.i64ToExp(int64(ASF_nofacedisplay)))
 			case "nofacep2":

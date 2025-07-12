@@ -742,8 +742,9 @@ func systemScriptInit(l *lua.LState) {
 		if err != nil {
 			l.RaiseError(err.Error())
 		}
-		time, buftime := cl.DefaultTime, cl.DefaultBufferTime
-		pausebuffer := cl.DefaultPauseBuffer
+		time := cl.DefaultTime
+		buftime := cl.DefaultBufferTime
+		hitpausebuffer := cl.DefaultHitpauseBuffer
 		if !nilArg(l, 4) {
 			time = int32(numArg(l, 4))
 		}
@@ -751,11 +752,11 @@ func systemScriptInit(l *lua.LState) {
 			buftime = Max(1, int32(numArg(l, 5)))
 		}
 		if !nilArg(l, 6) {
-			pausebuffer = boolArg(l, 6)
+			hitpausebuffer = boolArg(l, 6)
 		}
 		cm.time = time
 		cm.buftime = buftime
-		cm.pausebuffer = pausebuffer
+		cm.hitpausebuffer = hitpausebuffer
 		cl.Add(*cm)
 		return 0
 	})
@@ -781,7 +782,7 @@ func systemScriptInit(l *lua.LState) {
 			userDataError(l, 1, cl)
 		}
 		if cl.InputUpdate(int(numArg(l, 2))-1, 1, 0, 0, true) {
-			cl.Step(1, false, false, false, 0)
+			cl.Step(1, false, false, false, false, 0)
 		}
 		return 0
 	})
@@ -5555,6 +5556,8 @@ func triggerFunctions(l *lua.LState) {
 			l.Push(lua.LBool(sys.debugWC.asf(ASF_nocrouch)))
 		case "nodizzypointsdamage":
 			l.Push(lua.LBool(sys.debugWC.asf(ASF_nodizzypointsdamage)))
+		case "noendcmdbuftime":
+			l.Push(lua.LBool(sys.debugWC.asf(ASF_noendcmdbuftime)))
 		case "nofacep2":
 			l.Push(lua.LBool(sys.debugWC.asf(ASF_nofacep2)))
 		case "nofallcount":
