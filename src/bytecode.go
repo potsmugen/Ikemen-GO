@@ -9422,7 +9422,7 @@ func (sc hitOverride) Run(c *Char, _ []int32) bool {
 	crun := c
 	var at, sl, st, t int32 = 0, 0, -1, 1
 	var fa, fg, ks bool
-	gf := ^int32(0) // Default to all flags // int32(HF_H | HF_L | HF_A)
+	gf := IErr
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {

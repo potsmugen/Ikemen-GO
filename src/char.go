@@ -8722,8 +8722,11 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile) (hitResult int32) 
 				}
 			}
 			// Check guardflag
-			if ho.guardflag&hd.guardflag == 0 || c.asf(ASF_unguardable) {
-				continue
+			if ho.guardflag != IErr {
+				if ho.guardflag&hd.guardflag == 0 && // Flags override guardable
+					!(ho.guardflag == 0 && (hd.guardflag == 0 || c.asf(ASF_unguardable))) { // Blank flag overrides unguardable
+					continue
+				}
 			}
 			// Miss if using p1stateno or p2stateno and HitOverride together
 			// In Mugen, it misses even if the enemy guards // && Abs(hitResult) == 1
