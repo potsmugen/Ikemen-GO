@@ -11524,12 +11524,11 @@ func (sc modifySnd) Run(c *Char, _ []int32) bool {
 
 	x := &crun.pos[0]
 	ls := crun.localscl
+	var snd *SoundChannel
 	var ch, pri int32 = -1, 0
+	var stopgh, stopcs int32 = -1, -1 // Undefined bools
 	var vo, fr float32 = 100, 1.0
-	snd := crun.soundChannels.Get(-1)
-	stopgh, stopcs := false, false
 	freqMulSet, volumeSet, prioritySet, panSet, loopStartSet, loopEndSet, posSet, lcSet, loopSet := false, false, false, false, false, false, false, false, false
-	stopghSet, stopcsSet := false, false
 	var loopstart, loopend, position, lc int = 0, 0, 0, 0
 	var p float32 = 0
 
@@ -11584,12 +11583,13 @@ func (sc modifySnd) Run(c *Char, _ []int32) bool {
 			}
 			lcSet = true
 		case modifySnd_stopongethit:
-			stopgh = exp[0].evalB(c)
+			stopgh = Btoi(exp[0].evalB(c))
 		case modifySnd_stoponchangestate:
-			stopcs = exp[0].evalB(c)
+			stopcs = Btoi(exp[0].evalB(c))
 		}
 		return true
 	})
+
 	// Grab the correct sound channel now
 	channelCount := 1
 	if ch < 0 {
@@ -11646,11 +11646,11 @@ func (sc modifySnd) Run(c *Char, _ []int32) bool {
 				snd.SetVolume(vo)
 			}
 			// These flags can be updated regardless since there are no calculations involved
-			if stopghSet {
-				snd.stopOnGetHit = stopgh
+			if stopgh >= 0 {
+				snd.stopOnGetHit = stopgh != 0
 			}
-			if stopcsSet {
-				snd.stopOnChangeState = stopcs
+			if stopcs >= 0 {
+				snd.stopOnChangeState = stopgh != 0
 			}
 		}
 	}

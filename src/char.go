@@ -5380,7 +5380,7 @@ func (c *Char) destroy() {
 		}
 		// Remove ID from children
 		for _, ch := range c.children {
-			if ch != nil {
+			if ch != nil && ch.parentIndex > 0 {
 				ch.parentIndex *= -1
 			}
 		}
@@ -7422,8 +7422,8 @@ func (c *Char) getPalfx() *PalFX {
 		}
 	}
 	c.palfx = newPalFX()
-	// Mugen 1.1 behavior if invertblend param is omitted(Only if char mugenversion = 1.1)
-	if c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 1 && c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.palfx != nil {
+	// Mugen 1.1 behavior if invertblend param is omitted (only if char mugenversion = 1.1)
+	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 1 && c.palfx != nil {
 		c.palfx.PalFXDef.invertblend = -2
 	}
 	return c.palfx
