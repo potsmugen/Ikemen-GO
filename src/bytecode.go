@@ -5488,8 +5488,9 @@ const (
 	explod_interpolate_pfx_color
 	explod_interpolate_pfx_hue
 	explod_interpolation
-	explod_redirectid
+	explod_localcoord
 	explod_last = iota + palFX_last + 1 - 1
+	explod_redirectid
 )
 
 func (sc explod) Run(c *Char, _ []int32) bool {
@@ -5498,7 +5499,6 @@ func (sc explod) Run(c *Char, _ []int32) bool {
 		return false
 	}
 
-	redirscale := c.localscl / crun.localscl
 	rp := [...]int32{-1, 0}
 
 	e, i := crun.newExplod()
@@ -5506,6 +5506,34 @@ func (sc explod) Run(c *Char, _ []int32) bool {
 		return false
 	}
 	e.id = 0
+
+	// Get localcoord
+	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
+		switch paramID {
+		case explod_localcoord:
+			var x, y float32
+			x = exp[0].evalF(c)
+			if len(exp) > 1 {
+				y = exp[1].evalF(c)
+			}
+			if x > 0 && y > 0 {
+				e.localcoord = [2]float32{x, y}
+			}
+		}
+		return true
+	})
+
+	// Use explod's own localcoord if provided, or the usual redirection scale
+	// TODO: This could probably go in more sctrl's
+	var redirscale float32 = 1.0
+	if e.localcoord[0] <= 0 || e.localcoord[1] <= 0 {
+		e.localcoord = [2]float32{c.stOgi().localcoord[0], c.stOgi().localcoord[1]} // Default localcoord to state owner's, like Mugen
+		e.localscl = crun.localscl
+		redirscale = c.localscl / crun.localscl
+	} else {
+		e.localscl = 320 / (e.localcoord[0] / (float32(sys.gameWidth) / 320)) // Same as char calculation
+		redirscale = 1.0
+	}
 
 	// Mugenversion 1.1 chars default postype to "None"
 	if c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 1 {
@@ -5708,6 +5736,8 @@ func (sc explod) Run(c *Char, _ []int32) bool {
 			e.projection = Projection(exp[0].evalI(c))
 		case explod_window:
 			e.window = [4]float32{exp[0].evalF(c) * redirscale, exp[1].evalF(c) * redirscale, exp[2].evalF(c) * redirscale, exp[3].evalF(c) * redirscale}
+		case explod_localcoord:
+			return true // Already handled. Avoid default
 		case explod_redirectid:
 			return true // Already handled. Avoid default
 		default:
@@ -5726,7 +5756,7 @@ func (sc explod) Run(c *Char, _ []int32) bool {
 	//if c.minus == -2 || c.minus == -4 {
 	//	e.localscl = (320 / crun.localcoord)
 	//} else {
-	e.localscl = crun.localscl
+
 	e.setStartParams(&e.palfxdef)
 	e.setPos(crun)
 	crun.insertExplodEx(i, rp)
@@ -6275,6 +6305,17 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 							e.interpolate_time[1] = e.interpolate_time[0]
 							e.interpolate = interpolation
 						}
+					})
+				}
+			case explod_localcoord:
+				var x, y float32
+				x = exp[0].evalF(c)
+				if len(exp) > 1 {
+					y = exp[1].evalF(c)
+				}
+				if x > 0 && y > 0 {
+					eachExpl(func(e *Explod) {
+						e.localcoord = [2]float32{x, y}
 					})
 				}
 			default:
@@ -11908,8 +11949,8 @@ const (
 	text_color
 	text_xshear
 	text_id
-	text_redirectid
 	text_last = iota + palFX_last + 1 - 1
+	text_redirectid
 )
 
 func (sc text) Run(c *Char, _ []int32) bool {
@@ -11963,7 +12004,12 @@ func (sc text) Run(c *Char, _ []int32) bool {
 				fnt = -1
 			}
 		case text_localcoord:
-			ts.SetLocalcoord(exp[0].evalF(c), exp[1].evalF(c))
+			var x, y float32
+			x = exp[0].evalF(c)
+			if len(exp) > 1 {
+				y = exp[1].evalF(c)
+			}
+			ts.SetLocalcoord(x, y)
 		case text_bank:
 			ts.bank = exp[0].evalI(c)
 		case text_align:

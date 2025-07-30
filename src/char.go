@@ -1290,6 +1290,7 @@ type Explod struct {
 	palfxdef       PalFXDef
 	window         [4]float32
 	//lockSpriteFacing     bool
+	localcoord           [2]float32
 	localscl             float32
 	blendmode            int32
 	start_animelem       int32
