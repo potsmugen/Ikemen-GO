@@ -13,17 +13,18 @@ var ModAlt = NewModifierKey(false, true, false)
 var ModCtrlAlt = NewModifierKey(true, true, false)
 var ModCtrlAltShift = NewModifierKey(true, true, true)
 
-type CommandKey struct {
-	key    CommandKeyType
+// CommandList > Command > CommandStep > CommandStepKey
+type CommandStepKey struct {
+	key    CommandKey
 	tilde  bool
 	dollar bool
 	// TODO: Maybe we could move slash here as well
 }
 
-type CommandKeyType byte
+type CommandKey byte
 
 const (
-	CK_U CommandKeyType = iota
+	CK_U CommandKey = iota
 	CK_D
 	CK_B
 	CK_F
@@ -50,19 +51,19 @@ const (
 	CK_m
 )
 
-func (ck CommandKey) IsDirectionPress() bool {
+func (ck CommandStepKey) IsDirectionPress() bool {
 	return !ck.tilde && ck.key >= CK_U && ck.key <= CK_N
 }
 
-func (ck CommandKey) IsDirectionRelease() bool {
+func (ck CommandStepKey) IsDirectionRelease() bool {
 	return ck.tilde && ck.key >= CK_U && ck.key <= CK_N
 }
 
-func (ck CommandKey) IsButtonPress() bool {
+func (ck CommandStepKey) IsButtonPress() bool {
 	return !ck.tilde && ck.key >= CK_a && ck.key <= CK_m
 }
 
-func (ck CommandKey) IsButtonRelease() bool {
+func (ck CommandStepKey) IsButtonRelease() bool {
 	return ck.tilde && ck.key >= CK_a && ck.key <= CK_m
 }
 
@@ -365,7 +366,7 @@ func (ibit InputBits) BitsToKeys() [14]bool {
 }
 
 type CommandKeyRemap struct {
-	a, b, c, x, y, z, s, d, w, m CommandKeyType
+	a, b, c, x, y, z, s, d, w, m CommandKey
 }
 
 func NewCommandKeyRemap() *CommandKeyRemap {
@@ -689,7 +690,7 @@ func (ib *InputBuffer) updateInputTime(U, D, L, R, B, F, a, b, c, x, y, z, s, d,
 }
 
 // Check the buffer state of each key
-func (__ *InputBuffer) State(ck CommandKey) int32 {
+func (__ *InputBuffer) State(ck CommandStepKey) int32 {
 
 	// Hold simple directions
 	if !ck.tilde && !ck.dollar {
@@ -1028,14 +1029,14 @@ func (__ *InputBuffer) State(ck CommandKey) int32 {
 	// Special $N (and ~$N) case
 	// This one somehow returns "any change" in Mugen. Since "any neutral" is useless anyway we'll just add support for that
 	if ck.dollar && ck.key == CK_N {
-		return Min(Abs(__.Ub), Abs(__.Db), Abs(__.Bb), Abs(__.Fb), Abs(__.ab), Abs(__.bb), Abs(__.cb), Abs(__.xb), Abs(__.yb), Abs(__.zb), Abs(__.wb), Abs(__.db)), Abs(__.sb))
+		return Min(Abs(__.Ub), Abs(__.Db), Abs(__.Bb), Abs(__.Fb), Abs(__.ab), Abs(__.bb), Abs(__.cb), Abs(__.xb), Abs(__.yb), Abs(__.zb), Abs(__.wb), Abs(__.db), Abs(__.sb))
 	}
 
 	return 0
 }
 
 // Return charge time of a key
-func (ib *InputBuffer) StateCharge(ck CommandKey) int32 {
+func (ib *InputBuffer) StateCharge(ck CommandStepKey) int32 {
 	// Ignore a direction that was just pressed
 	// Fixes an issue where charge for a strict direction release (e.g. ~B) will be overridden if you press a different direction in the next frame
 	// This is a consequence of imagining charge as "release" like Elecbyte did. Of course, Mugen has that same issue
@@ -1866,35 +1867,36 @@ func (ai *AiInput) d() bool { return ai.dt != 0 }
 func (ai *AiInput) w() bool { return ai.wt != 0 }
 func (ai *AiInput) m() bool { return ai.mt != 0 }
 
-// cmdElem refers to each of the inputs required to complete a command
-type cmdElem struct {
-	key        []CommandKey
+// CommandStep refers to each of the steps required to complete a command
+// Each step can have multiple keys
+type CommandStep struct {
+	key        []CommandStepKey
 	chargetime int32
 	slash      bool
 	greater    bool
 }
 
 // Used to detect consecutive directions
-func (ce *cmdElem) IsDirection() bool {
+func (cs *CommandStep)IsDirection() bool {
 	// Released directions are not taken into account here
-	return !ce.slash && len(ce.key) == 1 && ce.key[0].IsDirectionPress()
+	return !cs.slash && len(cs.key) == 1 && cs.key[0].IsDirectionPress()
 }
 
 // Check if two command elements can be checked in the same frame
 // This logic seems more complex in Mugen because of variable input delay
-func (ce *cmdElem) IsDirToButton(next cmdElem) bool {
+func (cs *CommandStep)IsDirToButton(next CommandStep) bool {
 	// Not if second element must be held
 	if next.slash {
 		return false
 	}
 	// Not if first element includes button press or release
-	for _, k := range ce.key {
+	for _, k := range cs.key {
 		if k.IsButtonPress() || k.IsButtonRelease() {
 			return false
 		}
 	}
 	// Not if both elements share keys
-	for _, k := range ce.key {
+	for _, k := range cs.key {
 		for _, n := range next.key {
 			if k == n {
 				return false
@@ -1902,7 +1904,7 @@ func (ce *cmdElem) IsDirToButton(next cmdElem) bool {
 		}
 	}
 	// Yes if second element includes a button press
-	for range ce.key {
+	for range cs.key {
 		for _, n := range next.key {
 			if n.IsButtonPress() {
 				return true
@@ -1910,7 +1912,7 @@ func (ce *cmdElem) IsDirToButton(next cmdElem) bool {
 		}
 	}
 	// Yes if release direction then not release direction (includes buttons)
-	for _, k := range ce.key {
+	for _, k := range cs.key {
 		if k.IsDirectionRelease() {
 			for _, n := range next.key {
 				if !n.IsDirectionRelease() {
@@ -1927,7 +1929,7 @@ type Command struct {
 	name                   string
 	//hold                   [][]CommandKey // These should be obsolete in new input logic
 	//held                   []bool
-	cmd                    []cmdElem
+	cmd                    []CommandStep
 	cmdidx                 int
 	maxtime, curtime       int32
 	maxbuftime, curbuftime int32
@@ -1936,7 +1938,7 @@ type Command struct {
 	buffer_pauseend        bool
 	completeframe          bool
 	completed              []bool
-	stepTimers              []int32
+	stepTimers             []int32
 	loopOrder              []int
 }
 
@@ -1951,22 +1953,22 @@ func ReadCommand(name, cmdstr string, kr *CommandKeyRemap) (*Command, error) {
 	c := newCommand()
 	c.name = name
 	cmd := strings.Split(cmdstr, ",")
-	for _, cestr := range cmd {
+	for _, csstr := range cmd {
 		// Add new element
-		c.cmd = append(c.cmd, cmdElem{chargetime: 1})
+		c.cmd = append(c.cmd, CommandStep{chargetime: 1})
 		// Set working element to last one
-		ce := &c.cmd[len(c.cmd)-1]
-		cestr = strings.TrimSpace(cestr)
+		cs := &c.cmd[len(c.cmd)-1]
+		csstr = strings.TrimSpace(csstr)
 
 		getChar := func() rune {
-			if len(cestr) > 0 {
-				return rune(cestr[0])
+			if len(csstr) > 0 {
+				return rune(csstr[0])
 			}
 			return rune(-1)
 		}
 		nextChar := func() rune {
-			if len(cestr) > 0 {
-				cestr = strings.TrimSpace(cestr[1:])
+			if len(csstr) > 0 {
+				csstr = strings.TrimSpace(csstr[1:])
 			}
 			return getChar()
 		}
@@ -1975,10 +1977,10 @@ func ReadCommand(name, cmdstr string, kr *CommandKeyRemap) (*Command, error) {
 		dollar := false
 		switch getChar() {
 		case '>':
-			ce.greater = true
+			cs.greater = true
 			r := nextChar()
 			if r == '/' {
-				ce.slash = true
+				cs.slash = true
 				nextChar()
 				break
 			} else if r == '~' {
@@ -1993,18 +1995,18 @@ func ReadCommand(name, cmdstr string, kr *CommandKeyRemap) (*Command, error) {
 				n = n*10 + int32(r-'0')
 			}
 			if n > 0 {
-				ce.chargetime = n
+				cs.chargetime = n
 			}
 		case '/':
-			ce.slash = true
+			cs.slash = true
 			nextChar()
 		}
 
-		for len(cestr) > 0 {
+		for len(csstr) > 0 {
 			c0 := getChar()
 			switch c0 {
 			case 'B', 'D', 'F', 'L', 'R', 'U', 'N':
-				var k CommandKeyType
+				var k CommandKey
 				switch c0 {
 				case 'B': k = CK_B
 				case 'D': k = CK_D
@@ -2015,8 +2017,8 @@ func ReadCommand(name, cmdstr string, kr *CommandKeyRemap) (*Command, error) {
 				case 'N': k = CK_N
 				}
 				// Handle double-letter diagonals (like UB, DF, etc.)
-				if len(cestr) > 1 {
-					c1 := cestr[1]
+				if len(csstr) > 1 {
+					c1 := csstr[1]
 					if (c0 == 'U' || c0 == 'D') && (c1 == 'B' || c1 == 'F' || c1 == 'L' || c1 == 'R') {
 						// UB, UF, UL, UR, DB, DF, DL, DR
 						switch c1 {
@@ -2048,11 +2050,11 @@ func ReadCommand(name, cmdstr string, kr *CommandKeyRemap) (*Command, error) {
 						nextChar()
 					}
 				}
-				ce.key = append(ce.key, CommandKey{key: k, tilde: tilde, dollar: dollar})
+				cs.key = append(cs.key, CommandStepKey{key: k, tilde: tilde, dollar: dollar})
 				tilde, dollar = false, false
 			case 'a', 'b', 'c', 'x', 'y', 'z', 's', 'd', 'w', 'm':
 				// Use remap
-				var k CommandKeyType
+				var k CommandKey
 				switch c0 {
 				case 'a': k = kr.a
 				case 'b': k = kr.b
@@ -2065,7 +2067,7 @@ func ReadCommand(name, cmdstr string, kr *CommandKeyRemap) (*Command, error) {
 				case 'w': k = kr.w
 				case 'm': k = kr.m
 				}
-				ce.key = append(ce.key, CommandKey{key: k, tilde: tilde, dollar: dollar})
+				cs.key = append(cs.key, CommandStepKey{key: k, tilde: tilde, dollar: dollar})
 				tilde, dollar = false, false
 			case '$':
 				// Next key gets the dollar flag
@@ -2082,11 +2084,11 @@ func ReadCommand(name, cmdstr string, kr *CommandKeyRemap) (*Command, error) {
 		}
 
 		// Two consecutive identical directions are considered ">"
-		if len(c.cmd) >= 2 && ce.IsDirection() && c.cmd[len(c.cmd)-2].IsDirection() {
-			if ce.key[0].key == c.cmd[len(c.cmd)-2].key[0].key &&
-				ce.key[0].tilde == c.cmd[len(c.cmd)-2].key[0].tilde &&
-				ce.key[0].dollar == c.cmd[len(c.cmd)-2].key[0].dollar {
-				ce.greater = true
+		if len(c.cmd) >= 2 && cs.IsDirection() && c.cmd[len(c.cmd)-2].IsDirection() {
+			if cs.key[0].key == c.cmd[len(c.cmd)-2].key[0].key &&
+				cs.key[0].tilde == c.cmd[len(c.cmd)-2].key[0].tilde &&
+				cs.key[0].dollar == c.cmd[len(c.cmd)-2].key[0].dollar {
+				cs.greater = true
 			}
 		}
 	}
