@@ -205,9 +205,9 @@ type GameState struct {
 	fadeintime              int32
 	fadeouttime             int32
 	changeStateNest         int32
-	accel                   float32
-	clsnDraw                bool
-	statusDraw              bool
+	//accel                   float32
+	//clsnDisplay             bool
+	//debugDisplay            bool
 	workpal                 []uint32
 	nomusic                 bool
 	keyConfig               []KeyConfig
@@ -361,8 +361,9 @@ func (gs *GameState) LoadState(stateID int) {
 
 	sys.changeStateNest = gs.changeStateNest
 
-	sys.accel = gs.accel
-	sys.clsnDisplay = gs.clsnDraw
+	//sys.accel = gs.accel
+	//sys.clsnDisplay = gs.clsnDisplay
+	//sys.debugDisplay = gs.debugDisplay
 
 	// Things that directly or indirectly get put into CGO can't go into arenas
 	sys.workpal = make([]uint32, len(gs.workpal)) //arena.MakeSlice[uint32](a, len(gs.workpal), len(gs.workpal))
@@ -587,9 +588,9 @@ func (gs *GameState) SaveState(stateID int) {
 
 	gs.changeStateNest = sys.changeStateNest
 
-	gs.accel = sys.accel
-	gs.clsnDraw = sys.clsnDisplay
-	gs.statusDraw = sys.debugDisplay
+	//gs.accel = sys.accel
+	//gs.clsnDisplay = sys.clsnDisplay
+	//gs.debugDisplay = sys.debugDisplay
 
 	// Things that directly or indirectly get put into CGO can't go into arenas
 	gs.workpal = make([]uint32, len(sys.workpal)) //arena.MakeSlice[uint32](a, len(sys.workpal), len(sys.workpal))
