@@ -507,7 +507,9 @@ func (gs *GameState) LoadState(stateID int) {
 	sys.wintime = gs.wintime
 
 	// Log state load
-	sys.appendToConsole(fmt.Sprintf("%v: Game state loaded", sys.tickCount))
+	if sys.rollback.session == nil {
+		sys.appendToConsole(fmt.Sprintf("%v: Game state loaded", sys.tickCount))
+	}
 }
 
 func (gs *GameState) SaveState(stateID int) {
@@ -718,7 +720,9 @@ func (gs *GameState) SaveState(stateID int) {
 	gs.wintime = sys.wintime
 
 	// Log save state
-	sys.appendToConsole(fmt.Sprintf("%v: Game state saved", sys.tickCount))
+	if sys.rollback.session == nil {
+		sys.appendToConsole(fmt.Sprintf("%v: Game state saved", sys.tickCount))
+	}
 }
 
 func (gs *GameState) cloneLuaTable(s *lua.LTable) *lua.LTable {

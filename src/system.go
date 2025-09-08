@@ -2625,13 +2625,18 @@ func (s *System) SetupCharRoundStart(autolvmul float64, autolevels [MaxPlayerNo]
 	}
 }
 
-func (s *System) netplayBool() bool {
-	return s.netConnection != nil || s.rollback.session != nil
+func (s *System) debugModeAllowed() bool {
+	if s.netConnection != nil || s.rollback.session != nil {
+		return s.cfg.Debug.AllowNetplayDebug 
+	}
+	return s.cfg.Debug.AllowDebugMode
 }
 
-func (s *System) debugModeAllowed() bool {
-	return !s.netplayBool() && s.cfg.Debug.AllowDebugMode ||
-		s.netplayBool() && s.cfg.Debug.AllowNetplayDebug 
+func (s *System) debugKeysAllowed() bool {
+	return s.cfg.Debug.AllowDebugKeys || s.debugDisplay // || !v.DebugKey
+
+	// Previously, Ikemen disabled most debug keys during replays
+	// We might as well just allow them since debug mode is optional
 }
 
 type RoundStartBackup struct {

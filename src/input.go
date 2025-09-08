@@ -114,18 +114,19 @@ func OnKeyPressed(key Key, mk ModifierKey) {
 	if key != KeyUnknown {
 		sys.keyState[key] = true
 		sys.keyInput = key
-		sys.esc = sys.esc ||
-			key == KeyEscape && (mk&ModCtrlAlt) == 0
+
+		sys.esc = sys.esc || key == KeyEscape && (mk&ModCtrlAlt) == 0
+
 		for k, v := range sys.shortcutScripts {
-			if sys.netConnection == nil && (sys.replayFile == nil || !v.DebugKey) &&
-				//(!sys.paused || sys.step || v.Pause) &&
-				(sys.cfg.Debug.AllowDebugKeys || !v.DebugKey) {
+			if sys.debugKeysAllowed() {
 				v.Activate = v.Activate || k.Test(key, mk)
 			}
 		}
+
 		if key == KeyF12 {
 			captureScreen()
 		}
+
 		if key == KeyEnter && (mk&ModAlt) != 0 {
 			sys.window.toggleFullscreen()
 		}

@@ -1174,7 +1174,7 @@ options.t_itemname = {
 		end
 		return true
 	end,
-	--Netplay debug Mode
+	--Netplay Debug
 	['netplaydebug'] = function(t, item, cursorPosY, moveTxt)
 		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
 			sndPlay(motif.files.snd_data, motif.option_info.cursor_move_snd[1], motif.option_info.cursor_move_snd[2])
