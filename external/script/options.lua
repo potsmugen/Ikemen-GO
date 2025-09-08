@@ -191,6 +191,7 @@ options.t_itemname = {
 			--modifyGameOption('Config.TrainingChar', "")
 			--modifyGameOption('Config.GamepadMappings', "external/gamecontrollerdb.txt")
 			modifyGameOption('Debug.AllowDebugMode', true)
+			modifyGameOption('Debug.AllowNetplayDebug', false)
 			modifyGameOption('Debug.AllowDebugKeys', true)
 			--modifyGameOption('Debug.ClipboardRows', 2)
 			--modifyGameOption('Debug.ConsoleRows', 15)
@@ -1173,6 +1174,20 @@ options.t_itemname = {
 		end
 		return true
 	end,
+	--Netplay debug Mode
+	['netplaydebug'] = function(t, item, cursorPosY, moveTxt)
+		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
+			sndPlay(motif.files.snd_data, motif.option_info.cursor_move_snd[1], motif.option_info.cursor_move_snd[2])
+			if gameOption('Debug.AllowNetplayDebug') then
+				modifyGameOption('Debug.AllowNetplayDebug', false)
+			else
+				modifyGameOption('Debug.AllowNetplayDebug', true)
+			end
+			t.items[item].vardisplay = options.f_boolDisplay(gameOption('Debug.AllowNetplayDebug'), motif.option_info.menu_valuename_enabled, motif.option_info.menu_valuename_disabled)
+			options.modified = true
+		end
+		return true
+	end,
 	--Background Loading
 	--[[['backgroundloading'] = function(t, item, cursorPosY, moveTxt)
 		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
@@ -1382,6 +1397,9 @@ options.t_vardisplay = {
 	end,
 	['debugmode'] = function()
 		return options.f_boolDisplay(gameOption('Debug.AllowDebugMode'), motif.option_info.menu_valuename_enabled, motif.option_info.menu_valuename_disabled)
+	end,
+	['netplaydebug'] = function()
+		return options.f_boolDisplay(gameOption('Debug.AllowNetplayDebug'), motif.option_info.menu_valuename_enabled, motif.option_info.menu_valuename_disabled)
 	end,
 	['difficulty'] = function()
 		return gameOption('Options.Difficulty')

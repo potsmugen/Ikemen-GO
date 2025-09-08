@@ -486,11 +486,11 @@ func (s *System) init(w, h int32) *lua.LState {
 }
 
 func (s *System) shutdown() {
-	if !sys.gameEnd {
-		sys.gameEnd = true
+	if !s.gameEnd {
+		s.gameEnd = true
 	}
-	if sys.rollback.session != nil && sys.rollback.session.recording != nil {
-		sys.rollback.session.SaveReplay()
+	if s.rollback.session != nil && s.rollback.session.recording != nil {
+		s.rollback.session.SaveReplay()
 	}
 	gfx.Close()
 	s.window.Close()
@@ -2229,8 +2229,8 @@ func (s *System) fight() (reload bool) {
 	s.gameTime, s.paused, s.accel = 0, false, 1
 	s.aiInput = [len(s.aiInput)]AiInput{}
 
-	// Disable debug during netplay (but not during replays)
-	if sys.netConnection != nil {
+	// Disable debug mode
+	if !s.debugModeAllowed() {
 		s.debugDisplay = false
 		s.clsnDisplay = false
 		s.lifebarHide = false
@@ -2623,6 +2623,15 @@ func (s *System) SetupCharRoundStart(autolvmul float64, autolevels [MaxPlayerNo]
 			}
 		}
 	}
+}
+
+func (s *System) netplayBool() bool {
+	return s.netConnection != nil || s.rollback.session != nil
+}
+
+func (s *System) debugModeAllowed() bool {
+	return !s.netplayBool() && s.cfg.Debug.AllowDebugMode ||
+		s.netplayBool() && s.cfg.Debug.AllowNetplayDebug 
 }
 
 type RoundStartBackup struct {

@@ -140,6 +140,7 @@ type Config struct {
 	} `ini:"Config"`
 	Debug struct {
 		AllowDebugMode    bool    `ini:"AllowDebugMode"`
+		AllowNetplayDebug bool `ini:"AllowNetplayDebug"`
 		AllowDebugKeys    bool    `ini:"AllowDebugKeys"`
 		ClipboardRows     int     `ini:"ClipboardRows"`
 		ConsoleRows       int     `ini:"ConsoleRows"`
