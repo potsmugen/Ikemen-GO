@@ -5,7 +5,19 @@ if not main.makeRoster then
 end
 
 if main.storyboard.intro and matchno() == 1 and not continue() then
-	launchStoryboard(start.f_getCharData(start.p[1].t_selected[1].ref).intro)
+    -- Determine the reference side for arcade intro
+    local sideRef = main.singlePlayerSide or 1
+    if not start.p[sideRef].t_selected[1] then
+        if start.p[1].t_selected[1] then
+            sideRef = 1
+        elseif start.p[2].t_selected[1] then
+            sideRef = 2
+        end
+    end
+    local firstSel = start.p[sideRef].t_selected[1]
+    if firstSel then
+        launchStoryboard(start.f_getCharData(firstSel.ref).intro)
+    end
 end
 
 for i = matchno(), #start.t_roster do

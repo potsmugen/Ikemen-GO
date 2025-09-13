@@ -66,25 +66,42 @@ end
 -- external module, without conflicting with default scripts.
 start.t_makeRoster = {}
 start.t_makeRoster.arcade = function()
-	if start.p[2].ratio then --Ratio
-		if start.f_getCharData(start.p[1].t_selected[1].ref).ratiomatches ~= nil and main.t_selOptions[start.f_getCharData(start.p[1].t_selected[1].ref).ratiomatches .. '_arcaderatiomatches'] ~= nil then --custom settings exists as char param
-			return main.t_selOptions[start.f_getCharData(start.p[1].t_selected[1].ref).ratiomatches .. '_arcaderatiomatches'], main.t_orderChars
-		else --default settings
-			return main.t_selOptions.arcaderatiomatches, main.t_orderChars
-		end
-	elseif start.p[2].teamMode == 0 then --Single
-		if start.f_getCharData(start.p[1].t_selected[1].ref).maxmatches ~= nil and main.t_selOptions[start.f_getCharData(start.p[1].t_selected[1].ref).maxmatches .. '_arcademaxmatches'] ~= nil then --custom settings exists as char param
-			return start.f_unifySettings(main.t_selOptions[start.f_getCharData(start.p[1].t_selected[1].ref).maxmatches .. '_arcademaxmatches'], main.t_orderChars), main.t_orderChars
-		else --default settings
-			return start.f_unifySettings(main.t_selOptions.arcademaxmatches, main.t_orderChars), main.t_orderChars
-		end
-	else --Simul / Turns / Tag
-		if start.f_getCharData(start.p[1].t_selected[1].ref).maxmatches ~= nil and main.t_selOptions[start.f_getCharData(start.p[1].t_selected[1].ref).maxmatches .. '_teammaxmatches'] ~= nil then --custom settings exists as char param
-			return start.f_unifySettings(main.t_selOptions[start.f_getCharData(start.p[1].t_selected[1].ref).maxmatches .. '_teammaxmatches'], main.t_orderChars), main.t_orderChars
-		else --default settings
-			return start.f_unifySettings(main.t_selOptions.teammaxmatches, main.t_orderChars), main.t_orderChars
-		end
-	end
+    -- Determine a valid reference for P1
+    local p1sel = start.p[1].t_selected[1]
+    if not p1sel then
+        -- fallback: first character in order table
+        local defaultRef = main.t_orderChars[1] and main.t_orderChars[1][1]
+        if not defaultRef then
+            panicError("t_makeRoster.arcade(): no valid character for P1")
+        end
+        p1sel = { ref = defaultRef }
+    end
+
+    -- Get character data once
+    local cd = start.f_getCharData(p1sel.ref)
+
+    -- Ratio mode
+    if start.p[2].ratio then
+        if cd.ratiomatches ~= nil and main.t_selOptions[cd.ratiomatches .. '_arcaderatiomatches'] ~= nil then
+            return main.t_selOptions[cd.ratiomatches .. '_arcaderatiomatches'], main.t_orderChars
+        else
+            return main.t_selOptions.arcaderatiomatches, main.t_orderChars
+        end
+    -- Single mode
+    elseif start.p[2].teamMode == 0 then
+        if cd.maxmatches ~= nil and main.t_selOptions[cd.maxmatches .. '_arcademaxmatches'] ~= nil then
+            return start.f_unifySettings(main.t_selOptions[cd.maxmatches .. '_arcademaxmatches'], main.t_orderChars), main.t_orderChars
+        else
+            return start.f_unifySettings(main.t_selOptions.arcademaxmatches, main.t_orderChars), main.t_orderChars
+        end
+    -- Simul / Turns / Tag
+    else
+        if cd.maxmatches ~= nil and main.t_selOptions[cd.maxmatches .. '_teammaxmatches'] ~= nil then
+            return start.f_unifySettings(main.t_selOptions[cd.maxmatches .. '_teammaxmatches'], main.t_orderChars), main.t_orderChars
+        else
+            return start.f_unifySettings(main.t_selOptions.teammaxmatches, main.t_orderChars), main.t_orderChars
+        end
+    end
 end
 start.t_makeRoster.teamcoop = start.t_makeRoster.arcade
 start.t_makeRoster.netplayteamcoop = start.t_makeRoster.arcade
@@ -1619,6 +1636,7 @@ function start.f_selectMode()
 			main.f_playBGM(false, motif.music.title_bgm, motif.music.title_bgm_loop, motif.music.title_bgm_volume, motif.music.title_bgm_loopstart, motif.music.title_bgm_loopend)
 			return
 		end
+
 		--first match
 		if start.reset then
 			main.t_availableChars = main.f_tableCopy(main.t_orderChars)
@@ -1633,22 +1651,39 @@ function start.f_selectMode()
 			start.reset = false
 		end
 		--lua file with custom arcade path detection
+
+		-- determine single-player side character
+		local selCharSide = start.p[singlePlayerSide]
+		local selChar = selCharSide.t_selected[1]
+		if not selChar then
+			local fallback = main.t_orderChars[1] and main.t_orderChars[1][1]
+			if not fallback then
+				panicError("No valid character for single player side")
+			end
+			selChar = { ref = fallback }
+			selCharSide.t_selected[1] = selChar
+		end
+		local cd = start.f_getCharData(selChar.ref)
+
+		-- lua file with custom arcade path detection
 		local path = main.luaPath
 		if main.charparam.arcadepath then
-			if start.p[2].ratio and start.f_getCharData(start.p[1].t_selected[1].ref).ratiopath ~= '' then
-				path = start.f_getCharData(start.p[1].t_selected[1].ref).ratiopath
+			if start.p[2].ratio and cd.ratiopath ~= '' then
+				path = cd.ratiopath
 				if not main.f_fileExists(path) then
-					panicError("\n" .. start.f_getCharData(start.p[1].t_selected[1].ref).name .. " ratiopath doesn't exist: " .. path .. "\n")
+					panicError("\n" .. cd.name .. " ratiopath doesn't exist: " .. path .. "\n")
 				end
-			elseif not start.p[2].ratio and start.f_getCharData(start.p[1].t_selected[1].ref).arcadepath ~= '' then
-				path = start.f_getCharData(start.p[1].t_selected[1].ref).arcadepath
+			elseif not start.p[2].ratio and cd.arcadepath ~= '' then
+				path = cd.arcadepath
 				if not main.f_fileExists(path) then
-					panicError("\n" .. start.f_getCharData(start.p[1].t_selected[1].ref).name .. " arcadepath doesn't exist: " .. path .. "\n")
+					panicError("\n" .. cd.name .. " arcadepath doesn't exist: " .. path .. "\n")
 				end
 			end
 		end
+
 		--external script execution
 		assert(loadfile(path))()
+
 		--infinite matches flag detected
 		if main.makeRoster and start.t_roster[matchno()] ~= nil and start.t_roster[matchno()][1] == -1 then
 			table.remove(start.t_roster, matchno())
@@ -1686,6 +1721,7 @@ function start.f_selectMode()
 				end
 				start.exit = start.exit or main.exitSelect or not main.selectMenu[1]
 			end
+
 			if start.exit then
 				main.f_bgReset(motif[main.background].bg)
 				main.f_fadeReset('fadein', motif[main.group])
@@ -1693,6 +1729,7 @@ function start.f_selectMode()
 				start.exit = false
 				return
 			end
+
 			if not continue() or esc() then
 				start.f_selectReset(false)
 			else
@@ -1837,205 +1874,195 @@ function start.f_selectChallenger()
 end
 
 function launchFight(data)
-	local t = {}
-	if continue() then -- on rematch all arguments are ignored and values are restored from last match
-		t = main.f_tableCopy(start.launchFightSav)
-		start.p[2].t_selTemp = {} -- in case it's not cleaned already (preserved p2 side during select screen)
-	else -- otherwise take all arguments and settings into account
-		t.p1numchars = start.p[1].numChars
-		t.p1teammode = start.p[1].teamMode
-		t.p2numchars = start.p[2].numChars
-		t.p2teammode = start.p[2].teamMode
-		t.challenger = main.f_arg(data.challenger, false)
-		t.continue = main.f_arg(data.continue, main.continueScreen)
-		t.quickcontinue = (not main.selectMenu[1] and not main.selectMenu[2]) or main.f_arg(data.quickcontinue, main.quickContinue or gameOption('Options.QuickContinue'))
-		t.order = data.order or 1
-		t.orderselect = {main.f_arg(data.p1orderselect, main.orderSelect[1]), main.f_arg(data.p2orderselect, main.orderSelect[2])}
-		t.p1char = data.p1char or {}
-		t.p1numratio = data.p1numratio or {}
-		t.p1rounds = data.p1rounds or nil
-		t.p2char = data.p2char or {}
-		t.p2numratio = data.p2numratio or {}
-		t.p2rounds = data.p2rounds or nil
-		t.exclude = data.exclude or {}
-		t.musicData = {}
-		-- Parse musicX / musicfinal / musiclife / musicvictory arguments
-		for k, v in pairs(data) do
-			if k:match('^music') then
-				-- old syntax with only string argument maintained for backward compatibility with previous builds
-				if type(v) == "string" then
-					v = {v}
-				end
-				local bgtype, round = k:match('^(music[a-z]*)([0-9]*)$')
-				if t.musicData[bgtype] == nil then
-					t.musicData[bgtype] = {}
-				end
-				local t_ref = t.musicData[bgtype]
-				-- musicX parameters are nested using round numbers as table keys
-				if bgtype == 'music' or round ~= '' then
-					round = tonumber(round) or 1
-					if t.musicData[bgtype][round] == nil then t.musicData[bgtype][round] = {} end
-					t_ref = t.musicData[bgtype][round]
-				end
-				table.insert(t_ref, {bgmusic = (v[1] or ''), bgmvolume = (v[2] or 100), bgmloopstart = (v[3] or 0), bgmloopend = (v[4] or 0)})
-			end
-		end
-		t.stage = data.stage or ''
-		t.ai = data.ai or nil
-		t.vsscreen = main.f_arg(data.vsscreen, main.versusScreen)
-		t.victoryscreen = main.f_arg(data.victoryscreen, main.victoryScreen)
-		--t.frames = data.frames or fightscreenvar("time.framespercount")
-		t.roundtime = data.time or nil
-		t.lua = data.lua or ''
-		t.stageNo = start.f_getStageRef(t.stage)
-		start.p[1].numChars = data.p1numchars or math.max(start.p[1].numChars, #t.p1char)
-		start.p[1].teamMode = start.f_stringToTeamMode(data.p1teammode) or start.p[1].teamMode
-		start.p[2].numChars = data.p2numchars or math.max(start.p[2].numChars, #t.p2char)
-		start.p[2].teamMode = start.f_stringToTeamMode(data.p2teammode) or start.p[2].teamMode
-		t.p1numchars = start.f_matchPersistence()
-		-- add P1 chars forced via function arguments (ignore char param restrictions)
-		local reset = false
-		local cnt = 0
-		for _, v in main.f_sortKeys(t.p1char) do
-			if not reset then
-				start.p[1].t_selected = {}
-				start.p[1].t_selTemp = {}
-				reset = true
-			end
-			cnt = cnt + 1
-			local ref = start.f_getCharRef(v)
-			table.insert(start.p[1].t_selected, {
-				ref = ref,
-				pal = start.f_selectPal(ref),
-				pn = start.f_getPlayerNo(1, #start.p[1].t_selected + 1),
-				--cursor = {},
-				ratioLevel = start.f_getRatio(1, t.p1numratio[cnt]),
-			})
-			main.t_availableChars = start.f_excludeChar(main.t_availableChars, ref)
-		end
-		if #start.p[1].t_selected == 0 then
-			panicError("\n" .. "launchFight(): no valid P1 characters\n")
-			start.exit = true
-			return false -- return to main menu
-		end
-		-- add P2 chars forced via function arguments (ignore char param restrictions)
-		local onlyme = false
-		cnt = 0
-		for _, v in main.f_sortKeys(t.p2char) do
-			cnt = cnt + 1
-			local ref = start.f_getCharRef(v)
-			table.insert(start.p[2].t_selected, {
-				ref = ref,
-				pal = start.f_selectPal(ref),
-				pn = start.f_getPlayerNo(2, #start.p[2].t_selected + 1),
-				--cursor = {},
-				ratioLevel = start.f_getRatio(2, t.p2numratio[cnt]),
-			})
-			main.t_availableChars = start.f_excludeChar(main.t_availableChars, ref)
-			if not onlyme then onlyme = start.f_getCharData(ref).single end
-		end
-		-- add remaining P2 chars of particular order if there are still free slots in the selected team mode
-		if main.cpuSide[2] and #start.p[2].t_selected < start.p[2].numChars and not onlyme then
-			-- get list of available chars
-			local t_chars = main.f_tableCopy(main.t_availableChars)
-			-- remove chars temporary excluded from this match
-			for _, v in ipairs(t.exclude) do
-				t_chars = start.f_excludeChar(t_chars, start.f_getCharRef(v))
-			end
-			-- remove chars with 'single' param if some characters are forced into team
-			if #start.p[2].t_selected > 0 then
-				for _, v in ipairs(t_chars[t.order]) do
-					if start.f_getCharData(v).single then
-						t_chars = start.f_excludeChar(t_chars, v)
-					end
-				end
-			end
-			-- fill free slots
-			local t_remaining = main.f_tableCopy(t_chars)
-			local t_tmp = {}
-			for i = #start.p[2].t_selected, start.p[2].numChars - 1 do
-				if t_chars[t.order] ~= nil and #t_chars[t.order] > 0 then
-					local rand = math.random(1, #t_chars[t.order])
-					local ref = t_chars[t.order][rand]
-					if not start.f_getCharData(ref).single then
-						table.remove(t_chars[t.order], rand)
-						table.insert(t_tmp, ref)
-					else --one entry if 'single' param is detected on any opponent
-						t_tmp = {ref}
-						onlyme = true
-						break
-					end
-				end
-			end
-			-- not enough unique characters of particular order, take into account only if skiporder parameter = false
-			while not t.skiporder and #t_tmp + #start.p[2].t_selected < start.p[2].numChars and not onlyme and t_remaining[t.order] ~= nil and #t_remaining[t.order] > 0 do
-				table.insert(t_tmp, t_remaining[t.order][math.random(1, #t_remaining[t.order])])
-			end
-			-- append remaining characters
-			for _, v in ipairs(t_tmp) do
-				table.insert(start.p[2].t_selected, {
-					ref = v,
-					pal = start.f_selectPal(v),
-					pn = start.f_getPlayerNo(2, #start.p[2].t_selected + 1),
-					--cursor = {},
-					ratioLevel = start.f_getRatio(2, t.p2numratio[cnt]),
-				})
-				main.t_availableChars = start.f_excludeChar(main.t_availableChars, v)
-			end
-			-- team conversion if 'single' param is set on randomly added chars
-			if onlyme and #start.p[2].t_selected > 1 then
-				panicError("Unexpected launchFight state.\nPlease write down everything that lead to this error and report it to K4thos.\n")
-				--[[for i = 1, #start.p[2].t_selected do
-					if not start.f_getCharData(start.p[2].t_selected[i].ref).single then
-						table.insert(main.t_availableChars[t.order], start.p[2].t_selected[i].ref)
-						table.remove(start.p[2].t_selected, k)
-					end
-				end]]
-			end
-		end
-		if onlyme then
-			start.p[2].numChars = #start.p[2].t_selected
-		end
-		-- skip match if needed
-		if #start.p[2].t_selected < start.p[2].numChars then
-			start.p[2].t_selected = {}
-			start.p[2].t_selTemp = {}
-			printConsole("launchFight(): not enough P2 characters, skipping execution")
-			setMatchNo(matchno() + 1)
-			return true --continue lua code execution
-		end
-	end
-	--TODO: fix gameOption('Config.BackgroundLoading') setting
-	--if gameOption('Config.BackgroundLoading') then
-	--	selectStart()
-	--else
-		clearSelected()
-	--end
-	local ok = false
-	local saveData = false
-	local loopCount = 0
-	while true do
-		-- fight initialization
-		setTeamMode(1, start.p[1].teamMode, start.p[1].numChars)
-		setTeamMode(2, start.p[2].teamMode, start.p[2].numChars)
-		start.f_remapAI(t.ai)
-		start.f_setRounds(t.roundtime, {t.p1rounds, t.p2rounds})
-		t.stageNo = start.f_setStage(t.stageNo, t.stage ~= '' or continue() or loopCount > 0)
-		start.f_setMusic(t.stageNo, t.musicData)
-		if not start.f_selectVersus(t.vsscreen, t.orderselect) then break end
-		start.f_selectLoading()
-		start.f_overrideCharData()
-		saveData = true
-		local continueScreen = main.continueScreen
-		local victoryScreen = main.victoryScreen
-		main.continueScreen = t.continue
-		main.victoryScreen = t.victoryscreen
-		hook.run("launchFight")
-		_, t_gameStats = start.f_game(t.lua)
-		main.continueScreen = continueScreen
-		main.victoryScreen = victoryScreen
-		clearColor(motif.selectbgdef.bgclearcolor[1], motif.selectbgdef.bgclearcolor[2], motif.selectbgdef.bgclearcolor[3])
-		-- here comes a new challenger
+    local t = {}
+    local spSide = start.p[singlePlayerSide] -- Player side
+    local oppSide = (singlePlayerSide == 1) and 2 or 1 -- Opponent side (CPU or P2)
+
+    if continue() then
+        t = main.f_tableCopy(start.launchFightSav)
+        start.p[oppSide].t_selTemp = {}
+    else
+        -- Setup basic match parameters
+        t.p1numchars = start.p[1].numChars
+        t.p1teammode = start.p[1].teamMode
+        t.p2numchars = start.p[2].numChars
+        t.p2teammode = start.p[2].teamMode
+        t.challenger = main.f_arg(data.challenger, false)
+        t.continue = main.f_arg(data.continue, main.continueScreen)
+        t.quickcontinue = (not main.selectMenu[1] and not main.selectMenu[2])
+                          or main.f_arg(data.quickcontinue, main.quickContinue or gameOption('Options.QuickContinue'))
+        t.order = data.order or 1
+        t.orderselect = {
+            main.f_arg(data.p1orderselect, main.orderSelect[1]),
+            main.f_arg(data.p2orderselect, main.orderSelect[2])
+        }
+        t.p1char = data.p1char or {}
+        t.p1numratio = data.p1numratio or {}
+        t.p1rounds = data.p1rounds or nil
+        t.p2char = data.p2char or {}
+        t.p2numratio = data.p2numratio or {}
+        t.p2rounds = data.p2rounds or nil
+        t.exclude = data.exclude or {}
+        t.musicData = {}
+
+        -- Parse music parameters
+        for k, v in pairs(data) do
+            if k:match('^music') then
+                if type(v) == "string" then v = {v} end
+                local bgtype, round = k:match('^(music[a-z]*)([0-9]*)$')
+                t.musicData[bgtype] = t.musicData[bgtype] or {}
+                local t_ref = t.musicData[bgtype]
+                if bgtype == 'music' or round ~= '' then
+                    round = tonumber(round) or 1
+                    t.musicData[bgtype][round] = t.musicData[bgtype][round] or {}
+                    t_ref = t.musicData[bgtype][round]
+                end
+                table.insert(t_ref, {bgmusic = v[1] or '', bgmvolume = v[2] or 100,
+                                     bgmloopstart = v[3] or 0, bgmloopend = v[4] or 0})
+            end
+        end
+
+        t.stage = data.stage or ''
+        t.ai = data.ai or nil
+        t.vsscreen = main.f_arg(data.vsscreen, main.versusScreen)
+        t.victoryscreen = main.f_arg(data.victoryscreen, main.victoryScreen)
+        t.roundtime = data.time or nil
+        t.lua = data.lua or ''
+        t.stageNo = start.f_getStageRef(t.stage)
+
+        -- Adjust P1/P2 numChars and teamMode
+        start.p[1].numChars = data.p1numchars or math.max(start.p[1].numChars, #t.p1char)
+        start.p[1].teamMode = start.f_stringToTeamMode(data.p1teammode) or start.p[1].teamMode
+        start.p[2].numChars = data.p2numchars or math.max(start.p[2].numChars, #t.p2char)
+        start.p[2].teamMode = start.f_stringToTeamMode(data.p2teammode) or start.p[2].teamMode
+        t.p1numchars = start.f_matchPersistence()
+
+        -- Populate player-controlled side
+        spSide.t_selected = spSide.t_selected or {}
+        spSide.t_selTemp = spSide.t_selTemp or {}
+        local cnt = 0
+        for _, v in main.f_sortKeys(t.p1char) do
+            cnt = cnt + 1
+            local ref = start.f_getCharRef(v)
+            table.insert(spSide.t_selected, {
+                ref = ref,
+                pal = start.f_selectPal(ref),
+                pn = start.f_getPlayerNo(singlePlayerSide, #spSide.t_selected + 1),
+                ratioLevel = start.f_getRatio(singlePlayerSide, t.p1numratio[cnt])
+            })
+            main.t_availableChars = start.f_excludeChar(main.t_availableChars, ref)
+        end
+
+        -- Ensure at least one character exists
+        if #spSide.t_selected == 0 then
+            local fallbackRef = main.t_orderChars[1] and start.f_getCharRef(main.t_orderChars[1][1])
+            if fallbackRef then
+                table.insert(spSide.t_selected, {
+                    ref = fallbackRef,
+                    pal = start.f_selectPal(fallbackRef),
+                    pn = start.f_getPlayerNo(singlePlayerSide, 1),
+                    ratioLevel = 1
+                })
+            else
+                panicError("\nlaunchFight(): cannot populate single player side, no default character available\n")
+            end
+        end
+
+        -- Populate opponent side
+        start.p[oppSide].t_selected = start.p[oppSide].t_selected or {}
+        local onlyme = false
+        cnt = 0
+        for _, v in main.f_sortKeys(t.p2char) do
+            cnt = cnt + 1
+            local ref = start.f_getCharRef(v)
+            table.insert(start.p[oppSide].t_selected, {
+                ref = ref,
+                pal = start.f_selectPal(ref),
+                pn = start.f_getPlayerNo(oppSide, #start.p[oppSide].t_selected + 1),
+                ratioLevel = start.f_getRatio(oppSide, t.p2numratio[cnt])
+            })
+            main.t_availableChars = start.f_excludeChar(main.t_availableChars, ref)
+            if not onlyme then onlyme = start.f_getCharData(ref).single end
+        end
+
+        -- Fill remaining opponent slots (CPU)
+        if main.cpuSide[oppSide] and #start.p[oppSide].t_selected < start.p[oppSide].numChars and not onlyme then
+            local t_chars = main.f_tableCopy(main.t_availableChars)
+            for _, v in ipairs(t.exclude) do t_chars = start.f_excludeChar(t_chars, start.f_getCharRef(v)) end
+            local t_remaining = main.f_tableCopy(t_chars)
+            local t_tmp = {}
+            for i = #start.p[oppSide].t_selected, start.p[oppSide].numChars - 1 do
+                if t_chars[t.order] and #t_chars[t.order] > 0 then
+                    local rand = math.random(1, #t_chars[t.order])
+                    local ref = t_chars[t.order][rand]
+                    if not start.f_getCharData(ref).single then
+                        table.remove(t_chars[t.order], rand)
+                        table.insert(t_tmp, ref)
+                    else
+                        t_tmp = {ref}
+                        onlyme = true
+                        break
+                    end
+                end
+            end
+            while not t.skiporder and #t_tmp + #start.p[oppSide].t_selected < start.p[oppSide].numChars
+                  and not onlyme and t_remaining[t.order] and #t_remaining[t.order] > 0 do
+                table.insert(t_tmp, t_remaining[t.order][math.random(1, #t_remaining[t.order])])
+            end
+            for _, v in ipairs(t_tmp) do
+                table.insert(start.p[oppSide].t_selected, {
+                    ref = v,
+                    pal = start.f_selectPal(v),
+                    pn = start.f_getPlayerNo(oppSide, #start.p[oppSide].t_selected + 1),
+                    ratioLevel = start.f_getRatio(oppSide, t.p2numratio[cnt])
+                })
+                main.t_availableChars = start.f_excludeChar(main.t_availableChars, v)
+            end
+            if onlyme and #start.p[oppSide].t_selected > 1 then
+                panicError("Unexpected launchFight state.\nPlease report to K4thos.\n")
+            end
+        end
+        if onlyme then start.p[oppSide].numChars = #start.p[oppSide].t_selected end
+
+        -- Skip match if opponent not enough characters
+        if #start.p[oppSide].t_selected < start.p[oppSide].numChars then
+            start.p[oppSide].t_selected = {}
+            start.p[oppSide].t_selTemp = {}
+            printConsole("launchFight(): not enough opponent characters, skipping execution")
+            setMatchNo(matchno() + 1)
+            return true
+        end
+    end
+
+    -- Fight loop
+    clearSelected()
+    local ok = false
+    local saveData = false
+    local loopCount = 0
+    while true do
+        setTeamMode(1, start.p[1].teamMode, start.p[1].numChars)
+        setTeamMode(2, start.p[2].teamMode, start.p[2].numChars)
+        start.f_remapAI(t.ai)
+        start.f_setRounds(t.roundtime, {t.p1rounds, t.p2rounds})
+        t.stageNo = start.f_setStage(t.stageNo, t.stage ~= '' or continue() or loopCount > 0)
+        start.f_setMusic(t.stageNo, t.musicData)
+        if not start.f_selectVersus(t.vsscreen, t.orderselect) then break end
+        start.f_selectLoading()
+        start.f_overrideCharData()
+        saveData = true
+        local continueScreen = main.continueScreen
+        local victoryScreen = main.victoryScreen
+        main.continueScreen = t.continue
+        main.victoryScreen = t.victoryscreen
+        hook.run("launchFight")
+        _, t_gameStats = start.f_game(t.lua)
+        main.continueScreen = continueScreen
+        main.victoryScreen = victoryScreen
+        clearColor(motif.selectbgdef.bgclearcolor[1], motif.selectbgdef.bgclearcolor[2], motif.selectbgdef.bgclearcolor[3])
+
+		-- Challenger / exit handling
+		local oppSide = (singlePlayerSide == 1) and 2 or 1
+		local spSide = start.p[singlePlayerSide]
 		if start.challenger > 0 then
 			saveData = false
 			if t.challenger then -- end function called by f_arcadeChallenger() regardless of outcome
@@ -2052,13 +2079,12 @@ function launchFight(data)
 			end
 			break
 		-- player lost in modes that ends after 1 lose
-		elseif winnerteam() ~= 1 and main.elimination then
+		elseif winnerteam() ~= singlePlayerSide and main.elimination then
 			setMatchNo(-1)
 			break
-		-- player won or continuing is disabled
-		elseif winnerteam() == 1 or not t.continue then
-			start.p[2].t_selected = {}
-			start.p[2].t_selTemp = {}
+		elseif winnerteam() == singlePlayerSide or not t.continue then
+			start.p[oppSide].t_selected = {}
+			start.p[oppSide].t_selTemp = {}
 			setMatchNo(matchno() + 1)
 			setContinue(false)
 			ok = true -- continue lua code execution
@@ -2068,10 +2094,10 @@ function launchFight(data)
 			setMatchNo(-1)
 			break
 		-- continue = yes
-		elseif not t.quickcontinue then -- if 'Quick Continue' is disabled
-			start.p[1].t_selected = {}
-			start.p[1].t_selTemp = {}
-			start.p[1].selEnd = false
+		elseif not t.quickcontinue then
+			spSide.t_selected = {}
+			spSide.t_selTemp = {}
+			spSide.selEnd = false
 			start.launchFightSav = main.f_tableCopy(t)
 			--start.p[2].t_selTemp = {} -- uncomment to disable enemy team showing up in select screen
 			selScreenEnd = false
@@ -2082,16 +2108,17 @@ function launchFight(data)
 		end
 		start.challenger = 0
 		loopCount = loopCount + 1
-	end
-	if saveData then
-		start.f_saveData()
-	end
-	-- restore original values
-	start.p[1].numChars = t.p1numchars
-	start.p[1].teamMode = t.p1teammode
-	start.p[2].numChars = t.p2numchars
-	start.p[2].teamMode = t.p2teammode
-	return ok
+    end
+
+    if saveData then start.f_saveData() end
+
+    -- Restore original values
+    start.p[1].numChars = t.p1numchars
+    start.p[1].teamMode = t.p1teammode
+    start.p[2].numChars = t.p2numchars
+    start.p[2].teamMode = t.p2teammode
+
+    return ok
 end
 
 function launchStoryboard(path)
@@ -2293,45 +2320,50 @@ function start.f_selectScreen()
 			blinkCount = 0
 		end
 		for side = 1, 2 do
-			if not start.p[side].teamEnd then
-				start.f_teamMenu(side, t_teamMenu[side])
-			elseif not start.p[side].selEnd then
-				--for each player with active controls
-				for k, v in ipairs(start.p[side].t_selCmd) do
-					local member = main.f_tableLength(start.p[side].t_selected) + k
-					if main.coop and (side == 1 or gamemode('versuscoop')) then
-						member = k
-					end
-					--member selection
-					v.selectState, start.needUpdateDrawList = start.f_selectMenu(side, v.cmd, v.player, member, v.selectState)
-					--draw active cursor
-					if side == 2 and motif.select_info.p2_cursor_blink == 1 then
-						local sameCell = false
-						for _, v2 in ipairs(start.p[1].t_selCmd) do							
-							if start.c[v.player].cell == start.c[v2.player].cell and v.selectState == 0 and v2.selectState == 0 then
-								if blinkCount == 0 then
-									start.c[v.player].blink = not start.c[v.player].blink
+			if main.selectMenu[side] then
+				if not start.p[side].teamEnd then
+					start.f_teamMenu(side, t_teamMenu[side])
+				elseif not start.p[side].selEnd then
+					for k, v in ipairs(start.p[side].t_selCmd) do
+						local member = main.f_tableLength(start.p[side].t_selected) + k
+						if main.coop and (side == 1 or gamemode('versuscoop')) then
+							member = k
+						end
+						-- member selection
+						v.selectState, start.needUpdateDrawList = start.f_selectMenu(side, v.cmd, v.player, member, v.selectState)
+						-- draw active cursor
+						if side == 2 and motif.select_info.p2_cursor_blink == 1 then
+							local sameCell = false
+							for _, v2 in ipairs(start.p[1].t_selCmd) do
+								if start.c[v.player].cell == start.c[v2.player].cell and v.selectState == 0 and v2.selectState == 0 then
+									if blinkCount == 0 then
+										start.c[v.player].blink = not start.c[v.player].blink
+									end
+									sameCell = true
+									break
 								end
-								sameCell = true
-								break
+							end
+							if not sameCell then
+								start.c[v.player].blink = false
 							end
 						end
-						if not sameCell then
-							start.c[v.player].blink = false
+						if v.selectState < 4 and start.f_selGrid(start.c[v.player].cell + 1).hidden ~= 1 and not start.c[v.player].blink then
+							start.f_drawCursor(v.player, start.c[v.player].selX, start.c[v.player].selY, '_cursor_active', false)
 						end
 					end
-					if v.selectState < 4 and start.f_selGrid(start.c[v.player].cell + 1).hidden ~= 1 and not start.c[v.player].blink then
-						start.f_drawCursor(v.player, start.c[v.player].selX, start.c[v.player].selY, '_cursor_active', false)
+				end
+				-- delayed screen transition for the duration of face_done_anim or selection sound
+				if start.p[side].screenDelay > 0 then
+					if main.f_input(main.t_players, {'pal', 's'}) then
+						start.p[side].screenDelay = 0
+					else
+						start.p[side].screenDelay = start.p[side].screenDelay - 1
 					end
 				end
-			end
-			--delayed screen transition for the duration of face_done_anim or selection sound
-			if start.p[side].screenDelay > 0 then
-				if main.f_input(main.t_players, {'pal', 's'}) then
-					start.p[side].screenDelay = 0
-				else
-					start.p[side].screenDelay = start.p[side].screenDelay - 1
-				end
+			else
+				-- side has no menu, mark selection as already complete
+				start.p[side].teamEnd = true
+				start.p[side].selEnd = true
 			end
 		end
 		--exit select screen

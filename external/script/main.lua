@@ -2515,6 +2515,7 @@ function main.f_default()
 	setConsecutiveRounds(false)
 	setContinue(false)
 	setGameMode('')
+	singlePlayerSide = 1
 	setHomeTeam(2) --http://mugenguild.com/forum/topics/ishometeam-triggers-169132.0.html
 	setLifebarElements(main.lifebar)
 	setRoundTime(math.max(-1, main.roundTime * main.timeFramesPerCount))
@@ -2532,8 +2533,15 @@ end
 main.t_itemname = {
 	--ARCADE / TEAM ARCADE
 	['arcade'] = function(t, item)
-		main.f_playerInput(main.playerInput, 1)
-		main.t_pIn[2] = 1
+		-- If P2 selected the mode
+		if main.playerInput == 2 then
+			singlePlayerSide = 2
+			main.selectMenu = {false, true}
+			main.cpuSide = {true,  false}
+			setHomeTeam(2)
+		end
+			setHomeTeam(1)
+		end
 		main.aiRamp = true
 		main.charparam.ai = true
 		main.charparam.arcadepath = true
@@ -2835,8 +2843,15 @@ main.t_itemname = {
 	end,
 	--SURVIVAL
 	['survival'] = function()
-		main.f_playerInput(main.playerInput, 1)
-		main.t_pIn[2] = 1
+		-- If P2 selected the mode
+		if main.playerInput == 2 then
+			singlePlayerSide = 2
+			main.selectMenu = {false, true}
+			main.cpuSide = {true,  false}
+			setHomeTeam(2)
+		else
+			setHomeTeam(1)
+		end
 		main.aiRamp = true
 		main.charparam.ai = true
 		main.charparam.music = true
