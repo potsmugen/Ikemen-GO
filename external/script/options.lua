@@ -137,31 +137,40 @@ options.t_itemname = {
 			modifyGameOption('Options.Life', 100)
 			modifyGameOption('Options.Time', 99)
 			modifyGameOption('Options.GameSpeed', 0)
-			modifyGameOption('Options.Match.Wins', 2)
 			modifyGameOption('Options.Match.MaxDrawGames', -2) -- -2: match.maxdrawgames
 			modifyGameOption('Options.Credits', 10)
 			modifyGameOption('Options.QuickContinue', false)
 			modifyGameOption('Options.AutoGuard', false)
-			modifyGameOption('Options.GuardBreak', false)
-			modifyGameOption('Options.Dizzy', false)
-			modifyGameOption('Options.RedLife', true)
 			modifyGameOption('Options.Team.Duplicates', true)
 			modifyGameOption('Options.Team.LifeShare', false)
 			modifyGameOption('Options.Team.PowerShare', true)
 			modifyGameOption('Options.Team.SingleVsTeamLife', 100)
+			modifyGameOption('Options.Single.Match.Wins', 2)
+			modifyGameOption('Options.Single.GuardBreak', false)
+			modifyGameOption('Options.Single.Dizzy', false)
+			modifyGameOption('Options.Single.RedLife', true)
 			modifyGameOption('Options.Simul.Min', 2)
 			modifyGameOption('Options.Simul.Max', 4)
 			modifyGameOption('Options.Simul.Match.Wins', 2)
 			modifyGameOption('Options.Simul.LoseOnKO', true)
+			modifyGameOption('Options.Simul.GuardBreak', false)
+			modifyGameOption('Options.Simul.Dizzy', false)
+			modifyGameOption('Options.Simul.RedLife', true)
 			modifyGameOption('Options.Tag.Min', 2)
 			modifyGameOption('Options.Tag.Max', 4)
 			modifyGameOption('Options.Tag.Match.Wins', 2)
 			modifyGameOption('Options.Tag.LoseOnKO', false)	
 			modifyGameOption('Options.Tag.TimeScaling', 1)
+			modifyGameOption('Options.Tag.GuardBreak', false)
+			modifyGameOption('Options.Tag.Dizzy', false)
+			modifyGameOption('Options.Tag.RedLife', true)
 			modifyGameOption('Options.Turns.Min', 2)
 			modifyGameOption('Options.Turns.Max', 4)
 			modifyGameOption('Options.Turns.Recovery.Base', 0)
 			modifyGameOption('Options.Turns.Recovery.Bonus', 20)
+			modifyGameOption('Options.Turns.GuardBreak', false)
+			modifyGameOption('Options.Turns.Dizzy', false)
+			modifyGameOption('Options.Turns.RedLife', true)
 			modifyGameOption('Options.Ratio.Recovery.Base', 0)
 			modifyGameOption('Options.Ratio.Recovery.Bonus', 20)
 			modifyGameOption('Options.Ratio.Level1.Attack', 0.82)
@@ -341,15 +350,15 @@ options.t_itemname = {
 	['roundsnumsingle'] = function(t, item, cursorPosY, moveTxt)
 		if main.f_input(main.t_players, {'$F'}) and main.roundsNumSingle[1] < 10 then
 			sndPlay(motif.files.snd_data, motif.option_info.cursor_move_snd[1], motif.option_info.cursor_move_snd[2])
-			modifyGameOption('Options.Match.Wins', main.roundsNumSingle[1] + 1)
-			main.roundsNumSingle = {gameOption('Options.Match.Wins'), gameOption('Options.Match.Wins')}
-			t.items[item].vardisplay = gameOption('Options.Match.Wins')
+			modifyGameOption('Options.Single.Match.Wins', main.roundsNumSingle[1] + 1)
+			main.roundsNumSingle = {gameOption('Options.Single.Match.Wins'), gameOption('Options.Single.Match.Wins')}
+			t.items[item].vardisplay = gameOption('Options.Single.Match.Wins')
 			options.modified = true
 		elseif main.f_input(main.t_players, {'$B'}) and main.roundsNumSingle[1] > 1 then
 			sndPlay(motif.files.snd_data, motif.option_info.cursor_move_snd[1], motif.option_info.cursor_move_snd[2])
-			modifyGameOption('Options.Match.Wins', main.roundsNumSingle[1] - 1)
-			main.roundsNumSingle = {gameOption('Options.Match.Wins'), gameOption('Options.Match.Wins')}
-			t.items[item].vardisplay = gameOption('Options.Match.Wins')
+			modifyGameOption('Options.Single.Match.Wins', main.roundsNumSingle[1] - 1)
+			main.roundsNumSingle = {gameOption('Options.Single.Match.Wins'), gameOption('Options.Single.Match.Wins')}
+			t.items[item].vardisplay = gameOption('Options.Single.Match.Wins')
 			options.modified = true
 		end
 		return true
@@ -452,48 +461,6 @@ options.t_itemname = {
 				modifyGameOption('Options.AutoGuard', true)
 			end
 			t.items[item].vardisplay = options.f_boolDisplay(gameOption('Options.AutoGuard'))
-			options.modified = true
-		end
-		return true
-	end,
-	--Dizzy
-	['dizzy'] = function(t, item, cursorPosY, moveTxt)
-		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
-			sndPlay(motif.files.snd_data, motif.option_info.cursor_move_snd[1], motif.option_info.cursor_move_snd[2])
-			if gameOption('Options.Dizzy') then
-				modifyGameOption('Options.Dizzy', false)
-			else
-				modifyGameOption('Options.Dizzy', true)
-			end
-			t.items[item].vardisplay = options.f_boolDisplay(gameOption('Options.Dizzy'))
-			options.modified = true
-		end
-		return true
-	end,
-	--Guard Break
-	['guardbreak'] = function(t, item, cursorPosY, moveTxt)
-		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
-			sndPlay(motif.files.snd_data, motif.option_info.cursor_move_snd[1], motif.option_info.cursor_move_snd[2])
-			if gameOption('Options.GuardBreak') then
-				modifyGameOption('Options.GuardBreak', false)
-			else
-				modifyGameOption('Options.GuardBreak', true)
-			end
-			t.items[item].vardisplay = options.f_boolDisplay(gameOption('Options.GuardBreak'))
-			options.modified = true
-		end
-		return true
-	end,
-	--Red Life
-	['redlife'] = function(t, item, cursorPosY, moveTxt)
-		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
-			sndPlay(motif.files.snd_data, motif.option_info.cursor_move_snd[1], motif.option_info.cursor_move_snd[2])
-			if gameOption('Options.RedLife') then
-				modifyGameOption('Options.RedLife', false)
-			else
-				modifyGameOption('Options.RedLife', true)
-			end
-			t.items[item].vardisplay = options.f_boolDisplay(gameOption('Options.RedLife'))
 			options.modified = true
 		end
 		return true
@@ -1403,9 +1370,6 @@ options.t_vardisplay = {
 	['gamespeed'] = function()
 		return options.f_boolDisplay(gameOption('Options.GameSpeed') == 0, motif.option_info.menu_valuename_normal, options.f_boolDisplay(gameOption('Options.GameSpeed') < 0, motif.option_info.menu_valuename_slow:gsub('%%i', tostring(0-gameOption('Options.GameSpeed'))), motif.option_info.menu_valuename_fast:gsub('%%i', tostring(gameOption('Options.GameSpeed')))))
 	end,
-	['guardbreak'] = function()
-		return options.f_boolDisplay(gameOption('Options.GuardBreak'))
-	end,
 	['helpermax'] = function()
 		return gameOption('Config.HelperMax')
 	end,
@@ -1497,9 +1461,6 @@ options.t_vardisplay = {
 	['ratiorecoverybonus'] = function()
 		return gameOption('Options.Ratio.Recovery.Bonus') .. '%'
 	end,
-	['redlife'] = function()
-		return options.f_boolDisplay(gameOption('Options.RedLife'))
-	end,
 	['renderer'] = function()
 		return gameOption('Video.RenderMode')
 	end,
@@ -1529,9 +1490,6 @@ options.t_vardisplay = {
 	end,
 	['stereoeffects'] = function()
 		return options.f_boolDisplay(gameOption('Sound.StereoEffects'), motif.option_info.menu_valuename_enabled, motif.option_info.menu_valuename_disabled)
-	end,
-	['dizzy'] = function()
-		return options.f_boolDisplay(gameOption('Options.Dizzy'))
 	end,
 	['teamduplicates'] = function()
 		return options.f_boolDisplay(gameOption('Options.Team.Duplicates'))
@@ -1571,6 +1529,23 @@ function options.f_start()
 	-- default menus
 	if main.t_sort.option_info == nil or main.t_sort.option_info.menu == nil or #main.t_sort.option_info.menu == 0 then
 		motif.setBaseOptionInfo()
+	end
+	--
+	for _, team in ipairs({'Single', 'Tag', 'Simul', 'Turns'}) do
+		for _, option in ipairs({'Dizzy', 'GuardBreak', 'RedLife'}) do
+			local itemname = option:lower()..team:lower()
+			options.t_itemname[itemname] = function(t, item, cursorPosY, moveTxt)
+				if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
+					sndPlay(motif.files.snd_data, motif.option_info.cursor_move_snd[1], motif.option_info.cursor_move_snd[2])
+					local key = 'Options.'..team..'.'..option
+					modifyGameOption(key, not gameOption(key))
+					t.items[item].vardisplay = options.f_boolDisplay(gameOption(key))
+					options.modified = true
+				end
+				return true
+			end
+			options.t_vardisplay[itemname] = function() return options.f_boolDisplay(gameOption('Options.'..team..'.'..option)) end
+		end
 	end
 	-- external shaders
 	options.t_shaders = {}

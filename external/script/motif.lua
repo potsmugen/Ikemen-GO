@@ -2231,7 +2231,6 @@ function motif.setBaseOptionInfo()
 	motif.option_info.menu_itemname_menugame_lifemul = "Life"
 	motif.option_info.menu_itemname_menugame_singlevsteamlife = "Single VS Team Life"
 	motif.option_info.menu_itemname_menugame_gamespeed = "Game Speed"
-	motif.option_info.menu_itemname_menugame_roundsnumsingle = "Rounds to Win (Single)"
 	motif.option_info.menu_itemname_menugame_maxdrawgames = "Max Draw Games"
 	motif.option_info.menu_itemname_menugame_credits = "Credits"
 	motif.option_info.menu_itemname_menugame_aipalette = "Arcade Palette"
@@ -2239,24 +2238,34 @@ function motif.setBaseOptionInfo()
 	motif.option_info.menu_itemname_menugame_airamping = "AI Ramping"
 	motif.option_info.menu_itemname_menugame_quickcontinue = "Quick Continue"
 	motif.option_info.menu_itemname_menugame_autoguard = "Auto-Guard"
-	motif.option_info.menu_itemname_menugame_dizzy = "Dizzy"
-	motif.option_info.menu_itemname_menugame_guardbreak = "Guard Break"
-	motif.option_info.menu_itemname_menugame_redlife = "Red Life"
 	motif.option_info.menu_itemname_menugame_teamduplicates = "Team Duplicates"
 	motif.option_info.menu_itemname_menugame_teamlifeshare = "Team Life Share"
 	motif.option_info.menu_itemname_menugame_teampowershare = "Team Power Share"
 	motif.option_info.menu_itemname_menugame_empty = ""
+	motif.option_info.menu_itemname_menugame_menusingle = "Single Settings"
+	motif.option_info.menu_itemname_menugame_menusingle_roundsnumsingle = "Rounds to Win"
+	motif.option_info.menu_itemname_menugame_menusingle_dizzysingle = "Dizzy"
+	motif.option_info.menu_itemname_menugame_menusingle_guardbreaksingle = "Guard Break"
+	motif.option_info.menu_itemname_menugame_menusingle_redlifesingle = "Red Life"
+	motif.option_info.menu_itemname_menugame_menusingle_empty = ""
+	motif.option_info.menu_itemname_menugame_menusingle_back = "Back"
 	motif.option_info.menu_itemname_menugame_menutag = "Tag Settings"
-	motif.option_info.menu_itemname_menugame_menutag_roundsnumtag = "Rounds to Win (Tag)"
+	motif.option_info.menu_itemname_menugame_menutag_roundsnumtag = "Rounds to Win"
 	motif.option_info.menu_itemname_menugame_menutag_losekotag = "Partner KOed Lose"
+	motif.option_info.menu_itemname_menugame_menutag_dizzytag = "Dizzy"
+	motif.option_info.menu_itemname_menugame_menutag_guardbreaktag = "Guard Break"
+	motif.option_info.menu_itemname_menugame_menutag_redlifetag = "Red Life"
 	motif.option_info.menu_itemname_menugame_menutag_empty = ""
 	motif.option_info.menu_itemname_menugame_menutag_mintag = "Min Tag Chars"
 	motif.option_info.menu_itemname_menugame_menutag_maxtag = "Max Tag Chars"
 	motif.option_info.menu_itemname_menugame_menutag_empty = ""
 	motif.option_info.menu_itemname_menugame_menutag_back = "Back"
 	motif.option_info.menu_itemname_menugame_menusimul = "Simul Settings"
-	motif.option_info.menu_itemname_menugame_menusimul_roundsnumsimul = "Rounds to Win (Simul)"
+	motif.option_info.menu_itemname_menugame_menusimul_roundsnumsimul = "Rounds to Win"
 	motif.option_info.menu_itemname_menugame_menusimul_losekosimul = "Player KOed Lose"
+	motif.option_info.menu_itemname_menugame_menusimul_dizzysimul = "Dizzy"
+	motif.option_info.menu_itemname_menugame_menusimul_guardbreaksimul = "Guard Break"
+	motif.option_info.menu_itemname_menugame_menusimul_redlifesimul = "Red Life"
 	motif.option_info.menu_itemname_menugame_menusimul_empty = ""
 	motif.option_info.menu_itemname_menugame_menusimul_minsimul = "Min Simul Chars"
 	motif.option_info.menu_itemname_menugame_menusimul_maxsimul = "Max Simul Chars"
@@ -2265,6 +2274,9 @@ function motif.setBaseOptionInfo()
 	motif.option_info.menu_itemname_menugame_menuturns = "Turns Settings"
 	motif.option_info.menu_itemname_menugame_menuturns_turnsrecoverybase = "Turns Recovery Base"
 	motif.option_info.menu_itemname_menugame_menuturns_turnsrecoverybonus = "Turns Recovery Bonus"
+	motif.option_info.menu_itemname_menugame_menuturns_dizzyturns = "Dizzy"
+	motif.option_info.menu_itemname_menugame_menuturns_guardbreakturns = "Guard Break"
+	motif.option_info.menu_itemname_menugame_menuturns_redlifeturns = "Red Life"
 	motif.option_info.menu_itemname_menugame_menuturns_empty = ""
 	motif.option_info.menu_itemname_menugame_menuturns_minturns = "Min Turns Chars"
 	motif.option_info.menu_itemname_menugame_menuturns_maxturns = "Max Turns Chars"
@@ -2367,7 +2379,6 @@ function motif.setBaseOptionInfo()
 		"menugame_lifemul",
 		"menugame_singlevsteamlife",
 		"menugame_gamespeed",
-		"menugame_roundsnumsingle",
 		"menugame_maxdrawgames",
 		"menugame_credits",
 		"menugame_aipalette",
@@ -2375,16 +2386,23 @@ function motif.setBaseOptionInfo()
 		"menugame_airamping",
 		"menugame_quickcontinue",
 		"menugame_autoguard",
-		"menugame_dizzy",
-		"menugame_guardbreak",
-		"menugame_redlife",
 		"menugame_teamduplicates",
 		"menugame_teamlifeshare",
 		"menugame_teampowershare",
 		"menugame_empty",
+		"menugame_menusingle",
+		"menugame_menusingle_roundsnumsingle",
+		"menugame_menusingle_dizzysingle",
+		"menugame_menusingle_guardbreaksingle",
+		"menugame_menusingle_redlifesingle",
+		"menugame_menusingle_empty",
+		"menugame_menusingle_back",
 		"menugame_menutag",
 		"menugame_menutag_roundsnumtag",
 		"menugame_menutag_losekotag",
+		"menugame_menutag_dizzytag",
+		"menugame_menutag_guardbreaktag",
+		"menugame_menutag_redlifetag",
 		"menugame_menutag_empty",
 		"menugame_menutag_mintag",
 		"menugame_menutag_maxtag",
@@ -2393,6 +2411,9 @@ function motif.setBaseOptionInfo()
 		"menugame_menusimul",
 		"menugame_menusimul_roundsnumsimul",
 		"menugame_menusimul_losekosimul",
+		"menugame_menusimul_dizzysimul",
+		"menugame_menusimul_guardbreaksimul",
+		"menugame_menusimul_redlifesimul",
 		"menugame_menusimul_empty",
 		"menugame_menusimul_minsimul",
 		"menugame_menusimul_maxsimul",
@@ -2401,6 +2422,9 @@ function motif.setBaseOptionInfo()
 		"menugame_menuturns",
 		"menugame_menuturns_turnsrecoverybase",
 		"menugame_menuturns_turnsrecoverybonus",
+		"menugame_menuturns_dizzyturns",
+		"menugame_menuturns_guardbreakturns",
+		"menugame_menuturns_redlifeturns",
 		"menugame_menuturns_empty",
 		"menugame_menuturns_minturns",
 		"menugame_menuturns_maxturns",

@@ -1336,10 +1336,10 @@ main.roundsNumTag = {}
 main.maxDrawGames = {}
 function main.f_updateRoundsNum()
 	for i = 1, 2 do
-		if gameOption('Options.Match.Wins') == -1 then
+		if gameOption('Options.Single.Match.Wins') == -1 then
 			main.roundsNumSingle[i] = getMatchWins(i)
 		else
-			main.roundsNumSingle[i] = gameOption('Options.Match.Wins')
+			main.roundsNumSingle[i] = gameOption('Options.Single.Match.Wins')
 		end
 		if gameOption('Options.Simul.Match.Wins') == -1 then
 			main.roundsNumSimul[i] = getMatchWins(i)
@@ -1409,7 +1409,7 @@ function main.f_commandLine()
 	if main.flags['-loadmotif'] == nil then
 		loadLifebar(main.lifebarDef)
 	end
-	setLifebarElements({guardbar = gameOption('Options.GuardBreak'), stunbar = gameOption('Options.Dizzy'), redlifebar = gameOption('Options.RedLife')})
+	--setLifebarElements({guardbar = gameOption('Options.GuardBreak'), stunbar = gameOption('Options.Dizzy'), redlifebar = gameOption('Options.RedLife')})
 	local frames = fightscreenvar("time.framespercount")
 	main.f_updateRoundsNum()
 	local t = {}
@@ -2472,9 +2472,9 @@ function main.f_default()
 		p2score = false,
 		p2wincount = false,
 		timer = false,
-		guardbar = gameOption('Options.GuardBreak'),
-		stunbar = gameOption('Options.Dizzy'),
-		redlifebar = gameOption('Options.RedLife'),
+		--guardbar = gameOption('Options.GuardBreak'),
+		--stunbar = gameOption('Options.Dizzy'),
+		--redlifebar = gameOption('Options.RedLife'),
 		hidebars = motif.dialogue_info.enabled == 1,
 	}
 	main.lifePersistence = false --if life should be maintained after match

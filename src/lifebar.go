@@ -609,6 +609,7 @@ func (hb *HealthBar) draw(layerno int16, ref int, hbr *HealthBar, f []*Fnt) {
 	redval := sys.chars[ref][0].redLife - sys.chars[ref][0].life
 	var MidPosX = (float32(sys.gameWidth-320) / 2)
 	var MidPosY = (float32(sys.gameHeight-240) / 2)
+
 	// Calculates the clipping rectangle based on current bar settings
 	getBarClipRect := func(life float32) [4]int32 {
 		r := sys.scrrect
@@ -661,6 +662,15 @@ func (hb *HealthBar) draw(layerno int16, ref int, hbr *HealthBar, f []*Fnt) {
 		}
 	}
 
+	// Draw middle
+	hb.mid.lay.DrawAnim(&mr, float32(hb.pos[0])+sys.lifebarOffsetX, float32(hb.pos[1])+sys.lifebarOffsetY, sys.lifebarScale, mxs, mys,
+		layerno, hb.mid.anim, hb.mid.palfx)
+
+	if hb.mid_shift {
+		hb.shift.lay.DrawAnim(&mr, float32(hb.pos[0])+sys.lifebarOffsetX, float32(hb.pos[1])+sys.lifebarOffsetY, sys.lifebarScale, mxs, mys,
+			layerno, hb.shift.anim, hb.shift.palfx)
+	}
+
 	// Draw red life
 	if sys.chars[ref][0].redLifeEnabled() {
 		var rv int32
@@ -694,14 +704,6 @@ func (hb *HealthBar) draw(layerno int16, ref int, hbr *HealthBar, f []*Fnt) {
 				hb.red_value[rv2].frgba,
 			)
 		}
-	}
-
-	hb.mid.lay.DrawAnim(&mr, float32(hb.pos[0])+sys.lifebarOffsetX, float32(hb.pos[1])+sys.lifebarOffsetY, sys.lifebarScale, mxs, mys,
-		layerno, hb.mid.anim, hb.mid.palfx)
-
-	if hb.mid_shift {
-		hb.shift.lay.DrawAnim(&mr, float32(hb.pos[0])+sys.lifebarOffsetX, float32(hb.pos[1])+sys.lifebarOffsetY, sys.lifebarScale, mxs, mys,
-			layerno, hb.shift.anim, hb.shift.palfx)
 	}
 
 	// Multiple front elements

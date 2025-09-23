@@ -56,15 +56,19 @@ type Config struct {
 		Time       int32   `ini:"Time"`
 		GameSpeed  int     `ini:"GameSpeed"`
 		Match      struct {
-			Wins         int32 `ini:"Wins"`
 			MaxDrawGames int32 `ini:"MaxDrawGames"`
 		} `ini:"Match"`
 		Credits       int  `ini:"Credits"`
 		QuickContinue bool `ini:"QuickContinue"`
 		AutoGuard     bool `ini:"AutoGuard"`
-		GuardBreak    bool `ini:"GuardBreak"`
-		Dizzy         bool `ini:"Dizzy"`
-		RedLife       bool `ini:"RedLife"`
+		Single struct {
+			Dizzy      bool `ini:"Dizzy"`
+			GuardBreak bool `ini:"GuardBreak"`
+			RedLife    bool `ini:"RedLife"`
+			Match      struct {
+				Wins int32 `ini:"Wins"`
+			} `ini:"Match"`
+		} `ini:"Single"`
 		Team          struct {
 			Duplicates       bool    `ini:"Duplicates"`
 			LifeShare        bool    `ini:"LifeShare"`
@@ -72,26 +76,35 @@ type Config struct {
 			SingleVsTeamLife float32 `ini:"SingleVsTeamLife"`
 		} `ini:"Team"`
 		Simul struct {
-			Min   int `ini:"Min"`
-			Max   int `ini:"Max"`
-			Match struct {
+			Dizzy      bool `ini:"Dizzy"`
+			GuardBreak bool `ini:"GuardBreak"`
+			RedLife    bool `ini:"RedLife"`
+			Min        int  `ini:"Min"`
+			Max        int  `ini:"Max"`
+			Match      struct {
 				Wins int32 `ini:"Wins"`
 			} `ini:"Match"`
-			LoseOnKO bool `ini:"LoseOnKO"`
+			LoseOnKO   bool `ini:"LoseOnKO"`
 		} `ini:"Simul"`
 		Tag struct {
-			Min   int `ini:"Min"`
-			Max   int `ini:"Max"`
-			Match struct {
+			Dizzy       bool    `ini:"Dizzy"`
+			GuardBreak  bool    `ini:"GuardBreak"`
+			RedLife     bool    `ini:"RedLife"`
+			Min         int     `ini:"Min"`
+			Max         int     `ini:"Max"`
+			Match       struct {
 				Wins int32 `ini:"Wins"`
 			} `ini:"Match"`
 			LoseOnKO    bool    `ini:"LoseOnKO"`
 			TimeScaling float32 `ini:"TimeScaling"`
 		} `ini:"Tag"`
 		Turns struct {
-			Min      int `ini:"Min"`
-			Max      int `ini:"Max"`
-			Recovery struct {
+			Dizzy      bool `ini:"Dizzy"`
+			GuardBreak bool `ini:"GuardBreak"`
+			RedLife    bool `ini:"RedLife"`
+			Min        int `ini:"Min"`
+			Max        int `ini:"Max"`
+			Recovery   struct {
 				Base  float32 `ini:"Base"`
 				Bonus float32 `ini:"Bonus"`
 			} `ini:"Recovery"`
