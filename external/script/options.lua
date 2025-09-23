@@ -137,6 +137,7 @@ options.t_itemname = {
 			modifyGameOption('Options.Life', 100)
 			modifyGameOption('Options.Time', 99)
 			modifyGameOption('Options.GameSpeed', 0)
+			--modifyGameOption('Options.GameSpeedStep', 5)
 			modifyGameOption('Options.Match.MaxDrawGames', -2) -- -2: match.maxdrawgames
 			modifyGameOption('Options.Credits', 10)
 			modifyGameOption('Options.QuickContinue', false)
