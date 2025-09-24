@@ -2799,7 +2799,7 @@ func (c *Char) clsnOverlapTrigger(box1, pid, box2 int32) bool {
 	if getter == nil {
 		return false
 	}
-	return c.clsnCheck(getter, box1, box2, false, true, false, false)
+	return c.clsnCheck(getter, box1, box2, false, true)
 }
 
 func (c *Char) addChild(ch *Char) {
@@ -8512,21 +8512,63 @@ func (c *Char) offsetY() float32 {
 	return float32(c.size.draw.offset[1]) + c.offset[1]/c.localscl
 }
 
-func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32, clsnproxycheck bool) bool {
+// Get the character as well as all its proxy children (and their proxy children)
+func (c *Char) flattenClsnProxies() []*Char {
+	var list []*Char
+
+	// Start with the base character
+	queue := []*Char{c}
+
+	// Process the queue until all characters (base + proxies) have been handled
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		list = append(list, current)
+
+		for _, child := range current.children {
+			if child != nil && child.isclsnproxy {
+				queue = append(queue, child)
+			}
+		}
+	}
+
+	return list
+}
+
+func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32) bool {
+	// Safety checks
 	if p.ani == nil || c.curFrame == nil || c.scf(SCF_standby) || c.scf(SCF_disabled) {
 		return false
 	}
-	// Clsnproxies do not hit nor get hit themselves, they act as an extension of their parent's clsn boxes.
-	if c.isclsnproxy && !clsnproxycheck {
+
+	// Clsnproxies do not hit nor get hit themselves. They act as extensions of their parent's clsn boxes.
+	if c.isclsnproxy {
 		return false
 	}
-	// Recursively check clsnproxy children, god I hope this works and doesn't ruin performance. A child being the parent of its parent isn't something that can happen, right...?
-	if cbox != 3 || !clsnproxycheck {
-		for _, chi := range c.children {
-			if chi != nil && chi.isclsnproxy && chi.projClsnCheck(p, cbox, pbox, true) {
-				return true
-			}
+
+	// Get char and its proxies
+	var charTotal []*Char
+	if cbox == 3 {
+		charTotal = []*Char{c} // Except if size box
+	} else {
+		charTotal = c.flattenClsnProxies()
+	}
+
+	// Loop through all characters and check collision
+	for _, charSingle := range charTotal {
+		if charSingle.projClsnCheckSingle(p, cbox, pbox) {
+			return true
 		}
+	}
+
+	return false
+}
+
+func (c *Char) projClsnCheckSingle(p *Projectile, cbox, pbox int32) bool {
+	// Safety checks
+	if p.ani == nil || c.curFrame == nil || c.scf(SCF_standby) || c.scf(SCF_disabled) {
+		return false
 	}
 
 	// Get projectile animation frame
@@ -8589,7 +8631,8 @@ func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32, clsnproxycheck boo
 		charangle = 0
 	}
 
-	return sys.clsnOverlap(clsn1,
+	return sys.clsnOverlap(
+		clsn1,
 		[...]float32{p.clsnScale[0] * p.localscl * p.zScale, p.clsnScale[1] * p.localscl * p.zScale},
 		[...]float32{p.pos[0] * p.localscl, p.pos[1] * p.localscl},
 		p.facing,
@@ -8599,30 +8642,54 @@ func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32, clsnproxycheck boo
 		[...]float32{c.pos[0]*c.localscl + c.offsetX()*c.localscl,
 			c.pos[1]*c.localscl + c.offsetY()*c.localscl},
 		c.facing,
-		charangle)
+		charangle,
+	)
 }
 
-func (c *Char) clsnCheck(getter *Char, charbox, getterbox int32, reqcheck, trigger, clsnproxycheck, getterclsnproxycheck bool) bool {
+func (c *Char) clsnCheck(getter *Char, charbox, getterbox int32, reqcheck, trigger bool) bool {
 	// Safety checks
 	if c == nil || getter == nil || c.anim == nil || getter.anim == nil {
 		return false
 	}
-	// Clsnproxies do not hit nor get hit themselves, they act as an extension of their parent's clsn boxes.
-	if (c.isclsnproxy && !clsnproxycheck) || (getter.isclsnproxy && !getterclsnproxycheck) {
+
+	// Clsnproxies do not hit nor get hit themselves. They act as extensions of their parent's clsn boxes.
+	if c.isclsnproxy || getter.isclsnproxy {
 		return false
 	}
-	// Recursively check clsnproxy children, god I hope this works and doesn't ruin performance. A child being the parent of its parent isn't something that can happen, right...?
-	if (getterbox != 3 || !getterclsnproxycheck) && (charbox != 3 || !clsnproxycheck) {
-		for _, chi := range c.children {
-			if chi != nil && chi.isclsnproxy && chi.clsnCheck(getter, charbox, getterbox, reqcheck, trigger, true, getterclsnproxycheck) {
+
+	// Determine which characters to check
+	var charTotal []*Char
+	if charbox == 3 {
+		// Only base character for size box
+		charTotal = []*Char{c}
+	} else {
+		// Otherwise include all proxies
+		charTotal = c.flattenClsnProxies()
+	}
+
+	var getterTotal []*Char
+	if getterbox == 3 {
+		getterTotal = []*Char{getter}
+	} else {
+		getterTotal = getter.flattenClsnProxies()
+	}
+
+	// Check collision for all combinations
+	for _, charSingle := range charTotal {
+		for _, getterSingle := range getterTotal {
+			if charSingle.clsnCheckSingle(getterSingle, charbox, getterbox, reqcheck, trigger) {
 				return true
 			}
 		}
-		for _, chi := range getter.children {
-			if chi != nil && chi.isclsnproxy && c.clsnCheck(chi, charbox, getterbox, reqcheck, trigger, clsnproxycheck, true) {
-				return true
-			}
-		}
+	}
+
+	return false
+}
+
+func (c *Char) clsnCheckSingle(getter *Char, charbox, getterbox int32, reqcheck, trigger bool) bool {
+	// Safety checks
+	if c == nil || getter == nil || c.anim == nil || getter.anim == nil {
+		return false
 	}
 
 	// What this does is normally check the Clsn in the currently displayed frame
@@ -8699,7 +8766,8 @@ func (c *Char) clsnCheck(getter *Char, charbox, getterbox int32, reqcheck, trigg
 		getterangle = 0
 	}
 
-	return sys.clsnOverlap(clsn1,
+	return sys.clsnOverlap(
+		clsn1,
 		charscale,
 		[...]float32{c.pos[0]*c.localscl + c.offsetX()*c.localscl,
 			c.pos[1]*c.localscl + c.offsetY()*c.localscl},
@@ -8710,7 +8778,8 @@ func (c *Char) clsnCheck(getter *Char, charbox, getterbox int32, reqcheck, trigg
 		[...]float32{getter.pos[0]*getter.localscl + getter.offsetX()*getter.localscl,
 			getter.pos[1]*getter.localscl + getter.offsetY()*getter.localscl},
 		getter.facing,
-		getterangle)
+		getterangle,
+		)
 }
 
 func (c *Char) hitByAttrTrigger(attr int32) bool {
@@ -8905,7 +8974,7 @@ func (c *Char) hittableByChar(getter *Char, ghd *HitDef, gst StateType, proj boo
 			return (getter.atktmp >= 0 || !c.hasTarget(getter.id)) &&
 				!getter.hasTargetOfHitdef(c.id) &&
 				getter.attrCheck(c, hd, c.ss.stateType) &&
-				c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true, false, false, false) &&
+				c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true, false) &&
 				sys.zAxisOverlap(c.pos[2], c.hitdef.attack_depth[0], c.hitdef.attack_depth[1], c.localscl,
 					getter.pos[2], getter.sizeDepth[0], getter.sizeDepth[1], getter.localscl)
 		}
@@ -11392,7 +11461,7 @@ func (cl *CharList) hitDetectionPlayer(getter *Char) {
 				}
 
 				// If collision OK then get the hit type and act accordingly
-				if zok && c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true, false, false, false) {
+				if zok && c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true, false) {
 					if hitResult := c.hitResultCheck(getter, nil); hitResult != 0 {
 						// Check if MoveContact should be updated
 						// Hit type None should also set MoveHit here
@@ -11628,7 +11697,7 @@ func (cl *CharList) hitDetectionProjectile(getter *Char) {
 			if getter.atktmp != 0 && (getter.hitdef.affectteam == 0 ||
 				(p.hitdef.teamside-1 != getter.teamside) == (getter.hitdef.affectteam > 0)) &&
 				getter.hitdef.hitflag&int32(HF_P) != 0 &&
-				getter.projClsnCheck(p, 1, 2, false) &&
+				getter.projClsnCheck(p, 1, 2) &&
 				sys.zAxisOverlap(getter.pos[2], getter.hitdef.attack_depth[0], getter.hitdef.attack_depth[1], getter.localscl,
 					p.pos[2], p.hitdef.attack_depth[0], p.hitdef.attack_depth[1], p.localscl) {
 				if getter.hitdef.p1stateno >= 0 && getter.stateChange1(getter.hitdef.p1stateno, getter.hitdef.playerNo) {
@@ -11662,7 +11731,7 @@ func (cl *CharList) hitDetectionProjectile(getter *Char) {
 				//	getter.hittmp = int8(Btoi(getter.ghv.fallflag)) + 1
 				//}
 
-				if getter.projClsnCheck(p, p.hitdef.p2clsncheck, 1, false) &&
+				if getter.projClsnCheck(p, p.hitdef.p2clsncheck, 1) &&
 					sys.zAxisOverlap(p.pos[2], p.hitdef.attack_depth[0], p.hitdef.attack_depth[1], p.localscl,
 						getter.pos[2], getter.sizeDepth[0], getter.sizeDepth[1], getter.localscl) {
 
@@ -11759,7 +11828,7 @@ func (cl *CharList) pushDetection(getter *Char) {
 			}
 
 			// Push characters away from each other
-			if c.asf(ASF_sizepushonly) || getter.clsnCheck(c, 2, 2, false, false, false, false) {
+			if c.asf(ASF_sizepushonly) || getter.clsnCheck(c, 2, 2, false, false) {
 
 				getter.pushed, c.pushed = true, true
 
