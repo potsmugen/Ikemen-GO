@@ -115,6 +115,7 @@ func (w *Window) GetSize() (int, int) {
 	return w.Window.GetSize()
 }
 
+/*
 func (w *Window) GetScaledViewportSize() (int32, int32, int32, int32) {
 	// calculates a position and size for the viewport to fill the window while centered (see render_gl.go)
 	// returns x, y, width, height respectively
@@ -156,6 +157,49 @@ func (w *Window) GetScaledViewportSize() (int32, int32, int32, int32) {
 	resizedHeight = int32(float32(sys.gameHeight) * ratio)
 	x = (int32(winWidth) - resizedWidth) / 2
 	y = (int32(winHeight) - resizedHeight) / 2
+
+	return x, y, resizedWidth, resizedHeight
+}
+*/
+
+// Calculates a position and size for the viewport to fill the window while centered (see render_gl.go)
+// Returns x, y, width, height respectively
+func (w *Window) GetScaledViewportSize() (int32, int32, int32, int32) {
+	winWidth, winHeight := w.GetSize()
+
+	var x, y, resizedWidth, resizedHeight int32 = 0, 0, int32(winWidth), int32(winHeight)
+
+	// If aspect ratio should not be kept, just return full window
+	if !sys.cfg.Video.KeepAspect {
+		return 0, 0, int32(winWidth), int32(winHeight)
+	}
+
+	// Use default or custom aspect ratio
+	useDefault := sys.gameTime == 0 || sys.postMatchFlg ||
+		sys.cfg.Video.GameAspectWidth <= 0 || sys.cfg.Video.GameAspectHeight <= 0
+
+	var aspect float32
+	if useDefault {
+		aspect = float32(sys.cfg.Video.GameWidth) / float32(sys.cfg.Video.GameHeight)
+	} else {
+		aspect = float32(sys.cfg.Video.GameAspectWidth) / float32(sys.cfg.Video.GameAspectHeight)
+	}
+
+	// Calculate the corrected viewport
+	aspectWindow := float32(winWidth) / float32(winHeight)
+	if aspectWindow > aspect {
+		// Window is wider: black bars on sides
+		resizedHeight = int32(winHeight)
+		resizedWidth = int32(float32(resizedHeight) * aspect)
+		x = (int32(winWidth) - resizedWidth) / 2
+		y = 0
+	} else {
+		// Window is taller: black bars on top/bottom
+		resizedWidth = int32(winWidth)
+		resizedHeight = int32(float32(resizedWidth) / aspect)
+		x = 0
+		y = (int32(winHeight) - resizedHeight) / 2
+	}
 
 	return x, y, resizedWidth, resizedHeight
 }

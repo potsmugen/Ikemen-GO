@@ -4430,7 +4430,9 @@ func (s *Stage) drawModel(pos [2]float32, yofs float32, scl float32, layerNumber
 	rotation := [3]float32{s.model.rotation[0], s.model.rotation[1], s.model.rotation[2]}
 	scale := [3]float32{s.model.scale[0], s.model.scale[1], s.model.scale[2]}
 	proj := mgl.Translate3D(0, (sys.cam.zoomanchorcorrection+yofs)/float32(sys.gameHeight)*2+syo2+aspectCorrection, 0)
+
 	scaleX := scaleCorrection
+	/*
 	if sys.cfg.Video.StageFit && sys.isAspect43(s.stageCamera.localcoord) {
 		aspectNative := float32(sys.gameWidth) / float32(sys.gameHeight)
 		aspectWindow := float32(sys.scrrect[2]) / float32(sys.scrrect[3])
@@ -4438,6 +4440,17 @@ func (s *Stage) drawModel(pos [2]float32, yofs float32, scl float32, layerNumber
 			scaleX *= aspectWindow / aspectNative
 		}
 	}
+	*/
+
+	// TODO: This still allows the model to slide
+	if sys.isAspect43(s.stageCamera.localcoord) {
+		aspectNative := float32(sys.gameWidth) / float32(sys.gameHeight)
+		aspectWindow := float32(sys.scrrect[2]) / float32(sys.scrrect[3])
+		if aspectWindow > aspectNative {
+			scaleX *= aspectWindow / aspectNative
+		}
+	}
+
 	proj = proj.Mul4(mgl.Scale3D(scaleX, scaleCorrection, 1))
 	proj = proj.Mul4(mgl.Translate3D(0, (sys.cam.yshift * scl), 0))
 	proj = proj.Mul4(mgl.Perspective(drawFOV, float32(sys.scrrect[2])/float32(sys.scrrect[3]), s.stageCamera.near, s.stageCamera.far))

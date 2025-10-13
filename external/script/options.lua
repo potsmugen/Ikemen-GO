@@ -218,7 +218,7 @@ options.t_itemname = {
 			modifyGameOption('Video.ExternalShaders', {})
 			modifyGameOption('Video.WindowScaleMode', true)
 			modifyGameOption('Video.KeepAspect', true)
-			modifyGameOption('Video.StageFit', true)
+			--modifyGameOption('Video.StageFit', true)
 			modifyGameOption('Video.EnableModel', true)
 			modifyGameOption('Video.EnableModelShadow', true)
 			--modifyGameOption('Sound.SampleRate', 44100)
@@ -930,6 +930,8 @@ options.t_itemname = {
 		end
 		return true
 	end,
+
+	--[[
 	--StageFit
 	['stagefit'] = function(t, item, cursorPosY, moveTxt)
 		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
@@ -945,6 +947,8 @@ options.t_itemname = {
 		end
 		return true
 	end,
+	]]
+
 	--Keep Aspect Ratio
 	['keepaspect'] = function(t, item, cursorPosY, moveTxt)
 		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
@@ -1460,9 +1464,11 @@ options.t_vardisplay = {
 	['helpermax'] = function()
 		return gameOption('Config.HelperMax')
 	end,
+	--[[
 	['stagefit'] = function()
 		return options.f_boolDisplay(gameOption('Video.StageFit'), motif.option_info.menu_valuename_enabled, motif.option_info.menu_valuename_disabled)
 	end,
+	]]
 	['keepaspect'] = function()
 		return options.f_boolDisplay(gameOption('Video.KeepAspect'), motif.option_info.menu_valuename_enabled, motif.option_info.menu_valuename_disabled)
 	end,

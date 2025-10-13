@@ -696,6 +696,7 @@ func (s *System) isAspect43(localcoord [2]int32) bool {
 	return AbsF(aspect-aspect43) < eps
 }
 
+/*
 func (s *System) stageFit() {
 	def := strings.ToLower(filepath.Base(sys.sel.stagelist[sys.sel.selectedStageNo-1].def))
 	coord, ok := sys.stageLocalcoords[def]
@@ -709,6 +710,35 @@ func (s *System) stageFit() {
 	coordRatio := float32(coordInt[0]) / 320
 	sys.gameWidth = int32(float32(coordInt[0]) / coordRatio)
 	sys.widthScale = float32(sys.scrrect[2]) / float32(sys.gameWidth)
+}
+*/
+
+func (s *System) applyAspectRatio() {
+	// Base coordinate space
+	//baseWidth := float32(320)
+	baseHeight := float32(240)
+
+	// Use default or custom aspect ratio
+	useDefault := s.cfg.Video.GameAspectWidth <= 0 || s.cfg.Video.GameAspectHeight <= 0
+
+	var aspect float32
+	if useDefault {
+		aspect = float32(s.cfg.Video.GameWidth) / float32(s.cfg.Video.GameHeight)
+	} else {
+		aspect = float32(s.cfg.Video.GameAspectWidth) / float32(s.cfg.Video.GameAspectHeight)
+	}
+
+	// Compute new gameWidth/gameHeight while maintaining the same base height
+	gameWidth := baseHeight * aspect
+	s.gameWidth = int32(gameWidth)
+	s.gameHeight = int32(baseHeight)
+
+	// Scale to fit current screen size
+	s.widthScale = float32(s.scrrect[2]) / float32(s.gameWidth)
+	s.heightScale = float32(s.scrrect[3]) / float32(s.gameHeight)
+
+	// Adjust lifebar scale
+	sys.setLifebarScale()
 }
 
 func (s *System) eventUpdate() bool {
@@ -845,9 +875,13 @@ func (s *System) update() bool {
 
 	if s.gameTime == 0 {
 		s.preFightTime = s.frameCounter
-		if sys.cfg.Video.StageFit {
-			s.setWindowSize(s.scrrect[2], s.scrrect[3]) // Restore original resolution
-		}
+		//if sys.cfg.Video.StageFit {
+		//	s.setWindowSize(s.scrrect[2], s.scrrect[3]) // Restore original resolution
+		//}
+	}
+
+	if s.gameTime == 0 || s.postMatchFlg {
+		s.setWindowSize(s.scrrect[2], s.scrrect[3]) // Restore original resolution
 	}
 
 	if s.replayFile != nil {
@@ -4251,6 +4285,7 @@ func (l *Loader) load() {
 	defer func() {
 		l.loadExit <- l.state
 	}()
+	/*
 	if sys.cfg.Video.StageFit {
 		sys.stageFit()
 		coordRatio := float32(sys.gameWidth) / 320
@@ -4260,6 +4295,19 @@ func (l *Loader) load() {
 			}
 		}
 	}
+	*/
+
+	// Update aspect ratio
+	sys.applyAspectRatio()
+
+	// Normalize character localcoord to match new coordinate space
+	coordRatio := float32(sys.gameWidth) / 320
+	for _, c := range sys.chars {
+		if len(c) > 0 {
+			c[0].localcoord = c[0].gi().localcoord[0] / coordRatio
+		}
+	}
+
 	sys.setLifebarScale()
 	sys.loadMutex.Lock()
 	for prefix, ffx := range sys.ffx {
