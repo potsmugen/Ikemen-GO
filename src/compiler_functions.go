@@ -1250,54 +1250,54 @@ func (c *Compiler) velMul(is IniSection, sc *StateControllerBase, _ int8) (State
 	return *ret, err
 }
 
-func (c *Compiler) modifyShadow(is IniSection, sc *StateControllerBase, _ int8) (StateController, error) {
-	ret, err := (*modifyShadow)(sc), c.stateSec(is, func() error {
+func (c *Compiler) overrideShadow(is IniSection, sc *StateControllerBase, _ int8) (StateController, error) {
+	ret, err := (*overrideShadow)(sc), c.stateSec(is, func() error {
 		if err := c.paramValue(is, sc, "redirectid",
-			modifyShadow_redirectid, VT_Int, 1, false); err != nil {
+			overrideShadow_redirectid, VT_Int, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "color",
-			modifyShadow_color, VT_Int, 3, false); err != nil {
+			overrideShadow_color, VT_Int, 3, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "intensity",
-			modifyShadow_intensity, VT_Int, 1, false); err != nil {
+			overrideShadow_intensity, VT_Int, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "offset",
-			modifyShadow_offset, VT_Float, 2, false); err != nil {
+			overrideShadow_offset, VT_Float, 2, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "window",
-			modifyShadow_window, VT_Float, 4, false); err != nil {
+			overrideShadow_window, VT_Float, 4, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "xshear",
-			modifyShadow_xshear, VT_Float, 1, false); err != nil {
+			overrideShadow_xshear, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "yscale",
-			modifyShadow_yscale, VT_Float, 1, false); err != nil {
+			overrideShadow_yscale, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "angle",
-			modifyShadow_angle, VT_Float, 1, false); err != nil {
+			overrideShadow_angle, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "xangle",
-			modifyShadow_xangle, VT_Float, 1, false); err != nil {
+			overrideShadow_xangle, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "yangle",
-			modifyShadow_yangle, VT_Float, 1, false); err != nil {
+			overrideShadow_yangle, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "focallength",
-			modifyShadow_focallength, VT_Float, 1, false); err != nil {
+			overrideShadow_focallength, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramProjection(is, sc, "projection",
-			modifyShadow_projection); err != nil {
+			overrideShadow_projection); err != nil {
 			return err
 		}
 		return c.posSetSub(is, sc)
@@ -1305,54 +1305,54 @@ func (c *Compiler) modifyShadow(is IniSection, sc *StateControllerBase, _ int8) 
 	return *ret, err
 }
 
-func (c *Compiler) modifyReflection(is IniSection, sc *StateControllerBase, _ int8) (StateController, error) {
-	ret, err := (*modifyReflection)(sc), c.stateSec(is, func() error {
+func (c *Compiler) overrideReflection(is IniSection, sc *StateControllerBase, _ int8) (StateController, error) {
+	ret, err := (*overrideReflection)(sc), c.stateSec(is, func() error {
 		if err := c.paramValue(is, sc, "redirectid",
-			modifyReflection_redirectid, VT_Int, 1, false); err != nil {
+			overrideReflection_redirectid, VT_Int, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "color",
-			modifyReflection_color, VT_Int, 3, false); err != nil {
+			overrideReflection_color, VT_Int, 3, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "intensity",
-			modifyReflection_intensity, VT_Int, 1, false); err != nil {
+			overrideReflection_intensity, VT_Int, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "offset",
-			modifyReflection_offset, VT_Float, 2, false); err != nil {
+			overrideReflection_offset, VT_Float, 2, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "window",
-			modifyReflection_window, VT_Float, 4, false); err != nil {
+			overrideReflection_window, VT_Float, 4, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "xshear",
-			modifyReflection_xshear, VT_Float, 1, false); err != nil {
+			overrideReflection_xshear, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "yscale",
-			modifyReflection_yscale, VT_Float, 1, false); err != nil {
+			overrideReflection_yscale, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "angle",
-			modifyReflection_angle, VT_Float, 1, false); err != nil {
+			overrideReflection_angle, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "xangle",
-			modifyReflection_xangle, VT_Float, 1, false); err != nil {
+			overrideReflection_xangle, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "yangle",
-			modifyReflection_yangle, VT_Float, 1, false); err != nil {
+			overrideReflection_yangle, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "focallength",
-			modifyReflection_focallength, VT_Float, 1, false); err != nil {
+			overrideReflection_focallength, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramProjection(is, sc, "projection",
-			modifyReflection_projection); err != nil {
+			overrideReflection_projection); err != nil {
 			return err
 		}
 		return c.posSetSub(is, sc)

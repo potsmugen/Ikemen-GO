@@ -13258,25 +13258,25 @@ func (sc modifyStageBG) Run(c *Char, _ []int32) bool {
 	return false
 }
 
-type modifyShadow StateControllerBase
+type overrideShadow StateControllerBase
 
 const (
-	modifyShadow_color byte = iota
-	modifyShadow_intensity
-	modifyShadow_offset
-	modifyShadow_window
-	modifyShadow_xshear
-	modifyShadow_yscale
-	modifyShadow_angle
-	modifyShadow_xangle
-	modifyShadow_yangle
-	modifyShadow_focallength
-	modifyShadow_projection
-	modifyShadow_redirectid
+	overrideShadow_color byte = iota
+	overrideShadow_intensity
+	overrideShadow_offset
+	overrideShadow_window
+	overrideShadow_xshear
+	overrideShadow_yscale
+	overrideShadow_angle
+	overrideShadow_xangle
+	overrideShadow_yangle
+	overrideShadow_focallength
+	overrideShadow_projection
+	overrideShadow_redirectid
 )
 
-func (sc modifyShadow) Run(c *Char, _ []int32) bool {
-	crun := getRedirectedChar(c, StateControllerBase(sc), modifyShadow_redirectid, "ModifyShadow")
+func (sc overrideShadow) Run(c *Char, _ []int32) bool {
+	crun := getRedirectedChar(c, StateControllerBase(sc), overrideShadow_redirectid, "OverrideShadow")
 	if crun == nil {
 		return false
 	}
@@ -13285,7 +13285,7 @@ func (sc modifyShadow) Run(c *Char, _ []int32) bool {
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
-		case modifyShadow_color:
+		case overrideShadow_color:
 			var r, g, b int32
 			r = Clamp(exp[0].evalI(c), 0, 255)
 			if len(exp) > 1 {
@@ -13295,28 +13295,28 @@ func (sc modifyShadow) Run(c *Char, _ []int32) bool {
 				b = Clamp(exp[2].evalI(c), 0, 255)
 			}
 			crun.shadowColor = [3]int32{r, g, b}
-		case modifyShadow_intensity:
+		case overrideShadow_intensity:
 			crun.shadowIntensity = Clamp(exp[0].evalI(c), 0, 255)
-		case modifyShadow_offset:
+		case overrideShadow_offset:
 			crun.shadowOffset[0] = exp[0].evalF(c) * redirscale
 			if len(exp) > 1 {
 				crun.shadowOffset[1] = exp[1].evalF(c) * redirscale
 			}
-		case modifyShadow_window:
+		case overrideShadow_window:
 			crun.shadowWindow = [4]float32{exp[0].evalF(c), exp[1].evalF(c), exp[2].evalF(c), exp[3].evalF(c)}
-		case modifyShadow_xshear:
+		case overrideShadow_xshear:
 			crun.shadowXshear = exp[0].evalF(c)
-		case modifyShadow_yscale:
+		case overrideShadow_yscale:
 			crun.shadowYscale = exp[0].evalF(c)
-		case modifyShadow_angle:
+		case overrideShadow_angle:
 			crun.shadowRot.angle = exp[0].evalF(c)
-		case modifyShadow_xangle:
+		case overrideShadow_xangle:
 			crun.shadowRot.xangle = exp[0].evalF(c)
-		case modifyShadow_yangle:
+		case overrideShadow_yangle:
 			crun.shadowRot.yangle = exp[0].evalF(c)
-		case modifyShadow_focallength:
+		case overrideShadow_focallength:
 			crun.shadowfLength = exp[0].evalF(c)
-		case modifyShadow_projection:
+		case overrideShadow_projection:
 			crun.shadowProjection = Projection(exp[0].evalI(c))
 		}
 		return true
@@ -13324,25 +13324,25 @@ func (sc modifyShadow) Run(c *Char, _ []int32) bool {
 	return false
 }
 
-type modifyReflection StateControllerBase
+type overrideReflection StateControllerBase
 
 const (
-	modifyReflection_color byte = iota
-	modifyReflection_intensity
-	modifyReflection_offset
-	modifyReflection_window
-	modifyReflection_xshear
-	modifyReflection_yscale
-	modifyReflection_angle
-	modifyReflection_xangle
-	modifyReflection_yangle
-	modifyReflection_focallength
-	modifyReflection_projection
-	modifyReflection_redirectid
+	overrideReflection_color byte = iota
+	overrideReflection_intensity
+	overrideReflection_offset
+	overrideReflection_window
+	overrideReflection_xshear
+	overrideReflection_yscale
+	overrideReflection_angle
+	overrideReflection_xangle
+	overrideReflection_yangle
+	overrideReflection_focallength
+	overrideReflection_projection
+	overrideReflection_redirectid
 )
 
-func (sc modifyReflection) Run(c *Char, _ []int32) bool {
-	crun := getRedirectedChar(c, StateControllerBase(sc), modifyReflection_redirectid, "ModifyReflection")
+func (sc overrideReflection) Run(c *Char, _ []int32) bool {
+	crun := getRedirectedChar(c, StateControllerBase(sc), overrideReflection_redirectid, "OverrideReflection")
 	if crun == nil {
 		return false
 	}
@@ -13351,7 +13351,7 @@ func (sc modifyReflection) Run(c *Char, _ []int32) bool {
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
-		case modifyReflection_color:
+		case overrideReflection_color:
 			var r, g, b int32
 			r = Clamp(exp[0].evalI(c), 0, 255)
 			if len(exp) > 1 {
@@ -13361,28 +13361,28 @@ func (sc modifyReflection) Run(c *Char, _ []int32) bool {
 				b = Clamp(exp[2].evalI(c), 0, 255)
 			}
 			crun.reflectColor = [3]int32{r, g, b}
-		case modifyReflection_intensity:
+		case overrideReflection_intensity:
 			crun.reflectIntensity = Clamp(exp[0].evalI(c), 0, 255)
-		case modifyReflection_offset:
+		case overrideReflection_offset:
 			crun.reflectOffset[0] = exp[0].evalF(c) * redirscale
 			if len(exp) > 1 {
 				crun.reflectOffset[1] = exp[1].evalF(c) * redirscale
 			}
-		case modifyReflection_window:
+		case overrideReflection_window:
 			crun.reflectWindow = [4]float32{exp[0].evalF(c), exp[1].evalF(c), exp[2].evalF(c), exp[3].evalF(c)}
-		case modifyReflection_xshear:
+		case overrideReflection_xshear:
 			crun.reflectXshear = exp[0].evalF(c)
-		case modifyReflection_yscale:
+		case overrideReflection_yscale:
 			crun.reflectYscale = exp[0].evalF(c)
-		case modifyReflection_angle:
+		case overrideReflection_angle:
 			crun.reflectRot.angle = exp[0].evalF(c)
-		case modifyReflection_xangle:
+		case overrideReflection_xangle:
 			crun.reflectRot.xangle = exp[0].evalF(c)
-		case modifyReflection_yangle:
+		case overrideReflection_yangle:
 			crun.reflectRot.yangle = exp[0].evalF(c)
-		case modifyReflection_focallength:
+		case overrideReflection_focallength:
 			crun.reflectfLength = exp[0].evalF(c)
-		case modifyReflection_projection:
+		case overrideReflection_projection:
 			crun.reflectProjection = Projection(exp[0].evalI(c))
 		}
 		return true

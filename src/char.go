@@ -10443,7 +10443,7 @@ func (c *Char) actionPrepare() {
 		c.clsnAngle = 0
 		c.clsnOverrides = c.clsnOverrides[:0]
 
-		// Reset modifyShadow
+		// Reset overrideShadow
 		c.shadowColor = [3]int32{-1, -1, -1}
 		c.shadowIntensity = -1
 		c.shadowOffset = [2]float32{}
@@ -10454,7 +10454,7 @@ func (c *Char) actionPrepare() {
 		c.shadowProjection = -1
 		c.shadowfLength = 0
 
-		// Reset modifyReflection
+		// Reset overrideReflection
 		c.reflectColor = [3]int32{-1, -1, -1}
 		c.reflectIntensity = -1
 		c.reflectOffset = [2]float32{}
@@ -11476,7 +11476,7 @@ func (c *Char) cueDraw() {
 				// Meaning the character's shadow offset constant is unable to offset it correctly in every stage
 				// Ikemen works differently and as you'd expect it to
 				drawZoff := sys.posZtoYoffset(c.interPos[2], c.localscl)
-				// Gets the Yscale defined by ModifyShadow/Reflection or keeps the one from the stage
+				// Gets the Yscale defined by OverrideShadow/Reflection or keeps the one from the stage
 				getYscale := func(char, stage float32) float32 {
 					if char != 0 {
 						return char

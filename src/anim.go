@@ -1393,7 +1393,7 @@ func (rl *ReflectionList) add(rs *ReflectionSprite) {
 	}
 
 	// Stage without reflections
-	// TODO: Maybe ModifyReflection should be able to bypass this
+	// TODO: Maybe OverrideReflection should be able to bypass this
 	if sys.stage.reflection.intensity == 0 {
 		return
 	}
