@@ -2354,7 +2354,7 @@ func (s *System) draw(x, y, scl float32) {
 
 		// Draw reflections on layer -1
 		if !s.gsf(GSF_globalnoshadow) {
-			if s.stage.reflectionlayerno < 0 {
+			if s.stage.reflection.layerno < 0 {
 				s.reflections.draw(x, y, scl*s.cam.BaseScale())
 			}
 		}
@@ -2374,7 +2374,7 @@ func (s *System) draw(x, y, scl float32) {
 		// Draw reflections on layer 0
 		// TODO: Make shadows render in same layers as their sources?
 		if !s.gsf(GSF_globalnoshadow) {
-			if s.stage.reflectionlayerno >= 0 {
+			if s.stage.reflection.layerno >= 0 {
 				s.reflections.draw(x, y, scl*s.cam.BaseScale())
 			}
 			s.shadows.draw(x, y, scl*s.cam.BaseScale())
