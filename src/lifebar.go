@@ -601,9 +601,12 @@ func (hb *HealthBar) bgDraw(layerno int16) {
 }
 
 func (hb *HealthBar) draw(layerno int16, ref int, hbr *HealthBar, f []*Fnt) {
-	life := float32(sys.chars[ref][0].life) / float32(sys.chars[ref][0].lifeMax)
-	redlife := float32(sys.chars[ref][0].redLife) / float32(sys.chars[ref][0].lifeMax)
-	redval := sys.chars[ref][0].redLife - sys.chars[ref][0].life
+	// Get reference values
+	refChar := sys.chars[ref][0]
+	life := float32(refChar.life) / float32(refChar.lifeMax)
+	redlife := float32(refChar.redLife) / float32(refChar.lifeMax)
+	redval := refChar.redLife - refChar.life
+
 	var MidPosX = (float32(sys.gameWidth-320) / 2)
 	var MidPosY = (float32(sys.gameHeight-240) / 2)
 	// Calculates the clipping rectangle based on current bar settings
@@ -659,7 +662,7 @@ func (hb *HealthBar) draw(layerno int16, ref int, hbr *HealthBar, f []*Fnt) {
 	}
 
 	// Draw red life
-	if sys.chars[ref][0].redLifeEnabled() {
+	if refChar.redLifeEnabled() {
 		var rv int32
 		for k := range hb.red {
 			if k > rv && redval >= k {
@@ -677,7 +680,7 @@ func (hb *HealthBar) draw(layerno int16, ref int, hbr *HealthBar, f []*Fnt) {
 					rv2 = k
 				}
 			}
-			text := strings.Replace(hb.red_value[rv2].text, "%d", fmt.Sprintf("%v", sys.chars[ref][0].redLife), 1)
+			text := strings.Replace(hb.red_value[rv2].text, "%d", fmt.Sprintf("%v", refChar.redLife), 1)
 			text = strings.Replace(text, "%p", fmt.Sprintf("%v", math.Round(float64(redlife)*100)), 1)
 			hb.red_value[rv2].lay.DrawText(
 				float32(hb.pos[0])+sys.lifebarOffsetX,
@@ -722,7 +725,7 @@ func (hb *HealthBar) draw(layerno int16, ref int, hbr *HealthBar, f []*Fnt) {
 				fv2 = k
 			}
 		}
-		text := strings.Replace(hb.value[fv2].text, "%d", fmt.Sprintf("%v", sys.chars[ref][0].life), 1)
+		text := strings.Replace(hb.value[fv2].text, "%d", fmt.Sprintf("%v", refChar.life), 1)
 		text = strings.Replace(text, "%p", fmt.Sprintf("%v", math.Round(float64(life)*100)), 1)
 		hb.value[fv2].lay.DrawText(
 			float32(hb.pos[0])+sys.lifebarOffsetX,
@@ -844,11 +847,13 @@ func readPowerBar(pre string, is IniSection, sff *Sff, at AnimationTable, f []*F
 }
 
 func (pb *PowerBar) step(ref int, pbr *PowerBar, snd *Snd) {
-	pbval := sys.chars[ref][0].getPower()
-	power := float32(pbval) / float32(sys.chars[ref][0].powerMax)
+	// Get reference values
+	refChar := sys.chars[ref][0]
+	pbval := refChar.getPower()
+	power := float32(pbval) / float32(refChar.powerMax)
 	level := pbval / 1000
 	if pb.levelbars {
-		power = float32(pbval)/1000 - MinF(float32(level), float32(sys.chars[ref][0].powerMax)/1000-1)
+		power = float32(pbval)/1000 - MinF(float32(level), float32(refChar.powerMax)/1000-1)
 	}
 
 	// Element shifting gradient
@@ -4775,6 +4780,24 @@ func loadLifebar(def string) (*Lifebar, error) {
 		}
 	}
 	l.def = def
+
+	/*
+	// TODO: This is a hack
+	// During team life sharing, replace Tag/Simul lifebars with single
+	// For some reason just doing this in the drawing function doesn't work
+	if sys.cfg.Options.Team.LifeShare {
+		teamModeIndices := []int{1, 3, 4, 5, 6, 7} // Simul, Tag, and their 3P/4P variants
+		
+		for _, i := range teamModeIndices {
+			if i < len(l.hb) {
+				// Replace with Single lifebars
+				l.hb[i][0] = l.hb[0][0]
+				l.hb[i][1] = l.hb[0][1]
+			}
+		}
+	}
+	*/
+
 	return l, nil
 }
 
@@ -4951,8 +4974,11 @@ func (l *Lifebar) RemoveText(id, ownerid int32) {
 	}
 }
 
+// Resets lifebar as well as prepares team mode configuration for each player
 func (l *Lifebar) reset() {
 	var num [2]int
+
+	// Update team mode reference for each player
 	for ti, tm := range sys.tmode {
 		l.ref[ti] = int(tm)
 		if tm == TM_Simul {
@@ -4976,16 +5002,20 @@ func (l *Lifebar) reset() {
 		} else {
 			l.ref[ti] = 0 // Single (2)
 		}
+
+		// Set maximum number of lifebars
 		if tm == TM_Simul || tm == TM_Tag {
 			num[ti] = int(math.Min(8, float64(sys.numSimul[ti])*2))
 		} else {
 			num[ti] = len(l.hb[l.ref[ti]])
 		}
+
 		l.order[ti] = []int{}
 		for i := ti; i < num[ti]; i += 2 {
 			l.order[ti] = append(l.order[ti], i)
 		}
 	}
+
 	for i := range l.hb {
 		for j := range l.hb[i] {
 			l.hb[i][j].reset()
@@ -5053,6 +5083,7 @@ func (l *Lifebar) draw(layerno int16) {
 	}
 	if !sys.lifebarHide && l.active {
 		if !sys.gsf(GSF_nobardisplay) && l.bars {
+			/*
 			// HealthBar
 			for ti := range sys.tmode {
 				for i, v := range l.order[ti] {
@@ -5063,16 +5094,35 @@ func (l *Lifebar) draw(layerno int16) {
 					}
 				}
 			}
+			*/
+
+			// HealthBar
+			for ti, tm := range sys.tmode {
+				for i, v := range l.order[ti] {
+					// For LifeShare in team modes, only draw first 2 lifebars
+					if i >= 2 && sys.cfg.Options.Team.LifeShare && (tm == TM_Simul || tm == TM_Tag) {
+						continue
+					}
+					index := i*2 + ti
+					if !sys.chars[v][0].asf(ASF_nolifebardisplay) {
+						l.hb[l.ref[ti]][index].bgDraw(layerno)
+						l.hb[l.ref[ti]][index].draw(layerno, v, l.hb[l.ref[ti]][v], l.fnt[:])
+					}
+				}
+			}
+
 			// PowerBar
 			for ti, tm := range sys.tmode {
 				for i, v := range l.order[ti] {
 					index := i*2 + ti
-					if sys.cfg.Options.Team.PowerShare && (tm == TM_Simul || tm == TM_Tag) { // Draw player 1 or 2 bars
+					if sys.cfg.Options.Team.PowerShare && (tm == TM_Simul || tm == TM_Tag) {
+						// Draw player 1 or 2 bars
 						if i == 0 && !sys.chars[v][0].asf(ASF_nopowerbardisplay) {
 							l.pb[l.ref[ti]][index].bgDraw(layerno, index)
 							l.pb[l.ref[ti]][index].draw(layerno, index, l.pb[l.ref[ti]][index], l.fnt[:])
 						}
-					} else { // Draw everyone's bars
+					} else {
+						// Draw everyone's bars
 						if !sys.chars[v][0].asf(ASF_nopowerbardisplay) {
 							l.pb[l.ref[ti]][index].bgDraw(layerno, index)
 							l.pb[l.ref[ti]][index].draw(layerno, v, l.pb[l.ref[ti]][v], l.fnt[:])
@@ -5183,9 +5233,9 @@ func (l *Lifebar) draw(layerno int16) {
 		l.ro.draw(layerno, l.fnt[:])
 	}
 	// Text sctrl
-	for _, v := range l.textsprite {
-		if v.layerno == layerno {
-			v.Draw()
+	for _, ts := range l.textsprite {
+		if ts.layerno == layerno {
+			ts.Draw()
 		}
 	}
 	BlendReset()
