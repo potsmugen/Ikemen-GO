@@ -691,61 +691,71 @@ func (s *System) middleOfMatch() bool {
 	return s.matchTime != 0 && !s.postMatchFlg
 }
 
-// Used for the viewport change
-func (s *System) shouldRenderStageFit() bool {
-	if !s.middleOfMatch() || !sys.cfg.Video.StageFit || s.stage == nil {
-		return false
-	}
-
-	if sys.stage.stageCamera.localcoord[0] <= 0 || sys.stage.stageCamera.localcoord[1] <= 0 {
-		return false
-	}
-
-	return true
-}
-
 // This allows Char to access aspect ratio without going through Window, which can add errors
 func (s *System) getCurrentAspect() float32 {
-	// Use stage aspect ratio
-	if s.shouldRenderStageFit() {
-		coord := s.stage.stageCamera.localcoord
-		if coord[0] > 0 && coord[1] > 0 {
-			return float32(coord[0]) / float32(coord[1])
+	// Only use custom aspects during matches
+	if s.middleOfMatch() {
+		// Stage aspect ratio
+		if s.stage != nil && s.cfg.Video.MatchAspectWidth < 0 && s.cfg.Video.MatchAspectHeight < 0 {
+			coord := s.stage.stageCamera.localcoord
+			if coord[0] > 0 && coord[1] > 0 {
+				return float32(coord[0]) / float32(coord[1])
+			}
+		}
+		
+		// Custom aspect ratio
+		if s.cfg.Video.MatchAspectWidth > 0 && s.cfg.Video.MatchAspectHeight > 0 {
+			return float32(s.cfg.Video.MatchAspectWidth) / float32(s.cfg.Video.MatchAspectHeight)
 		}
 	}
-
+	
 	// Fallback to default
 	return float32(s.cfg.Video.GameWidth) / float32(s.cfg.Video.GameHeight)
 }
 
-func (s *System) applyStageFit() {
+// Change aspect ratio at match start
+// We need this separately from getCurrentAspect() because here we check next stage instead of current one
+func (s *System) applyAspectRatio() {
 	baseHeight := float32(240)
 	var stageWidth, stageHeight float32
 
-	// Get the next stage's localcoord
-	if s.sel.selectedStageNo > 0 && s.sel.selectedStageNo <= len(s.sel.stagelist) {
-		def := strings.ToLower(filepath.Base(s.sel.stagelist[s.sel.selectedStageNo-1].def))
-		if coord, ok := s.stageLocalcoords[def]; ok && coord[0] > 0 && coord[1] > 0 {
-			stageWidth = float32(coord[0])
-			stageHeight = float32(coord[1])
+	// Stage aspect
+	if s.cfg.Video.MatchAspectWidth < 0 && s.cfg.Video.MatchAspectHeight < 0 {
+		// Get the next stage's localcoord
+		if s.sel.selectedStageNo > 0 && s.sel.selectedStageNo <= len(s.sel.stagelist) {
+			def := strings.ToLower(filepath.Base(s.sel.stagelist[s.sel.selectedStageNo-1].def))
+			if coord, ok := s.stageLocalcoords[def]; ok && coord[0] > 0 && coord[1] > 0 {
+				stageWidth = float32(coord[0])
+				stageHeight = float32(coord[1])
+			}
 		}
-	}
 
-	// Calculate the stage's aspect ratio
-	var aspectGame float32
-	if stageWidth > 0 && stageHeight > 0 {
-		aspectGame = stageWidth / stageHeight
+		// Calculate the stage's aspect ratio
+		var aspectGame float32
+		if stageWidth > 0 && stageHeight > 0 {
+			aspectGame = stageWidth / stageHeight
+		} else {
+			// Fallback
+			aspectGame = float32(s.cfg.Video.GameWidth) / float32(s.cfg.Video.GameHeight)
+		}
+
+		// Compute new gameWidth/gameHeight while maintaining the same base height
+		gameWidth := baseHeight * aspectGame
+		s.gameWidth = int32(gameWidth)
+		s.gameHeight = int32(baseHeight)
+	} else if s.cfg.Video.MatchAspectWidth > 0 && s.cfg.Video.MatchAspectHeight > 0 {
+		// Custom aspect
+		aspectGame := float32(s.cfg.Video.MatchAspectWidth) / float32(s.cfg.Video.MatchAspectHeight)
+		gameWidth := baseHeight * aspectGame
+		s.gameWidth = int32(gameWidth)
+		s.gameHeight = int32(baseHeight)
 	} else {
-		// Fallback
-		aspectGame = float32(s.cfg.Video.GameWidth) / float32(s.cfg.Video.GameHeight)
+		// Default
+		s.gameWidth = s.cfg.Video.GameWidth
+		s.gameHeight = s.cfg.Video.GameHeight
 	}
 
-	// Compute new gameWidth/gameHeight while maintaining the same base height
-	gameWidth := baseHeight * aspectGame
-	s.gameWidth = int32(gameWidth)
-	s.gameHeight = int32(baseHeight)
-
-	// Scale to fit current screen size
+	// Scale to fit current screen size (this part stays the same)
 	s.widthScale = float32(s.scrrect[2]) / float32(s.gameWidth)
 	s.heightScale = float32(s.scrrect[3]) / float32(s.gameHeight)
 }
@@ -4304,9 +4314,9 @@ func (l *Loader) load() {
 		l.loadExit <- l.state
 	}()
 
-	if sys.cfg.Video.StageFit {
+	if sys.cfg.Video.MatchAspectWidth != 0 && sys.cfg.Video.MatchAspectHeight != 0 {
 		// Update aspect ratio
-		sys.applyStageFit()
+		sys.applyAspectRatio()
 
 		// Update character scaling
 		coordRatio := float32(sys.gameWidth) / 320

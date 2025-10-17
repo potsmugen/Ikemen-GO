@@ -205,10 +205,12 @@ options.t_itemname = {
 			--modifyGameOption('Debug.ForceStageZoomout', 0)
 			--modifyGameOption('Debug.ForceStageZoomin', 0)
 			modifyGameOption('Video.RenderMode', "OpenGL 3.2")
-			modifyGameOption('Video.GameWidth', 640)
-			modifyGameOption('Video.GameHeight', 480)
+			modifyGameOption('Video.GameWidth', 1280)
+			modifyGameOption('Video.GameHeight', 720)
 			--modifyGameOption('Video.WindowWidth', 0)
 			--modifyGameOption('Video.WindowHeight', 0)
+			modifyGameOption('Video.MatchAspectWidth', -1)
+			modifyGameOption('Video.MatchAspectHeight', -1)
 			modifyGameOption('Video.Fullscreen', false)
 			--modifyGameOption('Video.Borderless', false)
 			--modifyGameOption('Video.RGBSpriteBilinearFilter', true)
@@ -218,7 +220,7 @@ options.t_itemname = {
 			modifyGameOption('Video.ExternalShaders', {})
 			modifyGameOption('Video.WindowScaleMode', true)
 			modifyGameOption('Video.KeepAspect', true)
-			modifyGameOption('Video.StageFit', true)
+			--modifyGameOption('Video.StageFit', true)
 			modifyGameOption('Video.EnableModel', true)
 			modifyGameOption('Video.EnableModelShadow', true)
 			--modifyGameOption('Sound.SampleRate', 44100)
@@ -861,6 +863,82 @@ options.t_itemname = {
 		end
 		return true
 	end,
+
+	-- Match Aspect Ratio (submenu)
+	['aspectratio'] = function(t, item, cursorPosY, moveTxt)
+		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
+			sndPlay(motif.files.snd_data, motif.option_info.cursor_move_snd[1], motif.option_info.cursor_move_snd[2])
+			local t_pos = {}
+			local ok = false
+			local currentWidth = gameOption('Video.MatchAspectWidth')
+			local currentHeight = gameOption('Video.MatchAspectHeight')
+			for k, v in ipairs(t.submenu[t.items[item].itemname].items) do
+				if v.itemname == 'default' and currentWidth == 0 and currentHeight == 0 then
+					v.selected = true
+					ok = true
+				elseif v.itemname == 'stage' and currentWidth == -1 and currentHeight == -1 then
+					v.selected = true
+					ok = true
+				else
+					local width, height = v.itemname:match('^([0-9]+)x([0-9]+)$')
+					if width and height and tonumber(width) == currentWidth and tonumber(height) == currentHeight then
+						v.selected = true
+						ok = true
+					else
+						v.selected = false
+					end
+				end
+				if v.itemname == 'customaspect' then
+					t_pos = v
+				end
+			end
+			if not ok and t_pos.selected ~= nil then
+				t_pos.selected = true
+			end
+			t.submenu[t.items[item].itemname].loop()
+			t.items[item].vardisplay = options.t_vardisplay['aspectratio']()
+		end
+		return true
+	end,
+
+	--Custom aspect ratio
+	['customaspect'] = function(t, item, cursorPosY, moveTxt)
+		if main.f_input(main.t_players, {'pal', 's'}) then
+			sndPlay(motif.files.snd_data, motif.option_info.cursor_move_snd[1], motif.option_info.cursor_move_snd[2])
+			local width = tonumber(main.f_drawInput(
+				main.f_extractText(motif.option_info.textinput_aspect_width_text or "Enter aspect width:"),
+				txt_textinput,
+				overlay_textinput,
+				motif.option_info.textinput_offset[2],
+				main.f_ySpacing(motif.option_info, 'textinput'),
+				motif.optionbgdef
+			))
+			if width ~= nil and width > 0 then
+				sndPlay(motif.files.snd_data, motif.option_info.cursor_move_snd[1], motif.option_info.cursor_move_snd[2])
+				local height = tonumber(main.f_drawInput(
+					main.f_extractText(motif.option_info.textinput_aspect_height_text or "Enter aspect height:"),
+					txt_textinput,
+					overlay_textinput,
+					motif.option_info.textinput_offset[2],
+					main.f_ySpacing(motif.option_info, 'textinput'),
+					motif.optionbgdef
+				))
+				if height ~= nil and height > 0 then
+					modifyGameOption('Video.MatchAspectWidth', width)
+					modifyGameOption('Video.MatchAspectHeight', height)
+					sndPlay(motif.files.snd_data, motif.option_info.cursor_done_snd[1], motif.option_info.cursor_done_snd[2])
+					options.modified = true
+				else
+					sndPlay(motif.files.snd_data, motif.option_info.cancel_snd[1], motif.option_info.cancel_snd[2])
+				end
+			else
+				sndPlay(motif.files.snd_data, motif.option_info.cancel_snd[1], motif.option_info.cancel_snd[2])
+			end
+			return false
+		end
+		return true
+	end,
+
 	--Fullscreen
 	['fullscreen'] = function(t, item, cursorPosY, moveTxt)
 		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
@@ -930,6 +1008,7 @@ options.t_itemname = {
 		end
 		return true
 	end,
+	--[[
 	--StageFit
 	['stagefit'] = function(t, item, cursorPosY, moveTxt)
 		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
@@ -945,6 +1024,7 @@ options.t_itemname = {
 		end
 		return true
 	end,
+	]]
 	--Keep Aspect Ratio
 	['keepaspect'] = function(t, item, cursorPosY, moveTxt)
 		if main.f_input(main.t_players, {'$F', '$B', 'pal', 's'}) then
@@ -1415,6 +1495,17 @@ options.t_vardisplay = {
 	['airamping'] = function()
 		return options.f_boolDisplay(gameOption('Arcade.AI.Ramping'))
 	end,
+	['aspectratio'] = function()
+		local width = gameOption('Video.MatchAspectWidth')
+		local height = gameOption('Video.MatchAspectHeight')
+		if width > 0 and height > 0 then
+			return width .. ':' .. height
+		elseif width < 0 and height < 0 then
+			return 'Stage'
+		else
+			return 'Default'
+		end
+	end,
 	['audioducking'] = function()
 		return options.f_boolDisplay(gameOption('Sound.AudioDucking'), motif.option_info.menu_valuename_enabled, motif.option_info.menu_valuename_disabled)
 	end,
@@ -1460,9 +1551,11 @@ options.t_vardisplay = {
 	['helpermax'] = function()
 		return gameOption('Config.HelperMax')
 	end,
+	--[[
 	['stagefit'] = function()
 		return options.f_boolDisplay(gameOption('Video.StageFit'), motif.option_info.menu_valuename_enabled, motif.option_info.menu_valuename_disabled)
 	end,
+	]]
 	['keepaspect'] = function()
 		return options.f_boolDisplay(gameOption('Video.KeepAspect'), motif.option_info.menu_valuename_enabled, motif.option_info.menu_valuename_disabled)
 	end,
@@ -1680,8 +1773,8 @@ function options.f_start()
 	end
 	for _, v in ipairs(main.f_tableExists(main.t_sort.option_info).menu) do
 		-- resolution
-		if v:match('_[0-9]+x[0-9]+$') then
-			local width, height = v:match('_([0-9]+)x([0-9]+)$')
+		if v:match('_resolution_[0-9]+x[0-9]+$') then
+			local width, height = v:match('_resolution_([0-9]+)x([0-9]+)$')
 			options.t_itemname[width .. 'x' .. height] = function(t, item, cursorPosY, moveTxt)
 				if main.f_input(main.t_players, {'pal', 's'}) then
 					sndPlay(motif.files.snd_data, motif.option_info.cursor_done_snd[1], motif.option_info.cursor_done_snd[2])
@@ -1692,6 +1785,46 @@ function options.f_start()
 					return false
 				end
 				return true
+			end
+		-- aspect ratio
+		elseif v:match('_aspectratio_') then
+			-- aspect ratio default
+			if v:match('_aspectratio_default$') then
+				options.t_itemname['default'] = function(t, item, cursorPosY, moveTxt)
+					if main.f_input(main.t_players, {'pal', 's'}) then
+						sndPlay(motif.files.snd_data, motif.option_info.cursor_done_snd[1], motif.option_info.cursor_done_snd[2])
+						modifyGameOption('Video.MatchAspectWidth', 0)
+						modifyGameOption('Video.MatchAspectHeight', 0)
+						options.modified = true
+						return false
+					end
+					return true
+				end
+			-- aspect ratio stage
+			elseif v:match('_aspectratio_stage$') then
+				options.t_itemname['stage'] = function(t, item, cursorPosY, moveTxt)
+					if main.f_input(main.t_players, {'pal', 's'}) then
+						sndPlay(motif.files.snd_data, motif.option_info.cursor_done_snd[1], motif.option_info.cursor_done_snd[2])
+						modifyGameOption('Video.MatchAspectWidth', -1)
+						modifyGameOption('Video.MatchAspectHeight', -1)
+						options.modified = true
+						return false
+					end
+					return true
+				end
+			-- aspect ratio presets (4x3, 16x9, etc.)
+			elseif v:match('_aspectratio_[0-9]+x[0-9]+$') then
+				local width, height = v:match('_aspectratio_([0-9]+)x([0-9]+)$')
+				options.t_itemname[width .. 'x' .. height] = function(t, item, cursorPosY, moveTxt)
+					if main.f_input(main.t_players, {'pal', 's'}) then
+						sndPlay(motif.files.snd_data, motif.option_info.cursor_done_snd[1], motif.option_info.cursor_done_snd[2])
+						modifyGameOption('Video.MatchAspectWidth', tonumber(width))
+						modifyGameOption('Video.MatchAspectHeight', tonumber(height))
+						options.modified = true
+						return false
+					end
+					return true
+				end
 			end
 		-- ratio
 		elseif v:match('_ratio[1-4]+[al].-$') then
