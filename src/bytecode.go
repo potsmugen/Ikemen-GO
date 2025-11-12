@@ -5719,7 +5719,7 @@ func (sc explod) Run(c *Char, _ []int32) bool {
 			if c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 1 && c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
 				e.palfxdef.invertblend = -2
 			}
-			afterImage(sc).runSub(c, &e.aimg, paramID, exp)
+			afterImage(sc).runSub(c, crun, &e.aimg, paramID, exp)
 			palFX(sc).runSub(c, &e.palfxdef, paramID, exp)
 
 			explod(sc).setInterpolation(c, e, paramID, exp, &e.palfxdef)
@@ -6333,7 +6333,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 					if e.ownpal {
 						palFX(sc).runSub(c, &e.palfx.PalFXDef, paramID, exp)
 					}
-					afterImage(sc).runSub(c, &e.aimg, paramID, exp)
+					afterImage(sc).runSub(c, crun, &e.aimg, paramID, exp)
 				})
 			}
 		}
@@ -6439,7 +6439,7 @@ const (
 	afterImage_redirectid
 )
 
-func (sc afterImage) runSub(c *Char, ai *AfterImage, paramID byte, exp []BytecodeExp) {
+func (sc afterImage) runSub(c, crun *Char, ai *AfterImage, paramID byte, exp []BytecodeExp) {
 	switch paramID {
 	case afterImage_trans:
 		src := Clamp(int32(exp[0].evalI(c)), 0, 255)
@@ -6519,6 +6519,10 @@ func (sc afterImage) runSub(c *Char, ai *AfterImage, paramID byte, exp []Bytecod
 	case afterImage_ignorehitpause:
 		ai.ignorehitpause = exp[0].evalB(c)
 	}
+
+	// Check for errors
+	// This placement is not ideal, but it's a little cleaner than doing it in every sctrl that has afterimage parameters
+	ai.validateParams(crun)
 }
 
 func (sc afterImage) Run(c *Char, _ []int32) bool {
@@ -6538,7 +6542,7 @@ func (sc afterImage) Run(c *Char, _ []int32) bool {
 		if paramID == afterImage_redirectid {
 			return true // Already handled. Avoid runSub
 		}
-		sc.runSub(c, &crun.aimg, paramID, exp)
+		sc.runSub(c, crun, &crun.aimg, paramID, exp)
 		return true
 	})
 
@@ -7389,7 +7393,7 @@ func (sc projectile) Run(c *Char, _ []int32) bool {
 			return true // Already handled. Avoid runSub
 		default:
 			if !hitDef(sc).runSub(c, &p.hitdef, paramID, exp) {
-				afterImage(sc).runSub(c, &p.aimg, paramID, exp)
+				afterImage(sc).runSub(c, crun, &p.aimg, paramID, exp)
 			}
 		}
 		return true
@@ -8480,7 +8484,7 @@ func (sc modifyProjectile) Run(c *Char, _ []int32) bool {
 			default:
 				eachProj(func(p *Projectile) {
 					if !hitDef(sc).runSub(c, &p.hitdef, paramID, exp) {
-						afterImage(sc).runSub(c, &p.aimg, paramID, exp)
+						afterImage(sc).runSub(c, crun, &p.aimg, paramID, exp)
 					}
 				})
 			}
