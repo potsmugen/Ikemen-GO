@@ -2240,6 +2240,8 @@ func (nc *NetConnection) Synchronize() error {
 		return Error("Cannot connect to the other player")
 	}
 	nc.Stop()
+
+	// Determine random seed
 	var seed int32
 	if nc.host {
 		seed = Random()
@@ -2253,6 +2255,8 @@ func (nc *NetConnection) Synchronize() error {
 		}
 	}
 	Srand(seed)
+
+	// Determine gametime trigger offset
 	var pmTime int32
 	if nc.host {
 		pmTime = sys.preMatchTime
@@ -2266,6 +2270,7 @@ func (nc *NetConnection) Synchronize() error {
 		}
 	}
 	nc.preMatchTime = pmTime
+
 	if nc.recording != nil {
 		binary.Write(nc.recording, binary.LittleEndian, &seed)
 		binary.Write(nc.recording, binary.LittleEndian, &pmTime)
@@ -2382,12 +2387,16 @@ func (nc *NetConnection) Update() bool {
 				}
 				nc.buf[nc.locIn].curT = nc.time
 				nc.buf[nc.remIn].curT = nc.time
+
+				// Write to replay file
 				if nc.recording != nil {
+					// We skip attached characters here because they never have human inputs
 					for i := 0; i < MaxSimul*2; i++ {
 						binary.Write(nc.recording, binary.LittleEndian, &nc.buf[i].buf[nc.time&(NETBUF_NUM_FRAMES-1)])
 						binary.Write(nc.recording, binary.LittleEndian, &nc.buf[i].axisBuf[nc.time&(NETBUF_NUM_FRAMES-1)])
 					}
 				}
+
 				nc.time++
 				if nc.time >= foo {
 					nc.buf[nc.locIn].writeNetBuffer(0)
@@ -2404,8 +2413,37 @@ func (nc *NetConnection) Update() bool {
 	return !sys.gameEnd
 }
 
+// Remove the last given frames from the current replay recording
+func (nc *NetConnection) EraseLastFrames(frames int32) error {
+	if nc.recording == nil || frames <= 0 {
+		return nil
+	}
+
+	// Each player's input data per frame
+	bufEntrySize := 2 // size of "buf"
+	axisEntrySize := 6 // size of "axisBuf"
+	playerFrameSize := bufEntrySize + axisEntrySize // 8 bytes
+
+	// Total data per frame
+	// TODO: Do replays really need to save "MaxSimul * 2"?
+	frameSize := (MaxSimul * 2) * playerFrameSize
+
+	stat, err := nc.recording.Stat()
+	if err != nil {
+		return err
+	}
+
+	removeBytes := int64(frames) * int64(frameSize)
+	newSize := stat.Size() - removeBytes
+	if newSize < 0 {
+		newSize = 0
+	}
+
+	return nc.recording.Truncate(newSize)
+}
+
 type ReplayFile struct {
-	f      *os.File
+	file      *os.File
 	ibit   [MaxPlayerNo]InputBits
 	iaxes  [MaxPlayerNo][6]int8
 	preMatchTime int32
@@ -2413,14 +2451,14 @@ type ReplayFile struct {
 
 func OpenReplayFile(filename string) *ReplayFile {
 	rf := &ReplayFile{}
-	rf.f, _ = os.Open(filename)
+	rf.file, _ = os.Open(filename)
 	return rf
 }
 
 func (rf *ReplayFile) Close() {
-	if rf.f != nil {
-		rf.f.Close()
-		rf.f = nil
+	if rf.file != nil {
+		rf.file.Close()
+		rf.file = nil
 	}
 }
 
@@ -2454,13 +2492,15 @@ func (rf *ReplayFile) AnyButton() bool {
 }
 
 func (rf *ReplayFile) Synchronize() {
-	if rf.f != nil {
+	if rf.file != nil {
+		// Read random seed
 		var seed int32
-		if binary.Read(rf.f, binary.LittleEndian, &seed) == nil {
+		if binary.Read(rf.file, binary.LittleEndian, &seed) == nil {
 			Srand(seed)
 		}
+		// Read gametime trigger offset
 		var pmTime int32
-		if binary.Read(rf.f, binary.LittleEndian, &pmTime) == nil {
+		if binary.Read(rf.file, binary.LittleEndian, &pmTime) == nil {
 			rf.preMatchTime = pmTime
 			rf.Update()
 		}
@@ -2468,7 +2508,7 @@ func (rf *ReplayFile) Synchronize() {
 }
 
 func (rf *ReplayFile) Update() bool {
-	if rf.f == nil {
+	if rf.file == nil {
 		sys.esc = true
 	} else {
 		if sys.oldNextAddTime > 0 {
@@ -2484,14 +2524,14 @@ func (rf *ReplayFile) Update() bool {
 
 			// Read each player at a time, in the order of digital inputs, followed by each analog axis
 			for i := 0; i < len(rf.iaxes); i++ {
-				err := binary.Read(rf.f, binary.LittleEndian, rf.ibit[i])
+				err := binary.Read(rf.file, binary.LittleEndian, rf.ibit[i])
 				if err != nil {
 					sys.esc = true
 					break
 				} else {
 					// Now get the analog axes.
 					for j := 0; j < len(rf.iaxes[i]); j++ {
-						err = binary.Read(rf.f, binary.LittleEndian, rf.iaxes[i][j])
+						err = binary.Read(rf.file, binary.LittleEndian, rf.iaxes[i][j])
 
 						if err != nil {
 							sys.esc = true

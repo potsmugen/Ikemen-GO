@@ -261,6 +261,9 @@ type GameState struct {
 	loopContinue bool
 	winposetime  int32
 
+	// Netplay
+	netConTime int32
+
 	// Rollback
 	netTime int32
 }
@@ -276,6 +279,17 @@ func (gs *GameState) LoadState(stateID int) {
 	if gs == nil || !gs.saved {
 		sys.appendToConsole(fmt.Sprintf("%v: No game state available for loading", sys.tickCount))
 		return
+	}
+
+	// We must rewind netConnection time because it controls replay input recording
+	if sys.netConnection != nil {
+		// Determine how many frames we're rolling back
+		diff := sys.netConnection.time - gs.netConTime
+		sys.netConnection.time = gs.netConTime
+		// Discard those frames from the current replay recording
+		if sys.netConnection.recording != nil {
+			sys.netConnection.EraseLastFrames(diff)
+		}
 	}
 
 	if sys.rollback.session != nil {
@@ -504,6 +518,10 @@ func (gs *GameState) LoadState(stateID int) {
 }
 
 func (gs *GameState) SaveState(stateID int) {
+	if sys.netConnection != nil {
+		gs.netConTime = sys.netConnection.time
+	}
+
 	if sys.rollback.session != nil {
 		gs.netTime = sys.rollback.session.netTime
 	}
