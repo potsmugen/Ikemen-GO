@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net"
 	"os"
@@ -2450,9 +2451,13 @@ type ReplayFile struct {
 }
 
 func OpenReplayFile(filename string) *ReplayFile {
-	rf := &ReplayFile{}
-	rf.file, _ = os.Open(filename)
-	return rf
+	rf, err := os.Open(filename)
+	if err != nil {
+		log.Printf("Failed to open replay file %s: %v", filename, err)
+		return nil
+	}
+	log.Printf("Replay file opened: %s", filename)
+	return &ReplayFile{file: rf}
 }
 
 func (rf *ReplayFile) Close() {
@@ -2495,12 +2500,17 @@ func (rf *ReplayFile) Synchronize() {
 	if rf.file != nil {
 		// Read random seed
 		var seed int32
-		if binary.Read(rf.file, binary.LittleEndian, &seed) == nil {
+		err := binary.Read(rf.file, binary.LittleEndian, &seed)
+		log.Printf("Random seed read: %d, error: %v", seed, err)
+		if err == nil {
 			Srand(seed)
 		}
+
 		// Read gametime trigger offset
 		var pmTime int32
-		if binary.Read(rf.file, binary.LittleEndian, &pmTime) == nil {
+		err = binary.Read(rf.file, binary.LittleEndian, &pmTime)
+		log.Printf("Pre-match time read: %v, error: %v", pmTime, err)
+		if err == nil {
 			rf.preMatchTime = pmTime
 			rf.Update()
 		}
@@ -2526,14 +2536,15 @@ func (rf *ReplayFile) Update() bool {
 			for i := 0; i < len(rf.iaxes); i++ {
 				err := binary.Read(rf.file, binary.LittleEndian, rf.ibit[i])
 				if err != nil {
+					log.Printf("Error while reading digital input for controller %d: %v", i, err)
 					sys.esc = true
 					break
 				} else {
 					// Now get the analog axes.
 					for j := 0; j < len(rf.iaxes[i]); j++ {
 						err = binary.Read(rf.file, binary.LittleEndian, rf.iaxes[i][j])
-
 						if err != nil {
+							log.Printf("Error while reading analog input for controller %d, axis %d: %v", i, j, err)
 							sys.esc = true
 							break
 						}
@@ -2542,6 +2553,7 @@ func (rf *ReplayFile) Update() bool {
 			}
 		}
 		if sys.esc {
+			log.Printf("Closing replay file")
 			rf.Close()
 		}
 	}
