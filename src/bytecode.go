@@ -4969,10 +4969,7 @@ const (
 	helper_size_ground_front
 	helper_size_air_back
 	helper_size_air_front
-	helper_size_height_stand
-	helper_size_height_crouch
-	helper_size_height_air
-	helper_size_height_down
+	helper_size_height
 	helper_size_proj_doscale
 	helper_size_head_pos
 	helper_size_mid_pos
@@ -5047,7 +5044,7 @@ func (sc helper) Run(c *Char, _ []int32) bool {
 			h.size.airbox[0] = exp[0].evalF(c) * -1
 		case helper_size_air_front:
 			h.size.airbox[2] = exp[0].evalF(c)
-		case helper_size_height_stand:
+		case helper_size_height:
 			h.size.standbox[1] = exp[0].evalF(c) * -1
 		case helper_size_proj_doscale:
 			h.size.proj.doscale = exp[0].evalI(c)
