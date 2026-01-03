@@ -5346,6 +5346,7 @@ const (
 	palFX_invertall
 	palFX_invertblend
 	palFX_hue
+	palFX_priority
 	palFX_last = iota - 1
 	palFX_redirectid
 )
@@ -5418,6 +5419,8 @@ func (sc palFX) runSub(c *Char, pfd *PalFXDef, paramID byte, exp []BytecodeExp) 
 		pfd.invertall = exp[0].evalB(c)
 	case palFX_invertblend:
 		pfd.invertblend = Clamp(exp[0].evalI(c), -1, 2)
+	case palFX_priority:
+		pfd.priority = exp[0].evalI(c)
 	}
 }
 
@@ -5431,25 +5434,35 @@ func (sc palFX) Run(c *Char, _ []int32) bool {
 		return false
 	}
 
-	pf := crun.palfx
-	if pf == nil {
-		pf = newPalFX()
-	}
-	pf.clearWithNeg(true)
-
+	// Create a placeholder PalFX
+	newpfx := *newPalFXDef()
+	
 	// Mugen 1.1 invertblend fallback
 	if c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 1 &&
 		c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
-		pf.invertblend = -2
+		newpfx.invertblend = -2
 	}
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		if paramID == palFX_redirectid {
 			return true // Skip runSub
 		}
-		sc.runSub(c, &pf.PalFXDef, paramID, exp)
+		sc.runSub(c, &newpfx, paramID, exp)
 		return true
 	})
+
+	// Get existing PalFX
+	oldpfx := crun.palfx
+	if oldpfx == nil {
+		oldpfx = newPalFX()
+		crun.palfx = oldpfx
+	}
+
+	// Only apply if the existing PalFX is over or has lower priority
+	if oldpfx.time == 0 || newpfx.priority >= oldpfx.priority {
+		oldpfx.clearWithNeg(true)
+		oldpfx.PalFXDef = newpfx
+	}
 
 	return false
 }
@@ -5467,6 +5480,24 @@ func (sc allPalFX) Run(c *Char, _ []int32) bool {
 	return false
 }
 
+func (sc allPalFX) Run(c *Char, _ []int32) bool {
+	newpfx := *newPalFXDef()
+
+	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
+		palFX(sc).runSub(c, &newpfx, paramID, exp)
+		// Forcing 1.1 kind behavior
+		newpfx.invertblend = Clamp(newpfx.invertblend, 0, 1)
+		return true
+	})
+
+	if sys.allPalFX.time == 0 || newpfx.priority >= sys.allPalFX.priority {
+		sys.allPalFX.clear()
+		sys.allPalFX.PalFXDef = newpfx
+	}
+
+	return false
+}
+
 type bgPalFX palFX
 
 const (
@@ -5477,11 +5508,11 @@ const (
 func (sc bgPalFX) Run(c *Char, _ []int32) bool {
 	bgid := int32(-1)
 	bgidx := int(-1)
-	var backgrounds []*backGround
 
-	pfx := *newPalFXDef()
-	pfx.invertblend = -2 // Forcing 1.1 behavior
+	newpfx := *newPalFXDef()
+	newpfx.invertblend = -2 // Forcing 1.1 behavior
 
+	// 2. Scan all parameters into the temporary struct
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
 		case bgPalFX_id:
@@ -5491,7 +5522,7 @@ func (sc bgPalFX) Run(c *Char, _ []int32) bool {
 		default:
 			// Parse PalFX parameters
 			if isPalFXParam(paramID) {
-				palFX(sc).runSub(c, &pfx, paramID, exp)
+				palFX(sc).runSub(c, &newpfx, paramID, exp)
 			}
 		}
 		return true
@@ -5500,19 +5531,23 @@ func (sc bgPalFX) Run(c *Char, _ []int32) bool {
 	// Apply BGPalFX
 	if bgid < 0 && bgidx < 0 {
 		// Apply to stage itself
-		sys.bgPalFX.clear()
-		sys.bgPalFX.PalFXDef = pfx
-		sys.bgPalFX.invertblend = -3
+		if sys.bgPalFX.time == 0 || newpfx.priority >= sys.bgPalFX.priority {
+			sys.bgPalFX.clear()
+			sys.bgPalFX.PalFXDef = newpfx
+			sys.bgPalFX.invertblend = -3
+		}
 	} else {
 		// Apply to specific elements
-		backgrounds = c.getMultipleStageBg(bgid, bgidx, false)
+		backgrounds := c.getMultipleStageBg(bgid, bgidx, false)
 		if len(backgrounds) == 0 {
 			return false
 		}
 		for _, bg := range backgrounds {
-			bg.palfx.clear()
-			bg.palfx.PalFXDef = pfx
-			bg.palfx.invertblend = -3
+			if bg.palfx.time == 0 || newpfx.priority >= bg.palfx.priority {
+				bg.palfx.clear()
+				bg.palfx.PalFXDef = newpfx
+				bg.palfx.invertblend = -3
+			}
 		}
 	}
 	return false

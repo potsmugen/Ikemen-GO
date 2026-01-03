@@ -37,6 +37,7 @@ type PalFXDef struct {
 	invertall   bool
 	invertblend int32
 	hue         float32
+	priority    int32
 	interpolate bool
 	iadd        [6]int32
 	imul        [6]int32

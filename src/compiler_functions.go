@@ -1517,6 +1517,10 @@ func (c *Compiler) palFXSub(is IniSection,
 		palFX_invertblend, VT_Int, 1, false); err != nil {
 		return err
 	}
+	if err := c.paramValue(is, sc, prefix+"priority",
+		palFX_priority, VT_Int, 1, false); err != nil {
+		return err
+	}
 	return nil
 }
 
