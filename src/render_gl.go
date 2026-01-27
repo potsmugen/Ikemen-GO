@@ -174,6 +174,10 @@ type Renderer struct {
 	// Shader and vertex data for primitive rendering
 	spriteShader *ShaderProgram
 	vertexBuffer gl.Buffer
+	// Rendering pipeline state
+	currentEq  BlendEquation
+	currentSrc BlendFunc
+	currentDst BlendFunc
 }
 
 //go:embed shaders/sprite.vert.glsl
@@ -328,25 +332,14 @@ func (r *Renderer) EndFrame() {
 }
 
 func (r *Renderer) SetPipeline(eq BlendEquation, src, dst BlendFunc) {
+	r.currentEq = eq
+	r.currentSrc = src
+	r.currentDst = dst
+
 	gl.UseProgram(r.spriteShader.program)
-
-	gl.BlendEquation(BlendEquationLUT[eq])
-	gl.BlendFunc(BlendFunctionLUT[src], BlendFunctionLUT[dst])
-	gl.Enable(gl.BLEND)
-
-	// Must bind buffer before enabling attributes
-	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
-
-	gl.EnableVertexAttribArray(r.spriteShader.aPos)
-	gl.VertexAttribPointer(r.spriteShader.aPos, 2, gl.FLOAT, false, 16, 0)
-	gl.EnableVertexAttribArray(r.spriteShader.aUv)
-	gl.VertexAttribPointer(r.spriteShader.aUv, 2, gl.FLOAT, false, 16, 8)
 }
 
 func (r *Renderer) ReleasePipeline() {
-	gl.DisableVertexAttribArray(r.spriteShader.aPos)
-	gl.DisableVertexAttribArray(r.spriteShader.aUv)
-	gl.Disable(gl.BLEND)
 }
 
 func (r *Renderer) ReadPixels(data []uint8, width, height int) {
@@ -414,5 +407,21 @@ func (r *Renderer) SetVertexData(values ...float32) {
 }
 
 func (r *Renderer) RenderQuad() {
+	gl.BlendEquation(BlendEquationLUT[r.currentEq])
+	gl.BlendFunc(BlendFunctionLUT[r.currentSrc], BlendFunctionLUT[r.currentDst])
+	gl.Enable(gl.BLEND)
+
+	// Must bind buffer before enabling attributes
+	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
+
+	gl.EnableVertexAttribArray(r.spriteShader.aPos)
+	gl.VertexAttribPointer(r.spriteShader.aPos, 2, gl.FLOAT, false, 16, 0)
+	gl.EnableVertexAttribArray(r.spriteShader.aUv)
+	gl.VertexAttribPointer(r.spriteShader.aUv, 2, gl.FLOAT, false, 16, 8)
+
 	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+
+	gl.DisableVertexAttribArray(r.spriteShader.aPos)
+	gl.DisableVertexAttribArray(r.spriteShader.aUv)
+	gl.Disable(gl.BLEND)
 }
