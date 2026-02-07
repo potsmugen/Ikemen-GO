@@ -1706,28 +1706,39 @@ func (r *Renderer_GL32) RenderLUT(distribution int32, cubeTex Texture, lutTex Te
 	gl.BindFramebuffer(gl.FRAMEBUFFER, r.fbo_env)
 	gl.Viewport(0, 0, textureSize, textureSize)
 	r.UseProgram(r.cubemapFilteringShader.program)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
+	gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
+
 	loc := r.cubemapFilteringShader.a["VertCoord"]
 	gl.EnableVertexAttribArray(uint32(loc))
 	gl.VertexAttribPointerWithOffset(uint32(loc), 2, gl.FLOAT, false, 0, 0)
 	data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
-	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
-	gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
+
 	loc, unit := r.cubemapFilteringShader.u["cubeMap"], r.cubemapFilteringShader.t["cubeMap"]
 	gl.ActiveTexture((uint32(gl.TEXTURE0 + unit)))
+
 	gl.BindTexture(gl.TEXTURE_CUBE_MAP, cubeTexture.handle)
 	gl.Uniform1i(loc, int32(unit))
+
 	loc = r.cubemapFilteringShader.u["sampleCount"]
 	gl.Uniform1i(loc, sampleCount)
+
 	loc = r.cubemapFilteringShader.u["distribution"]
 	gl.Uniform1i(loc, distribution)
+
 	loc = r.cubemapFilteringShader.u["width"]
 	gl.Uniform1i(loc, textureSize)
+
 	loc = r.cubemapFilteringShader.u["roughness"]
 	gl.Uniform1f(loc, 0)
+
 	loc = r.cubemapFilteringShader.u["intensityScale"]
 	gl.Uniform1f(loc, 1)
+
 	loc = r.cubemapFilteringShader.u["currentFace"]
 	gl.Uniform1i(loc, 0)
+
 	loc = r.cubemapFilteringShader.u["isLUT"]
 	gl.Uniform1i(loc, 1)
 

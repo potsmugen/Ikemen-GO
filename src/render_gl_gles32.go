@@ -1138,7 +1138,8 @@ func (r *Renderer_GLES32) setShadowMapPipeline(doubleSided, invertFrontFace, use
 
 	loc := r.shadowMapShader.a["inVertexId"]
 	gl.EnableVertexAttribArray(uint32(loc))
-	gl.VertexAttribPointerWithOffset(uint32(loc), 1, gl.INT, false, 0, uintptr(vertAttrOffset))
+	//gl.VertexAttribPointerWithOffset(uint32(loc), 1, gl.INT, false, 0, uintptr(vertAttrOffset))
+	gl.VertexAttribIPointerWithOffset(uint32(loc), 1, gl.INT, 0, uintptr(vertAttrOffset))
 	offset := vertAttrOffset + 4*numVertices
 
 	loc = r.shadowMapShader.a["position"]
@@ -1340,7 +1341,8 @@ func (r *Renderer_GLES32) SetModelPipeline(eq BlendEquation, src, dst BlendFunc,
 
 	loc := r.modelShader.a["inVertexId"]
 	gl.EnableVertexAttribArray(uint32(loc))
-	gl.VertexAttribPointerWithOffset(uint32(loc), 1, gl.INT, false, 0, uintptr(vertAttrOffset))
+	//gl.VertexAttribPointerWithOffset(uint32(loc), 1, gl.INT, false, 0, uintptr(vertAttrOffset))
+	gl.VertexAttribIPointerWithOffset(uint32(loc), 1, gl.INT, 0, uintptr(vertAttrOffset))
 	offset := vertAttrOffset + 4*numVertices
 
 	loc = r.modelShader.a["position"]
@@ -1814,33 +1816,44 @@ func (r *Renderer_GLES32) RenderLUT(distribution int32, cubeTex Texture, lutTex 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, r.fbo_env)
 	gl.Viewport(0, 0, textureSize, textureSize)
 	r.UseProgram(r.cubemapFilteringShader.program)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
+	gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
+
 	loc := r.cubemapFilteringShader.a["VertCoord"]
 	gl.EnableVertexAttribArray(uint32(loc))
 	gl.VertexAttribPointerWithOffset(uint32(loc), 2, gl.FLOAT, false, 0, 0)
 	data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
-	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
-	gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
+
 	loc, unit := r.cubemapFilteringShader.u["cubeMap"], r.cubemapFilteringShader.t["cubeMap"]
 	gl.ActiveTexture((uint32(gl.TEXTURE0 + unit)))
 	gl.BindTexture(gl.TEXTURE_CUBE_MAP, cubeTexture.handle)
 	gl.Uniform1i(loc, int32(unit))
+
 	loc = r.cubemapFilteringShader.u["sampleCount"]
 	gl.Uniform1i(loc, sampleCount)
+
 	loc = r.cubemapFilteringShader.u["distribution"]
 	gl.Uniform1i(loc, distribution)
+
 	loc = r.cubemapFilteringShader.u["width"]
 	gl.Uniform1i(loc, textureSize)
+
 	loc = r.cubemapFilteringShader.u["roughness"]
 	gl.Uniform1f(loc, 0)
+
 	loc = r.cubemapFilteringShader.u["intensityScale"]
 	gl.Uniform1f(loc, 1)
+
 	loc = r.cubemapFilteringShader.u["currentFace"]
 	gl.Uniform1i(loc, 0)
+
 	loc = r.cubemapFilteringShader.u["isLUT"]
 	gl.Uniform1i(loc, 1)
 
 	gl.BindTexture(gl.TEXTURE_2D, lutTexture.handle)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, lutTexture.width, lutTexture.height, 0, gl.RGBA, gl.FLOAT, nil)
+	//gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, lutTexture.width, lutTexture.height, 0, gl.RGBA, gl.FLOAT, nil)
+	//gl.TexStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, lutTexture.width, lutTexture.height)
 
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, lutTexture.handle, 0)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
