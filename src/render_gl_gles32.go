@@ -1817,13 +1817,13 @@ func (r *Renderer_GLES32) RenderLUT(distribution int32, cubeTex Texture, lutTex 
 	gl.Viewport(0, 0, textureSize, textureSize)
 	r.UseProgram(r.cubemapFilteringShader.program)
 
+	data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
 	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
 	gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
 
 	loc := r.cubemapFilteringShader.a["VertCoord"]
 	gl.EnableVertexAttribArray(uint32(loc))
 	gl.VertexAttribPointerWithOffset(uint32(loc), 2, gl.FLOAT, false, 0, 0)
-	data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
 
 	loc, unit := r.cubemapFilteringShader.u["cubeMap"], r.cubemapFilteringShader.t["cubeMap"]
 	gl.ActiveTexture((uint32(gl.TEXTURE0 + unit)))
@@ -1853,7 +1853,7 @@ func (r *Renderer_GLES32) RenderLUT(distribution int32, cubeTex Texture, lutTex 
 
 	gl.BindTexture(gl.TEXTURE_2D, lutTexture.handle)
 	//gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, lutTexture.width, lutTexture.height, 0, gl.RGBA, gl.FLOAT, nil)
-	//gl.TexStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, lutTexture.width, lutTexture.height)
+	gl.TexStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, lutTexture.width, lutTexture.height)
 
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, lutTexture.handle, 0)
 	gl.Clear(gl.COLOR_BUFFER_BIT)

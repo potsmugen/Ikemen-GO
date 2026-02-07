@@ -1707,13 +1707,13 @@ func (r *Renderer_GL32) RenderLUT(distribution int32, cubeTex Texture, lutTex Te
 	gl.Viewport(0, 0, textureSize, textureSize)
 	r.UseProgram(r.cubemapFilteringShader.program)
 
+	data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
 	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
 	gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
 
 	loc := r.cubemapFilteringShader.a["VertCoord"]
 	gl.EnableVertexAttribArray(uint32(loc))
 	gl.VertexAttribPointerWithOffset(uint32(loc), 2, gl.FLOAT, false, 0, 0)
-	data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
 
 	loc, unit := r.cubemapFilteringShader.u["cubeMap"], r.cubemapFilteringShader.t["cubeMap"]
 	gl.ActiveTexture((uint32(gl.TEXTURE0 + unit)))
