@@ -351,6 +351,7 @@ func (t *Texture_GLES32) SetSubData(data []byte, x, y, width, height int32) {
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
+	gl.PixelStorei(gl.UNPACK_ROW_LENGTH, 0)
 
 	if data != nil {
 		gl.TexSubImage2D(gl.TEXTURE_2D, 0, x, y, width, height, uint32(uploadFormat), gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
@@ -362,8 +363,6 @@ func (t *Texture_GLES32) SetSubData(data []byte, x, y, width, height int32) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, interp)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-
-	// gl.PixelStorei(gl.UNPACK_ROW_LENGTH, 0)
 }
 
 func (t *Texture_GLES32) SetSubDataStride(data []byte, x, y, width, height, stride int32) {
