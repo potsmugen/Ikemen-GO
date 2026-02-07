@@ -285,6 +285,7 @@ func (t *Texture_GL21) SetSubData(data []byte, x, y, width, height int32) {
 
 	format := t.MapInternalFormat(Max(t.depth, 8))
 
+	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	if data != nil {
@@ -304,9 +305,9 @@ func (t *Texture_GL21) SetSubDataStride(textureData []byte, x, y, width, height,
 }
 
 func (t *Texture_GL21) SetDataG(data []byte, mag, min, ws, wt TextureSamplingParam) {
-
 	format := t.MapInternalFormat(Max(t.depth, 8))
 
+	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, int32(format), t.width, t.height, 0, format, gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
@@ -320,6 +321,8 @@ func (t *Texture_GL21) SetDataG(data []byte, mag, min, ws, wt TextureSamplingPar
 func (t *Texture_GL21) SetPixelData(data []float32) {
 	format := t.MapInternalFormat(Max(t.depth/4, 8))
 	internalFormat := t.MapInternalFormat(Max(t.depth, 8))
+
+	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, int32(internalFormat), t.width, t.height, 0, uint32(format), gl.FLOAT, unsafe.Pointer(&data[0]))
@@ -417,7 +420,7 @@ type GL21State struct {
 	blendDst            BlendFunc
 	scissorRect         [4]int32
 	scissorEnabled      bool
-	lastSpriteTexture   [8]uint32
+	lastSpriteTexture   [8]uint32 // Technically [2] should be enough right now
 	useNormal           bool
 	useTangent          bool
 	useVertColor        bool
@@ -1459,12 +1462,15 @@ func (r *Renderer_GL21) SetTexture(name string, tex Texture) {
 	t := tex.(*Texture_GL21)
 	loc, unit := r.spriteShader.u[name], r.spriteShader.t[name]
 
+	// Must update pointer regardless of binding
+	gl.ActiveTexture(uint32(gl.TEXTURE0 + unit))
+
 	if r.lastSpriteTexture[unit] == t.handle {
 		return
 	}
 
+	// Skipping the bind is enough optimization
 	r.lastSpriteTexture[unit] = t.handle
-	gl.ActiveTexture(uint32(gl.TEXTURE0 + unit))
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.Uniform1i(loc, int32(unit))
 }

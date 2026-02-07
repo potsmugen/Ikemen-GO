@@ -348,6 +348,7 @@ func (t *Texture_GLES32) SetSubData(data []byte, x, y, width, height int32) {
 
 	uploadFormat := t.MapInternalFormat(Max(t.depth, 8))
 
+	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 
@@ -370,6 +371,8 @@ func (t *Texture_GLES32) SetSubDataStride(data []byte, x, y, width, height, stri
 	if t.filter {
 		interp = gl.LINEAR
 	}
+
+	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 
@@ -397,9 +400,9 @@ func (t *Texture_GLES32) SetSubDataStride(data []byte, x, y, width, height, stri
 }
 
 func (t *Texture_GLES32) SetDataG(data []byte, mag, min, ws, wt TextureSamplingParam) {
-
 	format := t.MapInternalFormat(Max(t.depth, 8))
 
+	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, int32(format), t.width, t.height, 0, format, gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
@@ -411,13 +414,14 @@ func (t *Texture_GLES32) SetDataG(data []byte, mag, min, ws, wt TextureSamplingP
 }
 
 func (t *Texture_GLES32) SetPixelData(data []float32) {
-
+	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, t.width, t.height, 0, gl.RGBA, gl.FLOAT, unsafe.Pointer(&data[0]))
 }
 
 func (t Texture_GLES32) CopyData(src *Texture) {
+	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, 0) // Unbind whatever is currently bound
 	srcES := (*src).(*Texture_GLES32)
 	var fbo uint32
@@ -433,11 +437,15 @@ func (t Texture_GLES32) CopyData(src *Texture) {
 	gl.DeleteFramebuffers(1, &fbo)
 }
 
+/*
+// Not called anywhere
 func (t *Texture_GLES32) SetRGBPixelData(data []float32) {
+	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, t.width, t.height, 0, gl.RGB, gl.FLOAT, unsafe.Pointer(&data[0]))
 }
+*/
 
 // Return whether texture has a valid handle
 func (t *Texture_GLES32) IsValid() bool {
@@ -510,7 +518,7 @@ type GLES32State struct {
 	blendDst            BlendFunc
 	scissorRect         [4]int32
 	scissorEnabled      bool
-	lastSpriteTexture   [8]uint32
+	lastSpriteTexture   [8]uint32 // Technically [2] should be enough right now
 	useNormal           bool
 	useTangent          bool
 	useVertColor        bool
@@ -1573,12 +1581,15 @@ func (r *Renderer_GLES32) SetTexture(name string, tex Texture) {
 	t := tex.(*Texture_GLES32)
 	loc, unit := r.spriteShader.u[name], r.spriteShader.t[name]
 
+	// Must update pointer regardless of binding
+	gl.ActiveTexture(uint32(gl.TEXTURE0 + unit))
+
 	if r.lastSpriteTexture[unit] == t.handle {
 		return
 	}
 
+	// Skipping the bind is enough optimization
 	r.lastSpriteTexture[unit] = t.handle
-	gl.ActiveTexture(uint32(gl.TEXTURE0 + unit))
 	gl.BindTexture(gl.TEXTURE_2D, t.handle)
 	gl.Uniform1i(loc, int32(unit))
 }
