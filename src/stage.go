@@ -2544,7 +2544,7 @@ func loadEnvironment(filepath string) (*Environment, error) {
 				return
 			}
 			lowestMipLevel := int32(4)
-			env.hdrTexture.tex = gfx.newHDRTexture(int32(img.Bounds().Max.X), int32(img.Bounds().Max.Y))
+			env.hdrTexture.tex = gfx.newHDRTexture(int32(img.Bounds().Dx()), int32(img.Bounds().Dy()))
 
 			env.hdrTexture.tex.SetPixelData(data)
 			env.cubeMapTexture.tex = gfx.newCubeMapTexture(256, true, 0)
@@ -2705,7 +2705,7 @@ func loadglTFModel(filepath string) (*Model, error) {
 				rgba := image.NewRGBA(img.Bounds())
 				draw.Draw(rgba, img.Bounds(), img, img.Bounds().Min, draw.Src)
 				sys.mainThreadTask <- func() {
-					texture.tex = gfx.newModelTexture(int32(img.Bounds().Max.X), int32(img.Bounds().Max.Y), 32, false)
+					texture.tex = gfx.newModelTexture(int32(img.Bounds().Dx()), int32(img.Bounds().Dy()), 32, false)
 					texture.tex.SetDataG(rgba.Pix, mag, min, wrapS, wrapT)
 				}
 				textureMap[[2]int32{int32(*t.Source), int32(*t.Sampler)}] = texture
@@ -2724,7 +2724,7 @@ func loadglTFModel(filepath string) (*Model, error) {
 				rgba := image.NewRGBA(img.Bounds())
 				draw.Draw(rgba, img.Bounds(), img, img.Bounds().Min, draw.Src)
 				sys.mainThreadTask <- func() {
-					texture.tex = gfx.newModelTexture(int32(img.Bounds().Max.X), int32(img.Bounds().Max.Y), 32, false)
+					texture.tex = gfx.newModelTexture(int32(img.Bounds().Dx()), int32(img.Bounds().Dy()), 32, false)
 					texture.tex.SetDataG(rgba.Pix, mag, min, wrapS, wrapT)
 				}
 				textureMap[[2]int32{int32(*t.Source), -1}] = texture
