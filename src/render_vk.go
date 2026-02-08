@@ -4833,6 +4833,10 @@ func (r *Renderer_VK) Close() {
 	r.Destroy()
 }
 
+func (r *Renderer_VK) EnableDebug() {
+	// Do nothing
+}
+
 func (r *Renderer_VK) IsModelEnabled() bool {
 	return r.enableModel
 }
