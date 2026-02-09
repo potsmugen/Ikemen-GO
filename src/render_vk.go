@@ -188,7 +188,14 @@ func (t *Texture_VK) SetData(textureData []byte) {
 }
 
 func (t *Texture_VK) SetSubData(textureData []byte, x, y, width, height, stride int32) {
-	size := uint32(width * height * t.depth / 8)
+	rowLength := uint32(width)
+	if stride > 0 {
+		rowLength = uint32(stride / 4)
+	}
+
+	bytesPerPixel := uint32(t.depth / 8)
+	size := rowLength * uint32(height) * bytesPerPixel
+
 	bufferOffset := gfx.(*Renderer_VK).CopyToStagingBuffer(size, textureData)
 	imageExtent := vk.Extent3D{
 		Width:  uint32(width),
@@ -240,7 +247,7 @@ func (t *Texture_VK) SetSubData(textureData []byte, x, y, width, height, stride 
 	}
 	gfx.(*Renderer_VK).stagingImageCopyRegions[t.img] = append(regions, vk.BufferImageCopy{
 		BufferOffset:      bufferOffset,
-		BufferRowLength:   0,
+		BufferRowLength:   rowLength,
 		BufferImageHeight: 0,
 		ImageSubresource: vk.ImageSubresourceLayers{
 			AspectMask:     vk.ImageAspectFlags(vk.ImageAspectColorBit),
