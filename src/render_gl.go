@@ -64,7 +64,7 @@ func (r *Renderer_GL21) newShaderProgram(vert, frag, geo, id string, crashWhenFa
 
 	// Debug
 	if r.debugMode {
-		fmt.Printf("[DEBUG] Linked shader '%s' as Program ID: %d\n", id, prog)
+		fmt.Printf("[GL Debug] Linked shader '%s' as Program ID: %d\n", id, prog)
 	}
 
 	return s, nil
@@ -770,7 +770,7 @@ func (r *Renderer_GL21) Init() {
 	gl.GetIntegerv(gl.MAX_TEXTURE_IMAGE_UNITS, &maxTex)
 
 	if r.debugMode {
-		fmt.Printf("[DEBUG] GPU supports up to %d textures\n", maxTex)
+		fmt.Printf("[GL Debug] GPU supports up to %d textures\n", maxTex)
 	}
 
 	// Initialize sprite texture cache
@@ -790,7 +790,7 @@ func (r *Renderer_GL21) Close() {
 
 func (r *Renderer_GL21) EnableDebug() {
 	r.debugMode = true
-	fmt.Printf("[GL DEBUG] Debug mode enabled\n")
+	fmt.Printf("[GL Debug] Debug mode enabled\n")
 }
 
 func (r *Renderer_GL21) CheckErrors(label string) {
@@ -833,8 +833,8 @@ func (r *Renderer_GL21) CheckErrors(label string) {
 		}
 
 		// Log the error with a label so we know where it happened
-		// Format: [GL DEBUG] [Label]: 1281 (0x0501) GL_INVALID_VALUE - Description
-		fmt.Printf("[GL DEBUG] [%s]: %d (0x%04X) %s - %s\n", label, err, err, name, description)
+		// Format: [GL Debug] [Label]: 1281 (0x0501) GL_INVALID_VALUE - Description
+		fmt.Printf("[GL Debug] [%s]: %d (0x%04X) %s - %s\n", label, err, err, name, description)
 	}
 }
 

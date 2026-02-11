@@ -64,7 +64,7 @@ func (r *Renderer_GL32) newShaderProgram(vert, frag, geo, id string, crashWhenFa
 
 	// Debug
 	if r.debugMode {
-		fmt.Printf("[DEBUG] Linked shader '%s' as Program ID: %d\n", id, prog)
+		fmt.Printf("[GL Debug] Linked shader '%s' as Program ID: %d\n", id, prog)
 	}
 
 	return s, nil
@@ -779,7 +779,7 @@ func (r *Renderer_GL32) Init() {
 	gl.GetIntegerv(gl.MAX_TEXTURE_IMAGE_UNITS, &maxTex)
 
 	if r.debugMode {
-		fmt.Printf("[DEBUG] GPU supports up to %d textures\n", maxTex)
+		fmt.Printf("[GL Debug] GPU supports up to %d textures\n", maxTex)
 	}
 
 	// Initialize sprite texture cache
@@ -815,7 +815,7 @@ func (r *Renderer_GL32) EnableDebug() {
 			return
 		}
 
-		fmt.Printf("[GL DEBUG] %s\n", message)
+		fmt.Printf("[GL Debug] %s\n", message)
 
 		// Crash here so the log catches it
 		if severity == gl.DEBUG_SEVERITY_HIGH {
@@ -823,7 +823,7 @@ func (r *Renderer_GL32) EnableDebug() {
 		}
 	}, nil)
 
-	fmt.Printf("[GL DEBUG] Debug mode enabled\n")
+	fmt.Printf("[GL Debug] Debug mode enabled\n")
 }
 
 func (r *Renderer_GL32) IsModelEnabled() bool {
@@ -1680,7 +1680,7 @@ func (r *Renderer_GL32) SetModelUniformI(name string, val int) {
 	loc, ok := r.modelShader.u[name]
 	if !ok || loc < 0 {
 		if r.debugMode {
-			fmt.Printf("[DEBUG] Model uniform '%s' not registered\n", name)
+			fmt.Printf("[GL Debug] Model uniform '%s' not registered\n", name)
 		}
 		return
 	}
@@ -1691,7 +1691,7 @@ func (r *Renderer_GL32) SetModelUniformF(name string, values ...float32) {
 	loc, ok := r.modelShader.u[name]
 	if !ok || loc < 0 {
 		if r.debugMode {
-			fmt.Printf("[DEBUG] Model uniform '%s' not registered\n", name)
+			fmt.Printf("[GL Debug] Model uniform '%s' not registered\n", name)
 		}
 		return
 	}
@@ -1702,7 +1702,7 @@ func (r *Renderer_GL32) SetModelUniformFv(name string, values []float32) {
 	loc, ok := r.modelShader.u[name]
 	if !ok || loc < 0 {
 		if r.debugMode {
-			fmt.Printf("[DEBUG] Model uniform '%s' not registered\n", name)
+			fmt.Printf("[GL Debug] Model uniform '%s' not registered\n", name)
 		}
 		return
 	}
@@ -1713,7 +1713,7 @@ func (r *Renderer_GL32) SetModelUniformMatrix(name string, value []float32) {
 	loc, ok := r.modelShader.u[name]
 	if !ok || loc < 0 {
 		if r.debugMode {
-			fmt.Printf("[DEBUG] Model uniform '%s' not registered\n", name)
+			fmt.Printf("[GL Debug] Model uniform '%s' not registered\n", name)
 		}
 		return
 	}
@@ -1724,7 +1724,7 @@ func (r *Renderer_GL32) SetModelUniformMatrix3(name string, value []float32) {
 	loc, ok := r.modelShader.u[name]
 	if !ok || loc < 0 {
 		if r.debugMode {
-			fmt.Printf("[DEBUG] Model uniform '%s' not registered\n", name)
+			fmt.Printf("[GL Debug] Model uniform '%s' not registered\n", name)
 		}
 		return
 	}
@@ -1735,7 +1735,7 @@ func (r *Renderer_GL32) SetShadowMapUniformI(name string, val int) {
 	loc, ok := r.shadowMapShader.u[name]
 	if !ok || loc < 0 {
 		if r.debugMode {
-			fmt.Printf("[DEBUG] Shadow uniform '%s' not registered\n", name)
+			fmt.Printf("[GL Debug] Shadow uniform '%s' not registered\n", name)
 		}
 		return
 	}
@@ -1746,7 +1746,7 @@ func (r *Renderer_GL32) SetShadowMapUniformF(name string, values ...float32) {
 	loc, ok := r.shadowMapShader.u[name]
 	if !ok || loc < 0 {
 		if r.debugMode {
-			fmt.Printf("[DEBUG] Shadow uniform '%s' not registered\n", name)
+			fmt.Printf("[GL Debug] Shadow uniform '%s' not registered\n", name)
 		}
 		return
 	}
@@ -1757,7 +1757,7 @@ func (r *Renderer_GL32) SetShadowMapUniformFv(name string, values []float32) {
 	loc, ok := r.shadowMapShader.u[name]
 	if !ok || loc < 0 {
 		if r.debugMode {
-			fmt.Printf("[DEBUG] Shadow uniform '%s' not registered\n", name)
+			fmt.Printf("[GL Debug] Shadow uniform '%s' not registered\n", name)
 		}
 		return
 	}
@@ -1768,7 +1768,7 @@ func (r *Renderer_GL32) SetShadowMapUniformMatrix(name string, value []float32) 
 	loc, ok := r.shadowMapShader.u[name]
 	if !ok || loc < 0 {
 		if r.debugMode {
-			fmt.Printf("[DEBUG] Shadow uniform '%s' not registered\n", name)
+			fmt.Printf("[GL Debug] Shadow uniform '%s' not registered\n", name)
 		}
 		return
 	}
@@ -1779,7 +1779,7 @@ func (r *Renderer_GL32) SetShadowMapUniformMatrix3(name string, value []float32)
 	loc, ok := r.shadowMapShader.u[name]
 	if !ok || loc < 0 {
 		if r.debugMode {
-			fmt.Printf("[DEBUG] Shadow uniform '%s' not registered\n", name)
+			fmt.Printf("[GL Debug] Shadow uniform '%s' not registered\n", name)
 		}
 		return
 	}
