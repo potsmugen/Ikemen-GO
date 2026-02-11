@@ -603,7 +603,7 @@ func (r *Renderer_GL21) Init() {
 	// Calculate total amount of shaders loaded.
 	r.postShaderSelect = make([]*ShaderProgram_GL21, 1+len(sys.cfg.Video.ExternalShaders))
 
-	// Ident shader (no postprocessing)
+	// Identity shader (no postprocessing)
 	r.postShaderSelect[0], _ = r.newShaderProgram(identVertShader, identFragShader, "", "Identity Postprocess", true)
 	r.postShaderSelect[0].RegisterAttributes("VertCoord")
 	r.postShaderSelect[0].RegisterUniforms("Texture_GL21", "TextureSize", "CurrentTime")
@@ -775,7 +775,7 @@ func (r *Renderer_GL21) Init() {
 
 	// Initialize sprite texture cache
 	r.texCacheTexHandle = make([]uint32, maxTex)
-    r.texCacheLastUsed = make([]uint64, maxTex)
+	r.texCacheLastUsed = make([]uint64, maxTex)
 
 	// Initialize uniform cache
 	r.uniformICache = make(map[uint32]int32, 32)
@@ -1761,11 +1761,11 @@ func (r *Renderer_GL21) SetTexture(name string, tex Texture) {
 }
 
 func (r *Renderer_GL21) SetModelTexture(name string, tex Texture) {
-    r.SetTextureSub(r.modelShader.u, r.modelShader.t, name, tex)
+	r.SetTextureSub(r.modelShader.u, r.modelShader.t, name, tex)
 }
 
 func (r *Renderer_GL21) SetShadowMapTexture(name string, tex Texture) {
-    r.SetTextureSub(r.shadowMapShader.u, r.shadowMapShader.t, name, tex)
+	r.SetTextureSub(r.shadowMapShader.u, r.shadowMapShader.t, name, tex)
 }
 
 func (r *Renderer_GL21) SetShadowFrameTexture(i uint32) {
