@@ -1077,6 +1077,11 @@ func (r *Renderer_GL32) SetBlending(enable bool, eq BlendEquation, src, dst Blen
 }
 
 func (r *Renderer_GL32) SetPipeline() {
+	// Do nothing if we were already using the sprite shader
+	if r.program == r.spriteShader.program {
+		return
+	}
+
 	r.UseProgram(r.spriteShader.program)
 
 	gl.BindVertexArray(r.vao)
@@ -1085,9 +1090,9 @@ func (r *Renderer_GL32) SetPipeline() {
 	// Disable all active attributes
 	// Prevents "vertex shader is being recompiled" errors
 	// Note: We use 11 attributes tops. This may need to be updated in the future
-	for i := uint32(0); i < 11; i++ {
-		gl.DisableVertexAttribArray(i)
-	}
+	//for i := uint32(0); i < 11; i++ {
+	//	gl.DisableVertexAttribArray(i)
+	//}
 
 	locPos := r.spriteShader.a["position"]
 	gl.EnableVertexAttribArray(uint32(locPos))

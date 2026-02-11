@@ -1118,10 +1118,14 @@ func (r *Renderer_GLES32) SetBlending(enable bool, eq BlendEquation, src, dst Bl
 }
 
 func (r *Renderer_GLES32) SetPipeline() {
-	gl.BindVertexArray(r.vao)
+	// Do nothing if we were already using the sprite shader
+	if r.program == r.spriteShader.program {
+		return
+	}
 
 	r.UseProgram(r.spriteShader.program)
 
+	gl.BindVertexArray(r.vao)
 	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
 
 	locPos := r.spriteShader.a["position"]

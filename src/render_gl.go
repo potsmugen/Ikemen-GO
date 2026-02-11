@@ -1081,6 +1081,11 @@ func (r *Renderer_GL21) SetBlending(enable bool, eq BlendEquation, src, dst Blen
 }
 
 func (r *Renderer_GL21) SetPipeline() {
+	// Do nothing if we were already using the sprite shader
+	if r.program == r.spriteShader.program {
+		return
+	}
+
 	r.UseProgram(r.spriteShader.program)
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
