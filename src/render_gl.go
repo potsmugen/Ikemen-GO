@@ -446,8 +446,8 @@ type GL21State struct {
 	scissorRect         [4]int32
 	scissorEnabled      bool
 	texCacheSlotMap     map[uint32]int32 // Handle to unit
-	texCacheTexHandle   [8]uint32 // Unit to handle. Use 8 for GL2.1
-	texCacheLastUsed    [8]uint64 // Timer value when the slot was last used. Use 8 for GL2.1
+	texCacheTexHandle   []uint32 // Unit to handle. Sized per GPU
+	texCacheLastUsed    []uint64 // Timer value when the slot was last used. Sized per GPU
 	texCacheTimer       uint64 // Increments on every texture access
 	uniformICache       map[uint32]int32
 	uniformF1Cache      map[uint32]float32
@@ -765,8 +765,19 @@ func (r *Renderer_GL21) Init() {
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 
+	// Check hardware texture limit
+	// TODO: Maybe clamp the result
+	var maxTex int32
+	gl.GetIntegerv(gl.MAX_TEXTURE_IMAGE_UNITS, &maxTex)
+
+	if r.debugMode {
+		fmt.Printf("[DEBUG] GPU supports up to %d textures\n", maxTex)
+	}
+
 	// Initialize sprite texture cache
-	r.texCacheSlotMap = make(map[uint32]int32, 16)
+	r.texCacheSlotMap = make(map[uint32]int32, maxTex)
+	r.texCacheTexHandle = make([]uint32, maxTex)
+    r.texCacheLastUsed = make([]uint64, maxTex)
 
 	// Initialize uniform cache
 	r.uniformICache = make(map[uint32]int32, 32)
@@ -1705,7 +1716,7 @@ func (r *Renderer_GL21) SetTextureSub(uMap map[string]int32, tMap map[string]int
 		// We need to find the slot with the oldest timestamp
 		var victimUnit int32 = 0
 		var minTime uint64 = math.MaxUint64
-		for i := 0; i < 8; i++ {
+		for i := range r.texCacheLastUsed {
 			if r.texCacheLastUsed[i] < minTime {
 				minTime = r.texCacheLastUsed[i]
 				victimUnit = int32(i)
