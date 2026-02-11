@@ -928,7 +928,7 @@ func (r *Renderer_GL21) EndFrame() {
 		}
 
 		// tell GL we want to use our shader program
-		r.UseProgram(postShader.program)
+		r.ChangeProgram(postShader.program)
 
 		// set post-processing parameters
 		gl.Uniform1i(postShader.u["Texture_GL21"], 0)
@@ -1032,29 +1032,34 @@ func (r *Renderer_GL21) SetCullFace(doubleSided bool) {
 	}
 }
 
-func (r *Renderer_GL21) UseProgram(prog uint32) {
+// This should be called instead of gl.UseProgram()
+func (r *Renderer_GL21) ChangeProgram(prog uint32) {
+	// Program already in use
 	if r.program == prog {
 		return
+	}
+
+	// Lazy release of sprite pipeline
+	// We can't tell if the next thing we will draw is also a sprite, so this prevents releasing the pipeline after every single sprite
+	if r.program == r.spriteShader.program {
+		r.ReleasePipeline()
+	}
+
+	// Same for TTF fonts
+	if r.program == gfxFont.(*FontRenderer_GL21).shaderProgram.program {
+		gfxFont.(*FontRenderer_GL21).ReleaseFontPipeline()
 	}
 
 	// Switch program
 	gl.UseProgram(prog)
 	r.program = prog
 
-	// Reset texure cache
+	// Reset sprite texture cache
 	for i := range r.texCacheTexHandle {
 		r.texCacheTexHandle[i] = 0xFFFFFFFF
 		r.texCacheLastUsed[i] = 0
 	}
 	r.texCacheTimer = 1
-
-	// Clear cache between shaders
-	for i := range r.uniformICache {
-		r.uniformICache[i] = -1e9
-	}
-	for i := range r.uniformF1Cache {
-		r.uniformF1Cache[i] = -1e9
-	}
 }
 
 func (r *Renderer_GL21) SetBlending(enable bool, eq BlendEquation, src, dst BlendFunc) {
@@ -1086,7 +1091,7 @@ func (r *Renderer_GL21) SetPipeline() {
 		return
 	}
 
-	r.UseProgram(r.spriteShader.program)
+	r.ChangeProgram(r.spriteShader.program)
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
 
@@ -1099,8 +1104,16 @@ func (r *Renderer_GL21) SetPipeline() {
 	gl.VertexAttribPointerWithOffset(uint32(locUV), 2, gl.FLOAT, false, 16, 8)
 }
 
+func (r *Renderer_GL21) ReleasePipeline() {
+	loc := r.spriteShader.a["position"]
+	gl.DisableVertexAttribArray(uint32(loc))
+	loc = r.spriteShader.a["uv"]
+	gl.DisableVertexAttribArray(uint32(loc))
+	//gl.Disable(gl.BLEND)
+}
+
 func (r *Renderer_GL21) prepareShadowMapPipeline(bufferIndex uint32) {
-	r.UseProgram(r.shadowMapShader.program)
+	r.ChangeProgram(r.shadowMapShader.program)
 	gl.BindFramebufferEXT(gl.FRAMEBUFFER, r.fbo_shadow)
 	gl.Viewport(0, 0, 1024, 1024)
 	gl.Enable(gl.TEXTURE_2D)
@@ -1251,7 +1264,7 @@ func (r *Renderer_GL21) ReleaseShadowPipeline() {
 }
 
 func (r *Renderer_GL21) prepareModelPipeline(bufferIndex uint32, env *Environment) {
-	r.UseProgram(r.modelShader.program)
+	r.ChangeProgram(r.modelShader.program)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, r.fbo)
 	gl.Viewport(0, 0, sys.scrrect[2], sys.scrrect[3])
 	gl.Clear(gl.DEPTH_BUFFER_BIT)
@@ -1695,7 +1708,7 @@ func (r *Renderer_GL21) SetShadowMapUniformMatrix3(name string, value []float32)
 }
 
 func (r *Renderer_GL21) SetTextureSub(uMap map[string]int32, tMap map[string]int, name string, tex Texture) {
-	t := tex.(*Texture_GL32)
+	t := tex.(*Texture_GL21)
 	loc := uMap[name]
 
 	// Cached path for the sprite shader
@@ -1802,7 +1815,7 @@ func (r *Renderer_GL21) RenderCubeMap(envTex Texture, cubeTex Texture) {
 	cubeTexture := cubeTex.(*Texture_GL21)
 	textureSize := cubeTexture.width
 
-	r.UseProgram(r.panoramaToCubeMapShader.program)
+	r.ChangeProgram(r.panoramaToCubeMapShader.program)
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, r.fbo_env)
 	gl.Viewport(0, 0, textureSize, textureSize)
@@ -1837,7 +1850,7 @@ func (r *Renderer_GL21) RenderFilteredCubeMap(distribution int32, cubeTex Textur
 	textureSize := filteredTexture.width
 	currentTextureSize := textureSize >> mipmapLevel
 
-	r.UseProgram(r.cubemapFilteringShader.program)
+	r.ChangeProgram(r.cubemapFilteringShader.program)
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, r.fbo_env)
 	gl.Viewport(0, 0, currentTextureSize, currentTextureSize)
@@ -1883,7 +1896,7 @@ func (r *Renderer_GL21) RenderLUT(distribution int32, cubeTex Texture, lutTex Te
 	lutTexture := lutTex.(*Texture_GL21)
 	textureSize := lutTexture.width
 
-	r.UseProgram(r.cubemapFilteringShader.program)
+	r.ChangeProgram(r.cubemapFilteringShader.program)
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, r.fbo_env)
 	gl.Viewport(0, 0, textureSize, textureSize)
