@@ -444,7 +444,6 @@ type GL32State struct {
 	blendDst            BlendFunc
 	scissorRect         [4]int32
 	scissorEnabled      bool
-	texCacheSlotMap     map[uint32]int32 // Handle to unit
 	texCacheTexHandle   []uint32 // Unit to handle. Sized per GPU
 	texCacheLastUsed    []uint64 // Timer value when the slot was last used. Sized per GPU
 	texCacheTimer       uint64 // Increments on every texture access
@@ -784,7 +783,6 @@ func (r *Renderer_GL32) Init() {
 	}
 
 	// Initialize sprite texture cache
-	r.texCacheSlotMap = make(map[uint32]int32, maxTex)
 	r.texCacheTexHandle = make([]uint32, maxTex)
     r.texCacheLastUsed = make([]uint64, maxTex)
 
@@ -1035,9 +1033,6 @@ func (r *Renderer_GL32) UseProgram(prog uint32) {
 	r.program = prog
 
 	// Reset texure cache
-	for k := range r.texCacheSlotMap {
-		delete(r.texCacheSlotMap, k)
-	}
 	for i := range r.texCacheTexHandle {
 		r.texCacheTexHandle[i] = 0xFFFFFFFF
 		r.texCacheLastUsed[i] = 0
@@ -1774,42 +1769,35 @@ func (r *Renderer_GL32) SetTextureSub(uMap map[string]int32, tMap map[string]int
 		// Increment reference timer
 		r.texCacheTimer++
 
-		// Cache hit
-		if unit, ok := r.texCacheSlotMap[t.handle]; ok {
-			r.texCacheLastUsed[unit] = r.texCacheTimer // Update timestamp
-			r.SetUniformISub(loc, unit)
-			return
-		}
-
-		// Cache miss
-		// We need to find the slot with the oldest timestamp
-		var victimUnit int32 = 0
+		var oldestUnit int32 = 0
 		var minTime uint64 = math.MaxUint64
-		for i := range r.texCacheLastUsed {
+		
+		// Look for a hit or the oldest slot
+		for i := range r.texCacheTexHandle {
+			// If we find the texture already bound, that's a hit
+			if r.texCacheTexHandle[i] == t.handle {
+				r.texCacheLastUsed[i] = r.texCacheTimer
+				r.SetUniformISub(loc, int32(i))
+				return
+			}
+			
+			// While searching, track the oldest slot in case we miss
 			if r.texCacheLastUsed[i] < minTime {
 				minTime = r.texCacheLastUsed[i]
-				victimUnit = int32(i)
+				oldestUnit = int32(i)
 			}
 		}
 
-		// Eviction
-		oldHandle := r.texCacheTexHandle[victimUnit]
-		if oldHandle != 0xFFFFFFFF {
-			delete(r.texCacheSlotMap, oldHandle)
-		}
-
-		// Binding
-		gl.ActiveTexture(gl.TEXTURE0 + uint32(victimUnit))
+		// Cache miss
+		gl.ActiveTexture(gl.TEXTURE0 + uint32(oldestUnit))
 		gl.BindTexture(gl.TEXTURE_2D, t.handle)
 
-		// Update state
-		r.texCacheTexHandle[victimUnit] = t.handle
-		r.texCacheSlotMap[t.handle] = victimUnit
-		r.texCacheLastUsed[victimUnit] = r.texCacheTimer // Mark as fresh
+		// Update cache state
+		r.texCacheTexHandle[oldestUnit] = t.handle
+		r.texCacheLastUsed[oldestUnit] = r.texCacheTimer
 
 		// Update uniform
-		r.SetUniformISub(loc, victimUnit)
-
+		r.SetUniformISub(loc, oldestUnit)
 		return
 	}
 
