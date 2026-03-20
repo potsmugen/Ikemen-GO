@@ -560,6 +560,11 @@ func (r *Renderer_GL33) InitModelShader() error {
 	gl.BindVertexArray(r.modelEnvVAO)
 	gl.BindBuffer(gl.ARRAY_BUFFER, r.postVertBuffer)
 
+	if loc, ok := r.panoramaToCubeMapShader.attributes["VertCoord"]; ok && loc >= 0 {
+		gl.EnableVertexAttribArray(uint32(loc))
+		gl.VertexAttribPointer(uint32(loc), 2, gl.FLOAT, false, 0, nil)
+	}
+
 	if loc, ok := r.cubemapFilteringShader.attributes["VertCoord"]; ok && loc >= 0 {
 		gl.EnableVertexAttribArray(uint32(loc))
 		gl.VertexAttribPointer(uint32(loc), 2, gl.FLOAT, false, 0, nil)
@@ -2095,9 +2100,9 @@ func (r *Renderer_GL33) RenderCubeMap(envTex Texture, cubeTex Texture) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER, r.fbo_env)
 	gl.Viewport(0, 0, textureSize, textureSize)
 
-	data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
-	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
-	gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
+	//data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
+	//gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
+	//gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
 
 	loc, unit := r.panoramaToCubeMapShader.uniforms["panorama"], r.panoramaToCubeMapShader.textures["panorama"]
 	gl.ActiveTexture((uint32(gl.TEXTURE0 + unit)))
@@ -2132,9 +2137,9 @@ func (r *Renderer_GL33) RenderFilteredCubeMap(distribution int32, cubeTex Textur
 	gl.BindFramebuffer(gl.FRAMEBUFFER, r.fbo_env)
 	gl.Viewport(0, 0, currentTextureSize, currentTextureSize)
 
-	data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
-	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
-	gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
+	//data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
+	//gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
+	//gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
 
 	loc, unit := r.cubemapFilteringShader.uniforms["cubeMap"], r.cubemapFilteringShader.textures["cubeMap"]
 	gl.ActiveTexture((uint32(gl.TEXTURE0 + unit)))
@@ -2178,9 +2183,9 @@ func (r *Renderer_GL33) RenderLUT(distribution int32, cubeTex Texture, lutTex Te
 	gl.BindFramebuffer(gl.FRAMEBUFFER, r.fbo_env)
 	gl.Viewport(0, 0, textureSize, textureSize)
 
-	data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
-	gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
-	gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
+	//data := f32.Bytes(binary.LittleEndian, -1, -1, 1, -1, -1, 1, 1, 1)
+	//gl.BindBuffer(gl.ARRAY_BUFFER, r.vertexBuffer)
+	//gl.BufferData(gl.ARRAY_BUFFER, len(data), unsafe.Pointer(&data[0]), gl.STATIC_DRAW)
 
 	loc, unit := r.cubemapFilteringShader.uniforms["cubeMap"], r.cubemapFilteringShader.textures["cubeMap"]
 	gl.ActiveTexture((uint32(gl.TEXTURE0 + unit)))
