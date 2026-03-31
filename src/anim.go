@@ -303,8 +303,7 @@ func ReadAnimation(sff *Sff, pal *PaletteList, lines []string, i *int) *Animatio
 			}
 			(*i)++
 			for n := int32(0); n < size && *i < len(lines); {
-				line := strings.ToLower(strings.TrimSpace(
-					strings.SplitN(lines[*i], ";", 2)[0]))
+				line := strings.ToLower(strings.TrimSpace(lines[*i]))
 				if len(line) == 0 {
 					(*i)++
 					continue

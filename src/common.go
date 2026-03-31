@@ -390,6 +390,34 @@ func NormalizeNewlines(input string) string {
 	return input
 }
 
+// Removes comments from a file, unless they are inside quotes
+func RemoveComments(text, comment string) string {
+	if comment == "" {
+		return text
+	}
+
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		inString := false
+
+		for j := 0; j < len(line); j++ {
+			switch line[j] {
+			case '"':
+				inString = !inString
+			default:
+				if !inString && strings.HasPrefix(line[j:], comment) {
+					line = line[:j]
+					break
+				}
+			}
+		}
+
+		lines[i] = line
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 func LoadText(filename string) (string, error) {
 	rc, err := OpenFile(filename)
 	if err != nil {
@@ -407,6 +435,17 @@ func LoadText(filename string) (string, error) {
 	}
 
 	return string(bytes), nil
+}
+
+// Loads a text file, normalizes its newlines, and removes inline comments
+func LoadTextNormalized(filename string, comment string) (string, error) {
+	str, err := LoadText(filename)
+	if err != nil {
+		return "", err
+	}
+	str = NormalizeNewlines(str)
+	str = RemoveComments(str, comment)
+	return str, nil
 }
 
 func decodeShiftJIS(input string) string {

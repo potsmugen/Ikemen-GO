@@ -149,7 +149,7 @@ func loadFightFx(def string, isGlobal bool, isMainThread bool) error {
 				}
 				if is.LoadFile("air", []string{def, sys.motif.Def, "", "data/"},
 					func(filename string) error {
-						str, err := LoadText(filename)
+						str, err := LoadTextNormalized(filename, ";")
 						if err != nil {
 							return err
 						}

@@ -303,7 +303,7 @@ func loadFntV1(filename string) (*Fnt, error) {
 func loadFntV2(filename string, height int32) (*Fnt, error) {
 	f := newFnt()
 
-	content, err := LoadText(filename)
+	content, err := LoadTextNormalized(filename, ";")
 
 	if err != nil {
 		return nil, Error("File not found")

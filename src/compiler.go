@@ -6508,7 +6508,7 @@ func (c *Compiler) stateCompile(states map[int32]StateBytecode,
 		var err error
 		// If this is a zss file
 		if c.zssMode {
-			b, err := LoadText(filename)
+			b, err := LoadTextNormalized(filename, "#")
 			if err != nil {
 				return err
 			}
@@ -6517,13 +6517,13 @@ func (c *Compiler) stateCompile(states map[int32]StateBytecode,
 		}
 
 		// Try reading as an st file
-		str, err = LoadText(filename)
+		str, err = LoadTextNormalized(filename, ";")
 		return err
 	}); err != nil {
 		// If filename doesn't exist, see if a zss file exists
 		fnz += ".zss"
 		if err := LoadFile(&fnz, dirs, func(filename string) error {
-			b, err := LoadText(filename)
+			b, err := LoadTextNormalized(filename, "#")
 			if err != nil {
 				return err
 			}
@@ -6849,7 +6849,7 @@ func (c *Compiler) scan(line *string) string {
 	for {
 		c.token = c.tokenizer(line)
 		if len(c.token) > 0 {
-			if c.token[0] != '#' {
+			if c.token[0] != '#' { // Redundant now that comments are stripped first
 				break
 			}
 		}
@@ -6903,7 +6903,7 @@ func (c *Compiler) readSentenceLine(line *string) (s string, assign bool,
 			c.token = (*line)[i : i+1]
 			s, *line = (*line)[:i], (*line)[i+1:]
 		case '#':
-			s, *line = (*line)[:i], "" // Ignore the rest as a comment
+			s, *line = (*line)[:i], "" // Ignore the rest as a comment. Should be redundant now
 		case '"':
 			tmp := (*line)[i+1:]
 			if _, err := c.readString(&tmp); err != nil {
@@ -7936,7 +7936,7 @@ func (c *Compiler) Compile(pn int, def string, constants map[string]float32) (ma
 	states := make(map[int32]StateBytecode)
 
 	// Load initial data from definition file
-	str, err := LoadText(def)
+	str, err := LoadTextNormalized(def, ";")
 	if err != nil {
 		return nil, err
 	}
@@ -7995,7 +7995,7 @@ func (c *Compiler) Compile(pn int, def string, constants map[string]float32) (ma
 	if len(cmd) > 0 {
 		if err := LoadFile(&cmd, []string{def, "", sys.motif.Def, "data/"}, func(filename string) error {
 			var err error
-			str, err = LoadText(filename)
+			str, err = LoadTextNormalized(filename, ";")
 			if err != nil {
 				return err
 			}
@@ -8007,7 +8007,7 @@ func (c *Compiler) Compile(pn int, def string, constants map[string]float32) (ma
 	for _, key := range SortedKeys(sys.cfg.Common.Cmd) {
 		for _, v := range sys.cfg.Common.Cmd[key] {
 			if err := LoadFile(&v, []string{def, sys.motif.Def, sys.fightScreen.def, "", "data/"}, func(filename string) error {
-				txt, err := LoadText(filename)
+				txt, err := LoadTextNormalized(filename, ";")
 				if err != nil {
 					return err
 				}

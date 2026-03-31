@@ -3503,7 +3503,7 @@ func (c *Char) load(def string) error {
 		LogMessage("Error loading FX for %s: %v", def, err)
 	}
 
-	str, err := LoadText(def)
+	str, err := LoadTextNormalized(def, ";")
 	if err != nil {
 		return err
 	}
@@ -3655,7 +3655,7 @@ func (c *Char) load(def string) error {
 	for _, key := range SortedKeys(sys.cfg.Common.Const) {
 		for _, v := range sys.cfg.Common.Const[key] {
 			if err := LoadFile(&v, []string{def, sys.motif.Def, sys.fightScreen.def, "", "data/"}, func(filename string) error {
-				str, err = LoadText(filename)
+				str, err = LoadTextNormalized(filename, ";")
 				if err != nil {
 					return err
 				}
@@ -3679,7 +3679,7 @@ func (c *Char) load(def string) error {
 	if len(cns) > 0 {
 		cns_resolved := resolvePathRelativeToDef(cns)
 		if err := LoadFile(&cns_resolved, []string{def, "", sys.motif.Def, "data/"}, func(filename string) error {
-			str, err := LoadText(filename)
+			str, err := LoadTextNormalized(filename, ";")
 			if err != nil {
 				return err
 			}
@@ -3980,7 +3980,7 @@ func (c *Char) load(def string) error {
 		anim_resolved := resolvePathRelativeToDef(anim)
 		if LoadFile(&anim_resolved, []string{def, "", sys.motif.Def, "data/"}, func(filename string) error {
 			var err_air error
-			str, err_air = LoadText(filename)
+			str, err_air = LoadTextNormalized(filename, ";")
 			if err_air != nil {
 				return err_air
 			}
@@ -3994,7 +3994,7 @@ func (c *Char) load(def string) error {
 	for _, key := range SortedKeys(sys.cfg.Common.Air) {
 		for _, v := range sys.cfg.Common.Air[key] {
 			if err := LoadFile(&v, []string{def, sys.motif.Def, sys.fightScreen.def, "", "data/"}, func(filename string) error {
-				txt, err := LoadText(filename)
+				txt, err := LoadTextNormalized(filename, ";")
 				if err != nil {
 					return err
 				}
@@ -4213,7 +4213,7 @@ func (c *Char) loadFx(def string) error {
 	gi := c.gi()
 	gi.fxPath = []string{} // Always initialize before loading.
 
-	charDefContent, err := LoadText(def)
+	charDefContent, err := LoadTextNormalized(def, ";")
 	if err != nil {
 		return err
 	}
