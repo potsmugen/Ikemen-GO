@@ -6391,14 +6391,6 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 		LogMessage("Maximum ChangeState loops: %v, %v, %v -> %v -> %v", sys.changeStateNest, c.name, c.ss.prevno, c.ss.no, no)
 		return false
 	}
-	var ctrlsps_backup []int32
-	if c.hitPause() {
-		// If in hitpause, back up the current state's persistent.
-		ctrlsps_backup = make([]int32, len(c.ss.sb.ctrlsps))
-		copy(ctrlsps_backup, c.ss.sb.ctrlsps)
-	} else {
-		ctrlsps_backup = nil
-	}
 
 	c.ss.prevno = c.ss.no
 	c.ss.no = Max(0, no)
@@ -6447,7 +6439,7 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 
 		c.localscl = newLs
 	}
-	var ok bool
+
 	// Check if player is trying to change to a negative state.
 	if no < 0 {
 		sys.appendToConsole(c.warn() + "attempted to change to negative state")
@@ -6462,7 +6454,16 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 			LogMessage("Changed to out of bounds state number: P%v:%v", pn+1, no)
 		}
 	}
+
+	// If in hitpause, back up the current state's persistent.
+	var ctrlsps_backup []int32
+	if c.hitPause() {
+		ctrlsps_backup = make([]int32, len(c.ss.sb.ctrlsps))
+		copy(ctrlsps_backup, c.ss.sb.ctrlsps)
+	}
+
 	// Always attempt to change to the state we set to.
+	var ok bool
 	if c.ss.sb, ok = sys.cgi[pn].states[c.ss.no]; !ok {
 		sys.appendToConsole(c.warn() + fmt.Sprintf("changed to invalid state %v (from state %v)", no, c.ss.prevno))
 		if !sys.ignoreMostErrors {
@@ -6471,6 +6472,7 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 		c.ss.sb = *newStateBytecode(pn)
 		c.ss.sb.stateType, c.ss.sb.moveType, c.ss.sb.physics = ST_U, MT_U, ST_U
 	}
+
 	// Reset persistent counters for this state (Ikemen chars)
 	// This used to belong to (*StateBytecode).init(), but was moved outside there
 	// due to a MUGEN 1.1 problem where persistent was not getting reset until the end
@@ -6495,6 +6497,7 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 			c.hitStateChangeIdx = -1
 		}
 	}
+
 	c.stchtmp = true
 	return true
 }
@@ -8866,12 +8869,12 @@ func (c *Char) rdDistX(rd *Char, oc *Char) BytecodeValue {
 		return BytecodeUndefined()
 	}
 	dist := c.facing * c.distX(rd, oc)
-	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
-		if c.stWgi().mugenver[0] != 1 {
-			// Before Mugen 1.0, rounding down to the nearest whole number was performed.
-			dist = float32(int32(dist))
-		}
+
+	// Before Mugen 1.0, rounding down to the nearest whole number was performed.
+	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.stWgi().mugenver[0] != 1 {
+		dist = float32(int32(dist))
 	}
+
 	return BytecodeFloat(dist)
 }
 
@@ -8880,12 +8883,12 @@ func (c *Char) rdDistY(rd *Char, oc *Char) BytecodeValue {
 		return BytecodeUndefined()
 	}
 	dist := c.distY(rd, oc)
-	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
-		if c.stWgi().mugenver[0] != 1 {
-			// Before Mugen 1.0, rounding down to the nearest whole number was performed.
-			dist = float32(int32(dist))
-		}
+
+	// Before Mugen 1.0, rounding down to the nearest whole number was performed.
+	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.stWgi().mugenver[0] != 1 {
+		dist = float32(int32(dist))
 	}
+
 	return BytecodeFloat(dist)
 }
 
