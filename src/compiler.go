@@ -6811,9 +6811,11 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename,
 						}
 					}
 				case "ignorehitpause":
-					ih := Atoi(data) != 0
-					c.block.ignorehitpause = Btoi(ih) - 2
-					c.block.ctrlsIgnorehitpause = ih
+					if Atoi(data) != 0 {
+						c.block.ignorehitpause = 1
+					} else {
+						c.block.ignorehitpause = 0
+					}
 				default:
 					// Handle triggers
 					if strings.HasPrefix(name, "trigger") {
@@ -6985,9 +6987,9 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename,
 				}
 			}
 			if appending {
-				// If the trigger is always true
+				// When a block is always true, persistent and doesn't ignore hitpause, append a simplified version of it
 				if len(c.block.trigger) == 0 && c.block.persistentIndex < 0 &&
-					c.block.ignorehitpause < -1 {
+					!c.block.ignorehitpauseBool() {
 					if _, ok := sctrl.(NullStateController); !ok {
 						sbc.block.ctrls = append(sbc.block.ctrls, sctrl)
 					}
@@ -6996,8 +6998,8 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename,
 						c.block.ctrls = append(c.block.ctrls, sctrl)
 					}
 					sbc.block.ctrls = append(sbc.block.ctrls, *c.block)
-					if c.block.ignorehitpause >= -1 {
-						sbc.block.ignorehitpause = -1
+					if c.block.ignorehitpauseBool() {
+						sbc.block.ignorehitpause = 1
 					}
 				}
 			}
@@ -7263,20 +7265,22 @@ func (c *CharCompiler) blockAttribSet(line *string, bl *StateBlock, sbc *StateBy
 	inheritIhp, nestedInLoop bool) error {
 	// Inherit ignorehitpause/loop attr from parent block
 	if inheritIhp {
-		bl.ignorehitpause, bl.ctrlsIgnorehitpause = -1, true
+		bl.ignorehitpause = 1
 		// Avoid re-reading ignorehitpause
 		if c.token == "ignorehitpause" {
 			c.scan(line)
 		}
 	}
+
 	bl.nestedInLoop = nestedInLoop
+
 	for {
 		switch c.token {
 		case "ignorehitpause":
-			if bl.ignorehitpause >= -1 {
-				return c.wrongClosureToken()
+			if bl.ignorehitpause != -1 {
+				return Error("Duplicate ignorehitpause flag")
 			}
-			bl.ignorehitpause, bl.ctrlsIgnorehitpause = -1, true
+			bl.ignorehitpause = 1
 			c.scan(line)
 			continue
 		case "persistent":
@@ -7287,7 +7291,7 @@ func (c *CharCompiler) blockAttribSet(line *string, bl *StateBlock, sbc *StateBy
 				return Error("Persistent cannot be used in a negative state")
 			}
 			if bl.persistentIndex >= 0 {
-				return c.wrongClosureToken()
+				return Error("Duplicate persistent flag")
 			}
 			c.scan(line)
 			if err := c.needToken("("); err != nil {
@@ -7311,6 +7315,7 @@ func (c *CharCompiler) blockAttribSet(line *string, bl *StateBlock, sbc *StateBy
 		}
 		break
 	}
+
 	return nil
 }
 
@@ -7328,6 +7333,7 @@ func (c *CharCompiler) subBlock(line *string, root bool,
 	compileMain, compileElse := true, false
 	switch c.token {
 	case "{":
+		// Simple block without extra conditions
 	case "if":
 		compileElse = true
 		expr, _, err := c.readSentence(line)
@@ -7383,11 +7389,11 @@ func (c *CharCompiler) subBlock(line *string, root bool,
 		c.scan(line)
 		var err error
 		if bl.elseBlock, err = c.subBlock(line, root,
-			sbc, numVars, inheritIhp || bl.ctrlsIgnorehitpause, nestedInLoop); err != nil {
+			sbc, numVars, inheritIhp || bl.ignorehitpauseBool(), nestedInLoop); err != nil {
 			return nil, err
 		}
-		if bl.elseBlock.ignorehitpause >= -1 {
-			bl.ignorehitpause = -1
+		if bl.elseBlock.ignorehitpauseBool() {
+			bl.ignorehitpause = 1
 		}
 	}
 	return bl, nil
@@ -7406,7 +7412,7 @@ func (c *CharCompiler) switchBlock(line *string, bl *StateBlock,
 	c.scan(line)
 	compileCaseBlock := func(sbl *StateBlock, expr *string) error {
 		if err := c.blockAttribSet(line, sbl, sbc,
-			bl != nil && bl.ctrlsIgnorehitpause, bl != nil && bl.nestedInLoop); err != nil {
+			bl != nil && bl.ignorehitpauseBool(), bl != nil && bl.nestedInLoop); err != nil {
 			return err
 		}
 		otk := c.token
@@ -7486,8 +7492,8 @@ func (c *CharCompiler) switchBlock(line *string, bl *StateBlock,
 	if sbl, err := readNextCase(nil); err != nil {
 		return err
 	} else {
-		if bl != nil && sbl.ignorehitpause >= -1 {
-			bl.ignorehitpause = -1
+		if bl != nil && sbl.ignorehitpauseBool() {
+			bl.ignorehitpause = 1
 		}
 		bl.ctrls = append(bl.ctrls, *sbl)
 	}
@@ -7730,11 +7736,11 @@ func (c *CharCompiler) stateBlock(line *string, bl *StateBlock, root bool,
 			return nil
 		case "for", "if", "ignorehitpause", "persistent", "switch", "while":
 			if sbl, err := c.subBlock(line, root, sbc, numVars,
-				bl != nil && bl.ctrlsIgnorehitpause, bl != nil && bl.nestedInLoop); err != nil {
+				bl != nil && bl.ignorehitpauseBool(), bl != nil && bl.nestedInLoop); err != nil {
 				return err
 			} else {
-				if bl != nil && sbl.ignorehitpause >= -1 {
-					bl.ignorehitpause = -1
+				if bl != nil && sbl.ignorehitpauseBool() {
+					bl.ignorehitpause = 1
 				}
 				*ctrls = append(*ctrls, *sbl)
 			}
@@ -8240,7 +8246,7 @@ func (c *CharCompiler) Compile(pn int, def string, constants map[string]float32)
 
 	// Compile states
 	sys.stringPool[pn].Clear()
-	sys.cgi[pn].hitPauseToggleFlagCount = 0
+	//sys.cgi[pn].hitPauseToggleFlagCount = 0
 
 	// Compile state files
 	for _, s := range st {

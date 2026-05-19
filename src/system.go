@@ -5435,7 +5435,7 @@ func (l *Loader) load() {
 					if !charDone[j] {
 						sys.chars[j] = nil
 						sys.cgi[j].states = nil
-						sys.cgi[j].hitPauseToggleFlagCount = 0
+						//sys.cgi[j].hitPauseToggleFlagCount = 0
 						charDone[j] = true
 					}
 				}

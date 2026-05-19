@@ -4495,12 +4495,13 @@ func (cf CallFunction) Run(c *Char) (changeState bool) {
 	return bf.run(c, cf.ret)
 }
 
+// The blocks of code that make up a state
+// In CNS this only has one sctrl. In ZSS it can have multiple
 type StateBlock struct {
 	// Basic block fields
 	persistent          int32
 	persistentIndex     int32
-	ignorehitpause      int32
-	ctrlsIgnorehitpause bool
+	ignorehitpause      int32 // -1 undefined (for duplicate detection), 0 false, 1 true
 	trigger             BytecodeExp
 	elseBlock           *StateBlock
 	ctrls               []StateController
@@ -4516,7 +4517,15 @@ type StateBlock struct {
 }
 
 func newStateBlock() *StateBlock {
-	return &StateBlock{persistent: 1, persistentIndex: -1, ignorehitpause: -2}
+	return &StateBlock{
+		persistent: 1,
+		persistentIndex: -1,
+		ignorehitpause: -1,
+	}
+}
+
+func (b *StateBlock) ignorehitpauseBool() bool {
+	return b.ignorehitpause == 1
 }
 
 func (b StateBlock) Run(c *Char) (changeState bool) {
@@ -4531,8 +4540,8 @@ func (b StateBlock) Run(c *Char) (changeState bool) {
 
 	// Check if the character is currently in a hit pause
 	if c.hitPause() {
-		// If ignorehitpause is less than -1, do not proceed with this controller
-		if b.ignorehitpause < -1 {
+		// If ignorehitpause is false, do not proceed with this controller
+		if !b.ignorehitpauseBool() {
 			return false
 		}
 		/* https://github.com/ikemen-engine/Ikemen-GO/issues/2360
@@ -4613,7 +4622,7 @@ func (b StateBlock) Run(c *Char) (changeState bool) {
 					switch sc.(type) {
 					case StateBlock:
 					default:
-						if !b.ctrlsIgnorehitpause && c.hitPause() {
+						if !b.ignorehitpauseBool() && c.hitPause() {
 							continue
 						}
 					}
@@ -4668,7 +4677,7 @@ func (b StateBlock) Run(c *Char) (changeState bool) {
 			switch sc.(type) {
 			case StateBlock:
 			default:
-				if !b.ctrlsIgnorehitpause && c.hitPause() {
+				if !b.ignorehitpauseBool() && c.hitPause() {
 					continue
 				}
 			}
