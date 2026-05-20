@@ -6987,19 +6987,21 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename,
 				}
 			}
 			if appending {
+				/*
 				// When a block is always true, persistent and doesn't ignore hitpause, append a simplified version of it
+				// Update: This optimization is troublesome after ignorehitpause and persistent have been refactored
 				if len(c.block.trigger) == 0 && c.block.persistentIndex < 0 && !c.block.ignorehitpauseBool() {
 					if _, ok := sctrl.(NullStateController); !ok {
 						sbc.block.ctrls = append(sbc.block.ctrls, sctrl)
 					}
 				} else {
-					if _, ok := sctrl.(NullStateController); !ok {
-						c.block.ctrls = append(c.block.ctrls, sctrl)
-					}
-					sbc.block.ctrls = append(sbc.block.ctrls, *c.block)
-					if c.block.ignorehitpauseBool() {
-						sbc.block.ignorehitpause = 1
-					}
+				*/
+				if _, ok := sctrl.(NullStateController); !ok {
+					c.block.ctrls = append(c.block.ctrls, sctrl)
+				}
+				sbc.block.ctrls = append(sbc.block.ctrls, *c.block)
+				if c.block.ignorehitpauseBool() {
+					sbc.block.ignorehitpause = 1
 				}
 			}
 		}
