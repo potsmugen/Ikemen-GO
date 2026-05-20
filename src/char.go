@@ -6464,13 +6464,6 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 		}
 	}
 
-	// Backup old persistent counters
-	// In Mugen there's a bug where the persistent characters leak from one state to the next during hitpause
-	var oldPersistent []int32
-	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.hitPause() {
-		oldPersistent = c.ss.ctrlsPersistent
-	}
-
 	// Always attempt to change to the state we set to.
 	var ok bool
 	if c.ss.sb, ok = sys.cgi[pn].states[c.ss.no]; !ok {
@@ -6488,54 +6481,16 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 	// of a hitpause when attempting to change state during the hitpause.
 	// Ikemenver chars aren't affected by this.
 
-	// Allocate new persistent counters
-	newPersistent := make([]int32, c.ss.sb.numPersistent)
-
-	if oldPersistent != nil {
-		// Copy as many old counters as will fit
-		copyLen := len(newPersistent)
-		if len(oldPersistent) < copyLen {
-			copyLen = len(oldPersistent)
-		}
-		copy(newPersistent, oldPersistent[:copyLen])
-		// Apply Mugen hitpause bug
-		c.persistentChangeStateHitpauseCorrection(&c.ss.sb, newPersistent)
-		c.hitStateChangeIdx = c.currentSctrlIndex
-	} else {
+	// Persistent counter handling based on engine version
+	// If ikemenversion or the character is not in hitpause, we do a simple clear
+	// Otherwise, Mugen characters recreate a bug where the persistent flags from the previous state leak into the next state
+	if c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0 || !c.hitPause() {
+		c.ss.ctrlsPersistent = make([]int32, c.ss.sb.numPersistent)
 		c.hitStateChangeIdx = -1
 	}
 
-	// Save the new persistent counters
-	c.ss.ctrlsPersistent = newPersistent
-
 	c.stchtmp = true
 	return true
-}
-
-// Correction process to reproduce MUGEN's persistent behavior
-// This is called during a ChangeState while in hitpause
-func (c *Char) persistentChangeStateHitpauseCorrection(sbc *StateBytecode, newPersistent []int32) {
-	// Nested structures do not need to be considered since they didn't exist in Mugen
-	for _, sctrl := range sbc.block.ctrls {
-		if sctrlBlock, ok := sctrl.(StateBlock); ok {
-			idx := sctrlBlock.persistentIndex
-			if idx >= 0 && int(idx) < len(newPersistent) {
-				// If the destination SCTRL is persistent=0 (run-once)
-				if sctrlBlock.persistent == math.MaxInt32 {
-					// If the carried-over counter is > 1 (waiting),it is considered "already executed" and locked
-					if newPersistent[idx] > 1 {
-						newPersistent[idx] = math.MaxInt32
-					}
-				} else { // If the destination SCTRL is persistent > 0
-					// If the carried-over counter was from a p=0 SCTRL and was already executed (locked state)
-					// reset the counter with the new persistent value, making it executable again
-					if newPersistent[idx] == math.MaxInt32 {
-						newPersistent[idx] = sctrlBlock.persistent
-					}
-				}
-			}
-		}
-	}
 }
 
 func (c *Char) stateChange2() bool {
@@ -12311,9 +12266,7 @@ func (c *Char) tick() {
 				//c.ss.clearHitPauseExecutionToggleFlags()
 				//Having a hitStateChangeIdx means that ChangeState was performed during the hitpause
 				if c.hitPauseTime == 0 && c.hitStateChangeIdx != -1 {
-					for i := range c.ss.ctrlsPersistent {
-						c.ss.ctrlsPersistent[i] = 0
-					}
+					c.ss.ctrlsPersistent = make([]int32, c.ss.sb.numPersistent)
 					c.hitStateChangeIdx = -1
 				}
 			}

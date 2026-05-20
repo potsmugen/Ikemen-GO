@@ -4562,12 +4562,15 @@ func (b StateBlock) Run(c *Char) (changeState bool) {
 	// Decrement persistent counter every time the triggers fire
 	// Only execute controller when counter is 0
 	if b.persistentIndex >= 0 {
-		idx := b.persistentIndex
-		if c.ss.ctrlsPersistent[idx] != math.MaxInt32 {
-			c.ss.ctrlsPersistent[idx]--
-		}
-		if c.ss.ctrlsPersistent[idx] > 0 {
-			return false
+		idx := int(b.persistentIndex)
+		// Out of bounds should only happen for Mugen characters
+		if idx < len(c.ss.ctrlsPersistent) {
+			if c.ss.ctrlsPersistent[idx] != math.MaxInt32 {
+				c.ss.ctrlsPersistent[idx]--
+			}
+			if c.ss.ctrlsPersistent[idx] > 0 {
+				return false
+			}
 		}
 	}
 
