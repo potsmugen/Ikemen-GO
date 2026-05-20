@@ -161,8 +161,6 @@ func (sb *StateBytecode) Clone(a *arena.Arena) (result StateBytecode) {
 	result.stateDef = arena.MakeSlice[byte](a, len(sb.stateDef), len(sb.stateDef))
 	copy(result.stateDef, sb.stateDef)
 
-	result.ctrlsps = arena.MakeSlice[int32](a, len(sb.ctrlsps), len(sb.ctrlsps))
-	copy(result.ctrlsps, sb.ctrlsps)
 	result.block = sb.block.Clone(a)
 	return result
 }
@@ -252,8 +250,8 @@ func (p *Projectile) clone(a *arena.Arena, gsp *GameStatePool) *Projectile {
 
 func (ss *StateState) Clone(a *arena.Arena) (result StateState) {
 	result = *ss
-	result.ps = arena.MakeSlice[int32](a, len(ss.ps), len(ss.ps))
-	copy(result.ps, ss.ps)
+	result.ctrlsPersistent = arena.MakeSlice[int32](a, len(ss.ctrlsPersistent), len(ss.ctrlsPersistent))
+	copy(result.ctrlsPersistent, ss.ctrlsPersistent)
 	//for i := 0; i < len(ss.hitPauseExecutionToggleFlags); i++ {
 	//	result.hitPauseExecutionToggleFlags[i] = arena.MakeSlice[bool](a, len(ss.hitPauseExecutionToggleFlags[i]), len(ss.hitPauseExecutionToggleFlags[i]))
 	//	copy(result.hitPauseExecutionToggleFlags[i], ss.hitPauseExecutionToggleFlags[i])

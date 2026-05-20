@@ -6749,11 +6749,12 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename,
 		if _, ok := states[c.stateNo]; ok && c.stateNo < 0 {
 			*sbc = states[c.stateNo]
 		}
+
 		// Interpret the statedef properties
 		if err := c.stateDef(is, sbc); err != nil {
 			return errmes(err)
 		}
-		sctrl_index_counter := 0
+
 		// Continue looping through state file lines to define the current state
 		for c.i++; c.i < len(c.lines); c.i++ {
 			// Get the current line, without comments
@@ -6805,8 +6806,8 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename,
 							if c.block.persistent <= 0 {
 								c.block.persistent = math.MaxInt32
 							}
-							//c.block.persistentIndex = int32(len(sbc.ctrlsps))
-							//sbc.ctrlsps = append(sbc.ctrlsps, 0)
+							c.block.persistentIndex = sbc.numPersistent
+							sbc.numPersistent++
 						}
 					}
 				case "ignorehitpause":
@@ -6897,17 +6898,6 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename,
 			})
 			if err != nil {
 				return errmes(err)
-			}
-
-			c.block.persistentIndex = int32(sctrl_index_counter)
-			sctrl_index_counter++
-
-			// Check if the counter array needs to be extended
-			if int(c.block.persistentIndex) >= len(sbc.ctrlsps) {
-				newSize := int(c.block.persistentIndex) + 1
-				oldCtrlsps := sbc.ctrlsps
-				sbc.ctrlsps = make([]int32, newSize)
-				copy(sbc.ctrlsps, oldCtrlsps)
 			}
 
 			// Check that the sctrl has a valid type parameter
@@ -7314,8 +7304,8 @@ func (c *CharCompiler) blockAttribSet(line *string, bl *StateBlock, sbc *StateBy
 			if bl.persistent <= 0 {
 				bl.persistent = math.MaxInt32
 			}
-			bl.persistentIndex = int32(len(sbc.ctrlsps))
-			sbc.ctrlsps = append(sbc.ctrlsps, 0)
+			bl.persistentIndex = sbc.numPersistent
+			sbc.numPersistent++
 			c.scan(line)
 			continue
 		}
