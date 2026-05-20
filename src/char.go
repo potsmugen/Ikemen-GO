@@ -6464,6 +6464,13 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 		}
 	}
 
+	// Backup old persistent counters
+	// In Mugen there's a bug where the persistent characters leak from one state to the next during hitpause
+	var oldPersistent []int32
+	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.hitPause() {
+		oldPersistent = c.ss.ctrlsPersistent
+	}
+
 	// Always attempt to change to the state we set to.
 	var ok bool
 	if c.ss.sb, ok = sys.cgi[pn].states[c.ss.no]; !ok {
@@ -6481,22 +6488,25 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 	// of a hitpause when attempting to change state during the hitpause.
 	// Ikemenver chars aren't affected by this.
 
-	// Persistent counter handling based on engine version
-	// If ikemenversion or the character is not in hitpause, we do a simple clear
-	// Otherwise, Mugen characters recreate a bug where the persistent flags from the previous state leak into the next state
-	if c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0 || !c.hitPause() {
-		c.ss.ctrlsPersistent = make([]int32, c.ss.sb.numPersistent)
-		c.hitStateChangeIdx = -1
-	} else {
-		oldSlice := c.ss.ctrlsPersistent
-		newSize := int(c.ss.sb.numPersistent)
-		c.ss.ctrlsPersistent = make([]int32, newSize)
-		copyLen := newSize
-		if len(oldSlice) < copyLen {
-			copyLen = len(oldSlice)
+	// Allocate new persistent counters
+	newPersistent := make([]int32, c.ss.sb.numPersistent)
+
+	if oldPersistent != nil {
+		// Copy as many old counters as will fit
+		copyLen := len(newPersistent)
+		if len(oldPersistent) < copyLen {
+			copyLen = len(oldPersistent)
 		}
-		copy(c.ss.ctrlsPersistent, oldSlice[:copyLen])
+		copy(newPersistent, oldPersistent[:copyLen])
+		// Apply Mugen hitpause bug
+		c.persistentChangeStateHitpauseCorrection(&c.ss.sb, newPersistent)
+		c.hitStateChangeIdx = c.currentSctrlIndex
+	} else {
+		c.hitStateChangeIdx = -1
 	}
+
+	// Save the new persistent counters
+	c.ss.ctrlsPersistent = newPersistent
 
 	c.stchtmp = true
 	return true
