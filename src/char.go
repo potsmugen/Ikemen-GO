@@ -3020,7 +3020,7 @@ type CharGlobalInfo struct {
 	data                    CharData
 	velocity                CharVelocity
 	movement                CharMovement
-	states                  map[int32]StateBytecode
+	states                  map[int32]*StateBytecode
 	callFuncs               map[string]BytecodeFunction
 	//hitPauseToggleFlagCount int32
 	quotes                  [MaxQuotes]string
@@ -3044,7 +3044,7 @@ func newCharGlobalInfo() CharGlobalInfo {
 	gi := CharGlobalInfo{
 		localcoord:    [2]int32{320, 240},
 		constants:     make(map[string]float32),
-		states:        make(map[int32]StateBytecode),
+		states:        make(map[int32]*StateBytecode),
 		callFuncs:     make(map[string]BytecodeFunction),
 		animTable:     NewAnimationTable(),
 		palInfo:       make(map[int]PalInfo, sys.cfg.Config.PaletteMax),
@@ -3073,7 +3073,7 @@ type StateState struct {
 	ps            []int32
 	no, prevno    int32
 	time          int32
-	sb            StateBytecode
+	sb            *StateBytecode
 	ctrlsPersistent []int32
 	//hitPauseExecutionToggleFlags [MaxPlayerNo][]bool // Flags if an sctrl runs during a hit pause on the current tick.
 }
@@ -3113,7 +3113,7 @@ func (ss *StateState) clear() {
 
 	ss.no, ss.prevno = 0, 0
 	ss.time = 0
-	ss.sb = StateBytecode{}
+	ss.sb = nil
 }
 
 /*
@@ -3362,7 +3362,7 @@ func (c *Char) warn() string {
 }
 
 func (c *Char) panic(msg string) {
-	st := &c.ss.sb
+	st := c.ss.sb
 	if sys.workingState != st {
 		st = sys.workingState
 	}
@@ -6400,8 +6400,6 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 		return false
 	}
 
-	sameState := (no == c.ss.no && pn == c.ss.sb.playerNo)
-
 	c.ss.prevno = c.ss.no
 	c.ss.no = Max(0, no)
 	c.ss.time = 0
@@ -6466,7 +6464,6 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 		}
 	}
 
-	/*
 	// Always attempt to change to the state we set to.
 	var ok bool
 	if c.ss.sb, ok = sys.cgi[pn].states[c.ss.no]; !ok {
@@ -6474,23 +6471,8 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 		if !sys.ignoreMostErrors {
 			LogMessage("Invalid state: P%v:%v", pn+1, no)
 		}
-		c.ss.sb = *newStateBytecode(pn)
+		c.ss.sb = newStateBytecode(pn)
 		c.ss.sb.stateType, c.ss.sb.moveType, c.ss.sb.physics = ST_U, MT_U, ST_U
-	}
-	*/
-
-	// Only fetch a new StateBytecode if the state number or owner has changed
-    // Look up the target state pointer (cheap – no struct copy)
-	if !sameState {
-		var ok bool
-		if c.ss.sb, ok = sys.cgi[pn].states[c.ss.no]; !ok {
-			sys.appendToConsole(c.warn() + fmt.Sprintf("changed to invalid state %v (from state %v)", no, c.ss.prevno))
-			if !sys.ignoreMostErrors {
-				LogMessage("Invalid state: P%v:%v", pn+1, no)
-			}
-			c.ss.sb = *newStateBytecode(pn)
-			c.ss.sb.stateType, c.ss.sb.moveType, c.ss.sb.physics = ST_U, MT_U, ST_U
-		}
 	}
 
 	// Reset persistent counters for this state (Ikemen chars)

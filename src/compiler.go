@@ -6652,7 +6652,7 @@ func cnsStringArray(arg string) ([]string, error) {
 }
 
 // Forwards state compiling to CNS or ZSS branches as appropriate
-func (c *CharCompiler) stateCompile(states map[int32]StateBytecode,
+func (c *CharCompiler) stateCompile(states map[int32]*StateBytecode,
 	filename string, dirs []string, negoverride bool, constants map[string]float32) error {
 
 	// Determine type from extension
@@ -6698,7 +6698,7 @@ func (c *CharCompiler) stateCompile(states map[int32]StateBytecode,
 	return c.stateCompileCNS(states, filename, filetext, negoverride, constants)
 }
 
-func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename, filetext string, negoverride bool, constants map[string]float32) error {
+func (c *CharCompiler) stateCompileCNS(states map[int32]*StateBytecode, filename, filetext string, negoverride bool, constants map[string]float32) error {
 	// Reset ZSS mode
 	c.zssMode = false
 
@@ -6747,7 +6747,7 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename,
 		}
 		sbc := newStateBytecode(c.playerNo)
 		if _, ok := states[c.stateNo]; ok && c.stateNo < 0 {
-			*sbc = states[c.stateNo]
+			sbc = states[c.stateNo]
 		}
 
 		// Interpret the statedef properties
@@ -7008,7 +7008,7 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename,
 
 		// Skip appending if already declared. Exception for negative states present in CommonStates and files belonging to char flagged with ikemenversion
 		if _, ok := states[c.stateNo]; !ok || (!negoverride && c.stateNo < 0) {
-			states[c.stateNo] = *sbc
+			states[c.stateNo] = sbc
 		}
 	}
 	return nil
@@ -7866,7 +7866,7 @@ func (c *CharCompiler) stateBlock(line *string, bl *StateBlock, root bool,
 	return c.wrongClosureToken()
 }
 
-func (c *CharCompiler) stateCompileZSS(states map[int32]StateBytecode, filename, filetext string, constants map[string]float32) error {
+func (c *CharCompiler) stateCompileZSS(states map[int32]*StateBytecode, filename, filetext string, constants map[string]float32) error {
 	// Enable ZSS mode
 	// TODO: There's some overlap between this flag and sys.ignoreMostErrors
 	c.zssMode = true
@@ -7932,7 +7932,7 @@ func (c *CharCompiler) stateCompileZSS(states map[int32]StateBytecode, filename,
 			}
 			sbc := newStateBytecode(c.playerNo)
 			if _, ok := states[c.stateNo]; ok && c.stateNo < 0 {
-				*sbc = states[c.stateNo]
+				sbc = states[c.stateNo]
 			}
 			c.vars = make(map[string]uint8)
 			if err := c.stateDef(is, sbc); err != nil {
@@ -7946,7 +7946,7 @@ func (c *CharCompiler) stateCompileZSS(states map[int32]StateBytecode, filename,
 				return errmes(err)
 			}
 			if _, ok := states[c.stateNo]; !ok || c.stateNo < 0 {
-				states[c.stateNo] = *sbc
+				states[c.stateNo] = sbc
 			}
 		case "function":
 			name := c.scan(&line)
@@ -8026,9 +8026,9 @@ func (c *CharCompiler) stateCompileZSS(states map[int32]StateBytecode, filename,
 }
 
 // Compile a character definition file
-func (c *CharCompiler) Compile(pn int, def string, constants map[string]float32) (map[int32]StateBytecode, error) {
+func (c *CharCompiler) Compile(pn int, def string, constants map[string]float32) (map[int32]*StateBytecode, error) {
 	c.playerNo = pn
-	states := make(map[int32]StateBytecode)
+	states := make(map[int32]*StateBytecode)
 
 	// Load initial data from definition file
 	str, err := LoadText(def)
