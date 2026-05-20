@@ -4530,10 +4530,11 @@ func (b *StateBlock) ignorehitpauseBool() bool {
 
 func (b StateBlock) Run(c *Char) (changeState bool) {
 	c.currentSctrlIndex = b.persistentIndex
+
 	// For Mugen compatibility, if in hitpause and this SCTRL has the same index
 	// as the SCTRL that triggered a ChangeState during the hitpause
-	if c.hitPause() && c.hitStateChangeIdx >= 0 && b.persistentIndex == c.hitStateChangeIdx &&
-		c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.hitPause() &&
+		c.hitStateChangeIdx >= 0 && b.persistentIndex == c.hitStateChangeIdx {
 		// skip the execution of this SCTRL
 		return false
 	}

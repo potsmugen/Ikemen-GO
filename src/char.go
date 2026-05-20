@@ -6467,9 +6467,9 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 	// Backup old persistent counters
 	// In Mugen there's a bug where the persistent characters leak from one state to the next during hitpause
 	var oldPersistent []int32
-	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.hitPause() {
-		oldPersistent = c.ss.ctrlsPersistent
-	}
+	// if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.hitPause() {
+		// oldPersistent = c.ss.ctrlsPersistent
+	// }
 
 	// Always attempt to change to the state we set to.
 	var ok bool
