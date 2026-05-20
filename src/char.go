@@ -6400,6 +6400,8 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 		return false
 	}
 
+    sameState := (no == c.ss.no && pn == c.ss.sb.playerNo)
+
 	c.ss.prevno = c.ss.no
 	c.ss.no = Max(0, no)
 	c.ss.time = 0
@@ -6465,14 +6467,16 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 	}
 
 	// Always attempt to change to the state we set to.
-	var ok bool
-	if c.ss.sb, ok = sys.cgi[pn].states[c.ss.no]; !ok {
-		sys.appendToConsole(c.warn() + fmt.Sprintf("changed to invalid state %v (from state %v)", no, c.ss.prevno))
-		if !sys.ignoreMostErrors {
-			LogMessage("Invalid state: P%v:%v", pn+1, no)
+	if !sameState {
+		var ok bool
+		if c.ss.sb, ok = sys.cgi[pn].states[c.ss.no]; !ok {
+			sys.appendToConsole(c.warn() + fmt.Sprintf("changed to invalid state %v (from state %v)", no, c.ss.prevno))
+			if !sys.ignoreMostErrors {
+				LogMessage("Invalid state: P%v:%v", pn+1, no)
+			}
+			c.ss.sb = newStateBytecode(pn)
+			c.ss.sb.stateType, c.ss.sb.moveType, c.ss.sb.physics = ST_U, MT_U, ST_U
 		}
-		c.ss.sb = newStateBytecode(pn)
-		c.ss.sb.stateType, c.ss.sb.moveType, c.ss.sb.physics = ST_U, MT_U, ST_U
 	}
 
 	// Reset persistent counters for this state (Ikemen chars)
@@ -6484,10 +6488,18 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 	// Persistent counter handling based on engine version
 	// If ikemenversion or the character is not in hitpause, we do a simple clear
 	// Otherwise, Mugen characters recreate a bug where the persistent flags from the previous state leak into the next state
-	if c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0 || !c.hitPause() {
-		c.ss.ctrlsPersistent = make([]int32, c.ss.sb.numPersistent)
-		c.hitStateChangeIdx = -1
-	}
+if sameState {
+    // Reuse existing slice – just zero it (no allocation)
+    if c.ss.ctrlsPersistent != nil {
+        for i := range c.ss.ctrlsPersistent {
+            c.ss.ctrlsPersistent[i] = 0
+        }
+    }
+} else if c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0 || !c.hitPause() {
+    // Different state – allocate fresh slice
+    c.ss.ctrlsPersistent = make([]int32, c.ss.sb.numPersistent)
+    c.hitStateChangeIdx = -1
+}
 
 	c.stchtmp = true
 	return true
