@@ -138,10 +138,10 @@ func (b *StateBlock) Clone(a *arena.Arena) (result StateBlock) {
 	result = *b
 	result.trigger = arena.MakeSlice[OpCode](a, len(b.trigger), len(b.trigger))
 	copy(result.trigger, b.trigger)
-	if b.elseBlock != nil {
-		eb := b.elseBlock.Clone(a)
-		result.elseBlock = &eb
-	}
+	//aaaaaaaaaaaaa if b.elseBlock != nil {
+	//	eb := b.elseBlock.Clone(a)
+	//	result.elseBlock = &eb
+	//}
 
 	result.forCtrlVar.be = arena.MakeSlice[OpCode](a, len(b.forCtrlVar.be), len(b.forCtrlVar.be))
 	copy(result.forCtrlVar.be, b.forCtrlVar.be)
@@ -161,7 +161,7 @@ func (sb *StateBytecode) Clone(a *arena.Arena) (result StateBytecode) {
 	result.stateDef = arena.MakeSlice[byte](a, len(sb.stateDef), len(sb.stateDef))
 	copy(result.stateDef, sb.stateDef)
 
-	result.block = sb.block.Clone(a)
+	//aaaaaaaaresult.block = sb.block.Clone(a)
 	return result
 }
 

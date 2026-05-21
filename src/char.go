@@ -3113,7 +3113,7 @@ func (ss *StateState) clear() {
 
 	ss.no, ss.prevno = 0, 0
 	ss.time = 0
-	ss.sb = nil
+	ss.sb = newStateBytecode(-1)
 }
 
 /*

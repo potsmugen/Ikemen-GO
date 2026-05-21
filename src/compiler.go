@@ -6965,7 +6965,7 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]*StateBytecode, filename
 					}
 				}
 			}
-			c.block.trigger = texp
+			c.block.trigger = &texp
 
 			// For this sctrl type, call the function to construct the sctrl
 			sctrl, err := scf(is, sc)
@@ -6999,7 +6999,7 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]*StateBytecode, filename
 				if _, ok := sctrl.(NullStateController); !ok {
 					c.block.ctrls = append(c.block.ctrls, sctrl)
 				}
-				sbc.block.ctrls = append(sbc.block.ctrls, *c.block)
+				sbc.block.ctrls = append(sbc.block.ctrls, c.block)
 				if c.block.ignorehitpauseBool() {
 					sbc.block.ignorehitpause = 1
 				}
@@ -7496,7 +7496,7 @@ func (c *CharCompiler) switchBlock(line *string, bl *StateBlock,
 		if bl != nil && sbl.ignorehitpauseBool() {
 			bl.ignorehitpause = 1
 		}
-		bl.ctrls = append(bl.ctrls, *sbl)
+		bl.ctrls = append(bl.ctrls, sbl)
 	}
 	return nil
 }
@@ -7743,7 +7743,7 @@ func (c *CharCompiler) stateBlock(line *string, bl *StateBlock, root bool,
 				if bl != nil && sbl.ignorehitpauseBool() {
 					bl.ignorehitpause = 1
 				}
-				*ctrls = append(*ctrls, *sbl)
+				*ctrls = append(*ctrls, sbl)
 			}
 			continue
 		case "call":
@@ -7941,7 +7941,7 @@ func (c *CharCompiler) stateCompileZSS(states map[int32]*StateBytecode, filename
 			if err := c.statementEnd(&line); err != nil {
 				return errmes(err)
 			}
-			if err := c.stateBlock(&line, &sbc.block, true,
+			if err := c.stateBlock(&line, sbc.block, true,
 				sbc, &sbc.block.ctrls, &sbc.numVars); err != nil {
 				return errmes(err)
 			}
