@@ -1539,6 +1539,7 @@ type Sff struct {
 	palList      PaletteList
 	filename     string
 	debugMissing map[[2]uint16]bool // Sprites not found by animations
+	sourcePaths  []string // List of original file paths (for multiple file merging)
 }
 
 func newSff() (s *Sff) {
@@ -1568,29 +1569,200 @@ func removeSFFCache(filename string) {
 */
 
 // Find an already loaded SFF we can borrow. Replaces SFF caching
-func findActiveSff(filename string) *Sff {
-	// This would be clean, but it'd make multiple instances of the same character all do a full SFF reload
-	//if sys.reloadFlg {
-	//	return nil
-	//}
+// findActiveSff searches for an already loaded Sff that was built from exactly the same sourcePaths.
+// If found, it returns that Sff (do not modify it directly – caller should clone if needed).
+func findActiveSff(paths []string) *Sff {
+	if len(paths) == 0 {
+		return nil
+	}
 
-	// Scan characters
+	// Helper to compare source paths of the SFF files (order matters due to duplicates)
+	slicesEqual := func(a, b []string) bool {
+		if len(a) != len(b) {
+			return false
+		}
+		for i := range a {
+			if a[i] != b[i] {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Check loaded characters
 	for i := range sys.cgi {
-		if sys.cgi[i].sff != nil && sys.cgi[i].sff.filename == filename {
+		if sys.cgi[i].sff != nil && slicesEqual(sys.cgi[i].sff.sourcePaths, paths) {
 			return sys.cgi[i].sff
 		}
 	}
 
-	// Scan stage
-	if sys.stage != nil && sys.stage.sff != nil && sys.stage.sff.filename == filename {
+	// Check stage
+	if sys.stage != nil && sys.stage.sff != nil && slicesEqual(sys.stage.sff.sourcePaths, paths) {
 		return sys.stage.sff
 	}
 
-	// Scan common FX
+	// Check common FX
 	for _, ffx := range sys.ffx {
-		if ffx != nil && ffx.sff != nil && ffx.sff.filename == filename {
+		if ffx != nil && ffx.sff != nil && slicesEqual(ffx.sff.sourcePaths, paths) {
 			return ffx.sff
 		}
+	}
+
+	return nil
+}
+
+// LoadMultipleSffFiles loads several SFF files and merges them into a single Sff.
+// The files are resolved relative to defPath. The first file becomes the base Sff,
+// and subsequent files are merged with the rule "first found wins" for sprites and palettes.
+// loadMergedSff loads multiple SFF files and merges them (first‑found‑wins).
+// It reuses existing merged Sffs via findActiveSff.
+// loadMergedSff loads multiple SFF files and merges them (first‑found‑wins).
+// It reuses existing merged Sffs via findActiveSff.
+func loadMergedSff(paths []string, defPath string, isChar bool) (*Sff, error) {
+	if len(paths) == 0 {
+		return newSff(), nil
+	}
+
+	// Resolve all paths
+	resolved := make([]string, len(paths))
+	for i, p := range paths {
+		found := SearchFile(p, []string{defPath, "", "data/"}, "")
+		if found == "" {
+			return nil, fmt.Errorf("failed to locate SFF file %s", p)
+		}
+		resolved[i] = found
+	}
+
+	// Check if already loaded (cached)
+	if cached := findActiveSff(resolved); cached != nil {
+		return cached, nil
+	}
+
+	// Load first file as base
+	base, err := loadSff(resolved[0], isChar, false, false)
+	if err != nil {
+		return nil, err
+	}
+	base.sourcePaths = resolved[:1]
+
+	// --- Version check: forbid merging SFFv1 files ---
+	if base.header.Version[0] == 1 {
+		return nil, fmt.Errorf("cannot merge SFFv1 file (unsupported): %s", resolved[0])
+	}
+
+	// Merge subsequent files
+	for i := 1; i < len(resolved); i++ {
+		next, err := loadSff(resolved[i], isChar, false, false)
+		if err != nil {
+			return nil, err
+		}
+		if next.header.Version[0] == 1 {
+			return nil, fmt.Errorf("cannot merge SFFv1 file (unsupported): %s", resolved[i])
+		}
+		if err := mergeSff(base, next); err != nil {
+			return nil, err
+		}
+		base.sourcePaths = append(base.sourcePaths, resolved[i])
+	}
+
+	return base, nil
+}
+
+// mergeSff merges the source Sff into the destination Sff.
+// Rules:
+//   - Sprites: if a (group,index) already exists in dest, the source sprite is ignored.
+//   - Palettes: if a palette key (group,index) already exists in dest, the source palette is ignored,
+//     but any sprite referencing that palette via its original palidx will be remapped to the dest palette index.
+//   - New palettes are appended to dest, and their logical indices are remapped accordingly.
+func mergeSff(dest, src *Sff) error {
+	if dest == nil || src == nil {
+		return nil
+	}
+
+	// ---- 1. Build palette remapping from src's physical index to dest's logical index ----
+	// Map: (srcPalKey) -> destLogicalIndex
+	keyToDestIdx := make(map[[2]uint16]int)
+
+	// First, populate map with existing dest palettes
+	for key, destLogical := range dest.palList.PalTable {
+		keyToDestIdx[key] = destLogical
+	}
+
+	// Process each palette in src
+	for srcKey, srcLogical := range src.palList.PalTable {
+		if _, exists := keyToDestIdx[srcKey]; exists {
+			// Already present in dest, skip adding new palette
+			continue
+		}
+		// Add a new palette slot in dest
+		srcPalData := src.palList.Get(srcLogical)
+		if srcPalData == nil {
+			continue
+		}
+		newLogical := len(dest.palList.palettes)
+		dest.palList.SetSource(newLogical, srcPalData)
+		dest.palList.PalTable[srcKey] = newLogical
+		dest.palList.numcols[srcKey] = src.palList.numcols[srcKey]
+		// Create texture for the new palette (on main thread)
+		sys.mainThreadTask <- func() {
+			tex := NewTextureFromPalette(srcPalData)
+			dest.palList.PalTex = append(dest.palList.PalTex, tex)
+		}
+		keyToDestIdx[srcKey] = newLogical
+	}
+
+	// Build direct mapping: src physical index -> dest logical index
+	srcPhysToDestLogical := make([]int, len(src.palList.palettes))
+	for srcPhys := 0; srcPhys < len(src.palList.palettes); srcPhys++ {
+		// Find which palette key this physical index corresponds to
+		var foundKey [2]uint16
+		found := false
+		for key, logical := range src.palList.PalTable {
+			if logical == srcPhys {
+				foundKey = key
+				found = true
+				break
+			}
+		}
+		if !found {
+			// Orphaned physical index: fallback to palette 0
+			srcPhysToDestLogical[srcPhys] = 0
+			continue
+		}
+		if destLogical, ok := keyToDestIdx[foundKey]; ok {
+			srcPhysToDestLogical[srcPhys] = destLogical
+		} else {
+			srcPhysToDestLogical[srcPhys] = 0
+		}
+	}
+
+	// ---- 2. Merge sprites ----
+	for key, srcSpr := range src.sprites {
+		if _, exists := dest.sprites[key]; exists {
+			// Duplicate sprite: first found wins, skip
+			continue
+		}
+		// Clone the sprite (shallow copy, but palidx may be modified)
+		cloned := &Sprite{
+			Pal:      srcSpr.Pal,
+			Tex:      srcSpr.Tex,
+			Group:    srcSpr.Group,
+			Number:   srcSpr.Number,
+			Size:     srcSpr.Size,
+			Offset:   srcSpr.Offset,
+			palidx:   srcSpr.palidx,
+			rle:      srcSpr.rle,
+			coldepth: srcSpr.coldepth,
+			paltemp:  srcSpr.paltemp,
+			PalTex:   srcSpr.PalTex,
+		}
+		// Remap the palidx if needed
+		if cloned.palidx >= 0 && cloned.palidx < len(srcPhysToDestLogical) {
+			cloned.palidx = srcPhysToDestLogical[cloned.palidx]
+		} else {
+			cloned.palidx = 0
+		}
+		dest.sprites[key] = cloned
 	}
 
 	return nil
@@ -1599,12 +1771,13 @@ func findActiveSff(filename string) *Sff {
 // Loads the full SFF file
 func loadSff(filename string, char bool, isMainThread bool, isActPal bool) (*Sff, error) {
 	// Borrow an existing SFF if possible
-	if s := findActiveSff(filename); s != nil {
-		return s, nil
-	}
+	// if s := findActiveSff(filename); s != nil {
+		// return s, nil
+	// }
 
 	s := newSff()
 	s.filename = filename
+	s.sourcePaths = []string{filename}
 
 	f, err := OpenFile(filename)
 	if err != nil {

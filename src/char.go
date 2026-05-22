@@ -3635,7 +3635,8 @@ func (c *Char) load(def string) error {
 	}
 
 	lines, lnidx := SplitAndTrim(str, "\n"), 0
-	cns, sprite, anim, sound := "", "", "", ""
+	cns, anim, sound := "", "", ""
+	var spriteFiles []string
 	info, files, keymap, mapArray := true, true, true, true
 	lanInfo, lanFiles, lanKeymap, lanMapArray := true, true, true, true
 	shaders := true
@@ -3725,13 +3726,31 @@ func (c *Char) load(def string) error {
 
 		case "files":
 			if (isLan && lanFiles) || (!isLan && files) {
+
+for k := range is {
+	fmt.Printf("Files section key: %q", k)
+}
+
 				if isLan {
 					lanFiles = false
 				}
 				files = false
 
 				cns = decodeShiftJIS(is["cns"])
-				sprite = decodeShiftJIS(is["sprite"])
+
+				//sprite = decodeShiftJIS(is["sprite"])
+				if primary := decodeShiftJIS(is["sprite"]); primary != "" {
+					spriteFiles = append(spriteFiles, primary)
+				}
+				for i := 1; ; i++ {
+					key := fmt.Sprintf("sprite%d", i)
+					if val, ok := is[key]; ok {
+						spriteFiles = append(spriteFiles, decodeShiftJIS(val))
+					} else {
+						break
+					}
+				}
+
 				anim = decodeShiftJIS(is["anim"])
 				sound = decodeShiftJIS(is["sound"])
 				gi.movelists = loadMovelists(def, is)
@@ -4118,6 +4137,7 @@ func (c *Char) load(def string) error {
 		}
 	}
 
+	/*
 	// Load SFF
 	if len(sprite) > 0 {
 		if err := LoadFile(&sprite, []string{gi.def, "", "data/"}, "", func(filename string) error {
@@ -4127,6 +4147,18 @@ func (c *Char) load(def string) error {
 		}); err != nil {
 			return err
 		}
+	} else {
+		gi.sff = newSff()
+	}
+	*/
+
+	// Load SFF (multiple files supported)
+	if len(spriteFiles) > 0 {
+		sff, err := loadMergedSff(spriteFiles, gi.def, true)
+		if err != nil {
+			return err
+		}
+		gi.sff = sff
 	} else {
 		gi.sff = newSff()
 	}
@@ -4609,10 +4641,10 @@ func (c *Char) setAnimElemTo(anim *Animation, animelem *int32) {
 		}
 		/* Shadows and Reflections don't really a animate, so elemtime here is pointless
 		   if *elemtime != 0 {
-		       frametime := anim.frames[*animelem-1].Time
-		       if *elemtime < 0 || (frametime != -1 && *elemtime >= frametime) {
-		           *elemtime = 0
-		       }
+			   frametime := anim.frames[*animelem-1].Time
+			   if *elemtime < 0 || (frametime != -1 && *elemtime >= frametime) {
+				   *elemtime = 0
+			   }
 		   }
 		*/
 		anim.SetAnimElem(*animelem, 0)
@@ -8755,7 +8787,7 @@ func (c *Char) redLifeEnabled() bool {
 				return sys.cfg.Options.Turns.RedLife
 			default:
 				return false
-		    }
+			}
 	*/
 }
 
