@@ -2363,8 +2363,8 @@ func newFightScreenCombo() *FightScreenCombo {
 		text:         make(map[int32]*FSText),
 		autoalign:    true,
 		counterShake: ComboShake{
-			scale: 0.35, // Derived from old Ikemen formula
 			freq:  60, // Same as EnvShake
+			scale: 1.35, // Derived from old Ikemen formula
 		},
 	}
 }
@@ -2402,7 +2402,7 @@ func readFightScreenCombo(pre string, is IniSection,
 	is.ReadI32(pre+"counter.time", &co.counterShake.time)
 	var mult float32
 	if is.ReadF32(pre+"counter.mult", &mult) {
-		co.counterShake.scale = float32(co.counterShake.time) * mult
+		co.counterShake.scale = 1 + float32(co.counterShake.time) * mult
 	}
 
 	// New shake syntax
@@ -2675,14 +2675,14 @@ func (cs *ComboShake) update() {
 }
 
 func (cs *ComboShake) getScale() float32 {
-	if !cs.active || cs.scale == 0 {
+	if !cs.active || cs.scale == 1 {
 		return 1
 	}
 	t := float32(cs.curTime) / float32(cs.time)
-	curAmp := cs.scale * t
 	phaseRad := Rad(cs.phase) + Rad(cs.freq)*float32(cs.time-cs.curTime)
-	val := curAmp * float32(math.Cos(float64(phaseRad)))
-	return 1 + val
+	cosVal := float32(math.Cos(float64(phaseRad)))
+	exponent := float32(math.Log(float64(cs.scale))) * t * cosVal
+	return float32(math.Exp(float64(exponent)))
 }
 
 func (cs *ComboShake) getOffset() (x, y float32) {
