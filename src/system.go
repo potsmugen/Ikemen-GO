@@ -2353,17 +2353,11 @@ func (s *System) updateMusicMaps() {
 		s.cgi[i].music.Append(sys.stage.music)
 		// Append select.def stage music parameters
 		s.cgi[i].music.Append(sys.stage.si().music)
-		// Override with select.def char music parameters
-		useCharMusic := false
-		if sys.sel.gameParams != nil {
-			useCharMusic = sys.sel.gameParams.CharParamMusic
-		}
+		// Override stage music with select.def char music parameters
+		// Normally only outside Versus modes
 		if isSelectableChar {
-			// In Versus modes, round/final/life music shouldn't override stage music; victory.music still can.
-			if useCharMusic {
+			if sys.sel.gameParams != nil && sys.sel.gameParams.CharParamMusic {
 				s.cgi[i].music.Override(p[0].si().music)
-			} else if v, ok := p[0].si().music[normalizeMusicPrefix("victory")]; ok {
-				s.cgi[i].music.Override(Music{normalizeMusicPrefix("victory"): v})
 			}
 		}
 		// Override with music with launchFight parameters
@@ -5224,6 +5218,16 @@ func (s *Select) AddChar(def string) *SelectChar {
 				sprite_orig = decodeShiftJIS(isec["sprite"])
 				anim_orig = decodeShiftJIS(isec["anim"])
 				sc.sound = decodeShiftJIS(isec["sound"])
+
+				if victorybgm := decodeShiftJIS(isec["victorybgm "]); victorybgm != "" {
+					bg := newBgMusic()
+					bg.bgmusic = victorybgm
+					bg.bgmloop = 0
+					sc.music["charvictory"] = []*bgMusic{bg}
+					// We use "charvictory" because "victory" is used both by stage and char select.def overrides
+					// So it's easier to resolve the conflict here rather than everywhere else, even if a bit less correct
+					// TODO: This could work like victory quotes, being selectable and defaulting to random
+				}
 
 				// Clear and rebuild palettes to ensure localized files can overwrite defaults
 				sc.pal = nil
