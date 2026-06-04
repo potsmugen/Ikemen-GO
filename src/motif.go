@@ -6211,9 +6211,14 @@ func (vi *MotifVictory) init(m *Motif) {
 			}
 		}
 	}
-	matchHasVictory := pn >= 0 && pn < len(sys.cgi) && sys.cgi[pn].music.HasPrefix("victory")
-	if !matchHasVictory {
-		m.Music.Play("victory", sys.motif.Def)
+
+	// Play character or motif victory BGM only if the stage has none
+	if sys.stage == nil || sys.stage.bgmState < BGMStateVictory {
+		if pn >= 0 && pn < len(sys.cgi) && sys.cgi[pn].music.HasPrefix("victory") {
+			sys.cgi[pn].music.Play("charvictory", sys.cgi[pn].def)
+		} else {
+			m.Music.Play("victory", sys.motif.Def)
+		}
 	}
 
 	m.VictoryScreen.FadeIn.FadeData.init(m.fadeIn, true)
