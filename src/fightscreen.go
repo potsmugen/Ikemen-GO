@@ -2420,8 +2420,8 @@ func readFightScreenCombo(pre string, is IniSection,
 	is.ReadF32(pre+"counter.shake.phase", &co.counterShake.phase) // Conditional default like in EnvShake seems unnecessary
 	is.ReadF32(pre+"counter.shake.ampl", &co.counterShake.ampl)
 	is.ReadF32(pre+"counter.shake.scale", &co.counterShake.scale)
-	is.ReadF32(pre+"counter.shake.angle", &co.counterShake.angle)
-	is.ReadF32(pre+"counter.shake.angleadd", &co.counterShake.angleadd)
+	is.ReadF32(pre+"counter.shake.dir", &co.counterShake.dir)
+	is.ReadF32(pre+"counter.shake.diradd", &co.counterShake.diradd)
 	is.ReadF32(pre+"counter.shake.decay", &co.counterShake.decay)
 
 	// Read main text string then optional multiple values
@@ -2436,8 +2436,8 @@ func readFightScreenCombo(pre string, is IniSection,
 	is.ReadF32(pre+"text.shake.phase", &co.textShake.phase)
 	is.ReadF32(pre+"text.shake.ampl", &co.textShake.ampl)
 	is.ReadF32(pre+"text.shake.scale", &co.textShake.scale)
-	is.ReadF32(pre+"text.shake.angle", &co.textShake.angle)
-	is.ReadF32(pre+"text.shake.angleadd", &co.textShake.angleadd)
+	is.ReadF32(pre+"text.shake.dir", &co.textShake.dir)
+	is.ReadF32(pre+"text.shake.diradd", &co.textShake.diradd)
 	is.ReadF32(pre+"text.shake.decay", &co.textShake.decay)
 
 	co.bg = ReadAnimLayout(pre+"bg0.", is, sff, at, 2)
@@ -2704,8 +2704,8 @@ type ComboShake struct {
 	scale    float32
 	freq     float32
 	phase    float32
-	angle    float32
-	angleadd float32
+	dir      float32 // It's an angle but this name is consistent with EnvShake
+	diradd   float32
 	decay    float32
 	curTime  int32
 }
@@ -2755,7 +2755,7 @@ func (cs *ComboShake) getOffset() (x, y float32) {
 	val := curAmp * float32(math.Cos(float64(phaseRad)))
 
 	elapsed := float32(cs.time - cs.curTime)
-	currentAngleDeg := cs.angle + cs.angleadd*elapsed
+	currentAngleDeg := cs.dir + cs.diradd*elapsed
 	radAng := Rad(currentAngleDeg)
 
 	x = val * float32(math.Cos(float64(radAng)))
