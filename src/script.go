@@ -8378,6 +8378,10 @@ func triggerFunctions(l *lua.LState) {
 				lv = lua.LNumber(e.friction[2])
 			case "id":
 				lv = lua.LNumber(e.id)
+			case "ignoreenvshake":
+				lv = lua.LBool(e.ignoreenvshake)
+			case "ignorehitpause":
+				lv = lua.LBool(e.ignorehitpause)
 			case "layerno":
 				lv = lua.LNumber(e.layerno)
 			case "pausemovetime":

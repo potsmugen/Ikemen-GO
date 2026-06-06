@@ -842,6 +842,8 @@ const (
 	OC_ex2_explodvar_friction_y
 	OC_ex2_explodvar_friction_z
 	OC_ex2_explodvar_id
+	OC_ex2_explodvar_ignorehitpause
+	OC_ex2_explodvar_ignoreenvshake
 	OC_ex2_explodvar_layerno
 	OC_ex2_explodvar_pausemovetime
 	OC_ex2_explodvar_pos_x
@@ -3817,6 +3819,10 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 		fallthrough
 	case OC_ex2_explodvar_id:
 		fallthrough
+	case OC_ex2_explodvar_ignoreenvshake:
+		fallthrough
+	case OC_ex2_explodvar_ignorehitpause:
+		fallthrough
 	case OC_ex2_explodvar_bindid:
 		fallthrough
 	case OC_ex2_explodvar_bindtime:
@@ -6137,6 +6143,7 @@ const (
 	explod_syncid
 	explod_shader
 	explod_shaderparam
+	explod_ignoreenvshake
 	explod_last = iota + palFX_last + afterImage_last + 1 - 1
 	explod_redirectid
 )
@@ -6348,6 +6355,8 @@ func (sc explod) Run(c *Char, _ []int32) bool {
 			e.xshear = exp[0].evalF(c)
 		case explod_focallength:
 			e.fLength = exp[0].evalF(c)
+		case explod_ignoreenvshake:
+			e.ignoreenvshake = exp[0].evalB(c)
 		case explod_ignorehitpause:
 			e.ignorehitpause = exp[0].evalB(c)
 		case explod_bindid:
@@ -6954,6 +6963,11 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 			case explod_window:
 				eachExpl(func(e *Explod) {
 					e.window = [4]float32{exp[0].evalF(c) * redirscale, exp[1].evalF(c) * redirscale, exp[2].evalF(c) * redirscale, exp[3].evalF(c) * redirscale}
+				})
+			case explod_ignoreenvshake:
+				v1 := exp[0].evalB(c)
+				eachExpl(func(e *Explod) {
+					e.ignoreenvshake = v1
 				})
 			case explod_ignorehitpause:
 				ihp := exp[0].evalB(c)

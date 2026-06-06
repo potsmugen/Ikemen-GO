@@ -1683,6 +1683,7 @@ type Explod struct {
 	interpolate_xshear   [2]float32
 	timestamp            int32 // Determines run order
 	sortindex            int   // For faster run order sorting
+	ignoreenvshake       bool
 
 	shader       string
 	shaderParams [16]float32
@@ -2148,6 +2149,7 @@ func (e *Explod) update() {
 	sd.fLength = fLength
 	sd.window = ewin
 	sd.xshear = xshear
+	sd.ignoreEnvShake = e.ignoreenvshake
 	sd.shader = e.shader
 	sd.shaderParams = e.shaderParams
 
@@ -5624,6 +5626,10 @@ func (c *Char) explodVar(eid BytecodeValue, idx BytecodeValue, vtype OpCode) Byt
 			v = BytecodeFloat(e.friction[2])
 		case OC_ex2_explodvar_id:
 			v = BytecodeInt(e.id)
+		case OC_ex2_explodvar_ignoreenvshake:
+			v = BytecodeBool(e.ignoreenvshake)
+		case OC_ex2_explodvar_ignorehitpause:
+			v = BytecodeBool(e.ignorehitpause)
 		case OC_ex2_explodvar_layerno:
 			v = BytecodeInt(e.layerno)
 		case OC_ex2_explodvar_pausemovetime:

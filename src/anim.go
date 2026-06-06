@@ -1196,6 +1196,7 @@ type SpriteData struct {
 	under        bool
 	shader       string
 	shaderParams [16]float32
+	ignoreEnvShake bool
 }
 
 func newSpriteData() *SpriteData {
@@ -1286,9 +1287,6 @@ func (dl DrawList) draw(layerno int32, under bool, cameraX, cameraY, cameraScl f
 		return a.sortindex > b.sortindex
 	})
 
-	// Common variables
-	shake := sys.envShake.getOffset()
-
 	// Draw only the filtered items
 	for _, idx := range sortList {
 		s := dl[idx]
@@ -1319,6 +1317,12 @@ func (dl DrawList) draw(layerno int32, under bool, cameraX, cameraY, cameraScl f
 			s.anim.transType = s.trans
 			s.anim.srcAlpha = int16(s.alpha[0])
 			s.anim.dstAlpha = int16(s.alpha[1])
+		}
+
+		// Get EnvShake
+		shake := sys.envShake.getOffset()
+		if s.ignoreEnvShake {
+			shake = [2]float32{0, 0}
 		}
 
 		var pos [2]float32
@@ -1441,9 +1445,6 @@ func (sl ShadowList) draw(x, y, scl float32) {
 		}
 		return false
 	})
-
-	// Common variables
-	shake := sys.envShake.getOffset()
 
 	// Draw the entire list in reverse
 	for i := len(sl) - 1; i >= 0; i-- {
@@ -1589,6 +1590,12 @@ func (sl ShadowList) draw(x, y, scl float32) {
 
 		drawwindow := &sys.scrrect
 
+		// Get EnvShake
+		shake := sys.envShake.getOffset()
+		if s.ignoreEnvShake {
+			shake = [2]float32{0, 0}
+		}
+
 		// TODO: If the char has an active window sctrl, shadows should also be affected, in addition to the stage window
 		if sys.stage.sdw.window != [4]float32{0, 0, 0, 0} || s.shadowWindow != [4]float32{0, 0, 0, 0} {
 			var w [4]float32
@@ -1682,9 +1689,6 @@ func (rl ReflectionList) draw(x, y, scl float32) {
 		}
 		return false
 	})
-
-	// Common variables
-	shake := sys.envShake.getOffset()
 
 	// Draw the entire list in reverse
 	for i := len(rl) - 1; i >= 0; i-- {
@@ -1858,6 +1862,12 @@ func (rl ReflectionList) draw(x, y, scl float32) {
 		}
 
 		drawwindow := &sys.scrrect
+
+		// Get EnvShake
+		shake := sys.envShake.getOffset()
+		if s.ignoreEnvShake {
+			shake = [2]float32{0, 0}
+		}
 
 		// TODO: If the char has an active window sctrl, reflections should also be affected, in addition to the stage window
 		if sys.stage.reflection.window != [4]float32{0, 0, 0, 0} || s.reflectWindow != [4]float32{0, 0, 0, 0} {

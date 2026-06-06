@@ -1046,6 +1046,10 @@ func (c *CharCompiler) explodSub(is IniSection, sc *StateControllerBase) error {
 		explod_focallength, VT_Float, 1, false); err != nil {
 		return err
 	}
+	if err := c.paramValue(is, sc, "ignoreenvshake",
+		explod_ignoreenvshake, VT_Bool, 1, false); err != nil {
+		return err
+	}
 	if err := c.explodInterpolate(is, sc); err != nil {
 		return err
 	}
