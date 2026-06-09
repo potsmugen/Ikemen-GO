@@ -9,6 +9,7 @@
 		float alpha, gray, hue;
 		int mask;
 		bool isFlat, isRgba, isTrapez, neg;
+		float opacityFade;
 	};
 	layout(push_constant, std430) uniform u {
 		vec4 palUV;
@@ -35,6 +36,7 @@
 	uniform float alpha, gray, hue;
 	uniform int mask;
 	uniform bool isFlat, isRgba, isTrapez, neg;
+	uniform float opacityFade;
 	COMPAT_VARYING vec2 texcoord;
 #endif
 
@@ -126,6 +128,15 @@ void main(void) {
 	// Sprites only, because flat colors are already tinted
 	if (!isFlat) {
 		c.rgb = mix(c.rgb, tint.rgb * c.a, tint.a);
+	}
+
+	if (opacityFade > 0.0) {
+		// Discard full transparency so the mask color isn't brought back
+		if (c.a == 0) discard;
+		// Determine brightness from the strongest RGB component. A simple average would shift the perceived hue
+		float brightness = max(c.r, max(c.g, c.b));
+		// Factor brightness into alpha
+		c.a = brightness * opacityFade;
 	}
 
 	FragColor = c;

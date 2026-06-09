@@ -643,6 +643,13 @@ func RenderSprite(rp RenderParams) {
 		gfx.SetUniformI("isRgba", 0)
 	}
 
+	if rp.blendMode == TT_opacity {
+		fade := float32(rp.blendAlpha[0]) / 255.0
+		gfx.SetUniformF("opacityFade", fade)
+	} else {
+		gfx.SetUniformF("opacityFade", 0)
+	}
+
 	if rp.shader != "" {
 		var timeSec float32
 		if sys.middleOfMatch() {
@@ -760,6 +767,9 @@ func renderWithBlending(
 				render(BlendInv, blendSourceFactor, BlendOne, float32(src)/255)
 			}
 		}
+	// Opacity
+    case blendMode == TT_opacity:
+		render(BlendAdd, BlendSrcAlpha, BlendOneMinusSrcAlpha, 1.0)
 	// Add, None or Default
 	// None takes this path because SuperPause darkens sprites through their source alpha
 	// Default should normally not reach here, so this is only a fallback
