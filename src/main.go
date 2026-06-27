@@ -17,6 +17,7 @@ import (
 
 var Version = "development"
 var BuildTime = "" // Set automatically by GitHub Actions
+var EngineIkemenVer = [3]uint16{1, 0, 0} // For common files
 
 func init() {
 	if runtime.GOOS != "android" {

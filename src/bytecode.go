@@ -1384,7 +1384,12 @@ func (BytecodeExp) pow(v1 *BytecodeValue, v2 BytecodeValue, pn int) {
 		}
 		var i, bit, tmp int32 = 1, 0, i1
 
-		oldVersion := sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0 && sys.cgi[pn].mugenver[0] != 1
+		// Note: Bytecode mostly cares about its own engine version, not the character's
+		// Since e.g. a Mugen character may be executing Ikemen code (custom states, common states, etc)
+		// Hence sys.workingState.ikemenver / sys.workingState.mugenver
+
+		//oldVersion := sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0 && sys.cgi[pn].mugenver[0] != 1
+		oldVersion := sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 && sys.workingState.mugenver[0] != 1
 
 		for ; bit <= hb; bit++ {
 			shift := uint(bit)
@@ -2190,7 +2195,7 @@ func (be BytecodeExp) run(c *Char) BytecodeValue {
 				// Recovery command is an exception in that its position is always checked in the final char
 				// Note: In Mugen, a character running a negative state will use its own engine version but the localcoord and commands of the state owner
 				// The commands part is not fully recreated at the moment, but no issues have come out of it so far
-				if cmdName != "recovery" && oc.stWgi().ikemenver[0] == 0 && oc.stWgi().ikemenver[1] == 0 {
+				if cmdName != "recovery" && sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 {
 					redir = oc.ss.sb.playerNo
 					pno = c.ss.sb.playerNo
 				}
@@ -2210,7 +2215,7 @@ func (be BytecodeExp) run(c *Char) BytecodeValue {
 			sys.bcStack.PushI(int32(c.frontEdgeDist() * (c.localscl / oc.localscl)))
 		case OC_gameheight:
 			// Optional exception preventing GameHeight from being affected by stage zoom.
-			if c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 0 &&
+			if sys.workingState.mugenver[0] == 1 && sys.workingState.mugenver[1] == 0 &&
 				c.gi().constants["default.legacygamedistancespec"] == 1 {
 				sys.bcStack.PushF(c.screenHeight())
 			} else {
@@ -2220,7 +2225,7 @@ func (be BytecodeExp) run(c *Char) BytecodeValue {
 			sys.bcStack.PushI(sys.gameTime())
 		case OC_gamewidth:
 			// Optional exception preventing GameWidth from being affected by stage zoom.
-			if c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 0 &&
+			if sys.workingState.mugenver[0] == 1 && sys.workingState.mugenver[1] == 0 &&
 				c.gi().constants["default.legacygamedistancespec"] == 1 {
 				sys.bcStack.PushF(c.screenWidth())
 			} else {
@@ -2335,10 +2340,18 @@ func (be BytecodeExp) run(c *Char) BytecodeValue {
 			sys.bcStack.PushB(c.ss.stateType == StateType(be[i]))
 			i++
 		case OC_teammode:
+			reqMode := TeamMode(be[i])
 			if c.teamside == -1 {
-				sys.bcStack.PushB(TM_Single == TeamMode(be[i]))
+				// TODO: Probably return simul if stage has multiple AC's
+				sys.bcStack.PushB(TM_Single == reqMode)
 			} else {
-				sys.bcStack.PushB(sys.tmode[c.playerNo&1] == TeamMode(be[i]))
+				curMode := sys.tmode[c.playerNo&1]
+				// Tag didn't exist in Mugen, so we'll allow "teammode = Simul" to return true in Tag for legacy characters
+				if sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 && reqMode == TM_Simul && curMode == TM_Tag {
+					sys.bcStack.PushB(true)
+				} else {
+					sys.bcStack.PushB(curMode == reqMode)
+				}
 			}
 			i++
 		case OC_teamside:
@@ -4433,6 +4446,8 @@ type BytecodeFunction struct {
 	numArgs int32
 	numRets int32
 	ctrls   []StateController
+	ikemenver [3]uint16
+	mugenver  [2]uint16
 }
 
 func (bf BytecodeFunction) run(c *Char, ret []uint8) (changeState bool) {
@@ -4443,6 +4458,20 @@ func (bf BytecodeFunction) run(c *Char, ret []uint8) (changeState bool) {
 		// This should only happen during development
 		c.panic("Bytecode stack size mismatch or arguments read incorrectly")
 	}
+
+	// Save current working state
+	oldWs := sys.workingState
+	// Create a dummy StateBytecode with the function's engine version
+	dummy := &StateBytecode{
+		playerNo:  oldWs.playerNo,
+		ikemenver: bf.ikemenver,
+		mugenver:  bf.mugenver,
+	}
+	sys.workingState = dummy
+	// Restore previous working state
+	defer func() {
+		sys.workingState = oldWs
+	}()
 
 	copy(sys.bcVar, sys.bcStack)
 	sys.bcStack.Clear()
@@ -4544,7 +4573,7 @@ func (b StateBlock) Run(c *Char, ps []int32) (changeState bool) {
 	// For Mugen compatibility, if in hitpause and this SCTRL has the same index
 	// as the SCTRL that triggered a ChangeState during the hitpause
 	if c.hitPause() && c.hitStateChangeIdx >= 0 && b.persistentIndex == c.hitStateChangeIdx &&
-		c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+		sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 {
 		// skip the execution of this SCTRL
 		return false
 	}
@@ -5026,7 +5055,7 @@ func (sc assertSpecial) Run(c *Char, _ []int32) bool {
 			}
 		case assertSpecial_noko:
 			// NoKO affects all characters in Mugen, so legacy chars do so as well
-			if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+			if sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 {
 				if enable {
 					sys.setGSF(GlobalSpecialFlag(GSF_globalnoko))
 				} else {
@@ -5138,7 +5167,7 @@ func (sc playSnd) Run(c *Char, _ []int32) bool {
 	if lc == 0 {
 		if lp {
 			// WINMUGEN bug: volume is disabled when loop is specified (unless volumescale used)
-			if !vscaleflg && c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+			if !vscaleflg && sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 {
 				params.volume = 100
 			}
 			params.loopCount = -1
@@ -6004,8 +6033,8 @@ func (sc palFX) Run(c *Char, _ []int32) bool {
 	pf.clearWithNeg(true)
 
 	// Mugen 1.1 invertblend fallback
-	if c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 1 &&
-		c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+	if sys.workingState.mugenver[0] == 1 && sys.workingState.mugenver[1] == 1 &&
+		sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 {
 		pf.invertblend = -2
 	}
 
@@ -6165,12 +6194,13 @@ func (sc explod) Run(c *Char, _ []int32) bool {
 	e.id = 0
 
 	// Mugenversion 1.1 chars default postype to "None"
-	if c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 1 {
+	if sys.workingState.mugenver[0] == 1 && sys.workingState.mugenver[1] == 1 {
 		e.postype = PT_None
 	}
 
 	// Mugen 1.1 behavior if invertblend param is omitted
-	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 1 {
+	if sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 &&
+		sys.workingState.mugenver[0] == 1 && sys.workingState.mugenver[1] == 1 {
 		e.palfx.invertblend = -2
 	}
 
@@ -6527,7 +6557,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 	// Mugen chars can only modify some parameters after defining PosType
 	// Ikemen chars don't have this restriction
 	paramlock := func() bool {
-		return c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && !ptexists
+		return sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 && !ptexists
 	}
 
 	var expls []*Explod
@@ -6557,7 +6587,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 			return true // Already handled. Avoid default
 		default:
 			if len(expls) == 0 {
-				logMissing := c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0
+				logMissing := sys.workingState.ikemenver[0] != 0 || sys.workingState.ikemenver[1] != 0
 				expls = crun.getMultipleExplods(eid, idx, logMissing)
 				if len(expls) == 0 {
 					return false
@@ -6615,7 +6645,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 						// There's a bug in Mugen 1.1 where an explod that is facing left can't be flipped
 						// https://github.com/ikemen-engine/Ikemen-GO/issues/1252
 						// Ikemen chars just work as supposed to
-						if c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0 || e.trueFacing() >= 0 {
+						if sys.workingState.ikemenver[0] != 0 || sys.workingState.ikemenver[1] != 0 || e.trueFacing() >= 0 {
 							e.relativef = rf
 						}
 					})
@@ -6626,7 +6656,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 					eachExpl(func(e *Explod) {
 						// There's a bug in Mugen 1.1 where an explod that is upside down can't be flipped
 						// Ikemen chars just work as supposed to
-						if e.vfacing >= 0 || c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0 {
+						if e.vfacing >= 0 || sys.workingState.ikemenver[0] != 0 || sys.workingState.ikemenver[1] != 0 {
 							e.vfacing = vf
 						}
 					})
@@ -6740,7 +6770,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 				eachExpl(func(e *Explod) {
 					e.bindtime = t
 					// Bindtime fix (update bindtime according to current explod time)
-					if (crun.stWgi().ikemenver[0] != 0 || crun.stWgi().ikemenver[1] != 0) && t > 0 {
+					if (sys.workingState.ikemenver[0] != 0 || sys.workingState.ikemenver[1] != 0) && t > 0 {
 						e.bindtime = e.time + t
 					}
 					e.setAllPosX(e.pos[0])
@@ -6752,7 +6782,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 				eachExpl(func(e *Explod) {
 					e.removetime = t
 					// Removetime fix (update removetime according to current explod time)
-					if (crun.stWgi().ikemenver[0] != 0 || crun.stWgi().ikemenver[1] != 0) && t > 0 {
+					if (sys.workingState.ikemenver[0] != 0 || sys.workingState.ikemenver[1] != 0) && t > 0 {
 						e.removetime = e.time + t
 					}
 				})
@@ -6771,7 +6801,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 				eachExpl(func(e *Explod) {
 					e.supermovetime = t
 					// Supermovetime fix (update supermovetime according to current explod time)
-					if (crun.stWgi().ikemenver[0] != 0 || crun.stWgi().ikemenver[1] != 0) && t > 0 {
+					if (sys.workingState.ikemenver[0] != 0 || sys.workingState.ikemenver[1] != 0) && t > 0 {
 						e.supermovetime = e.time + t
 					}
 				})
@@ -6780,7 +6810,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 				eachExpl(func(e *Explod) {
 					e.pausemovetime = t
 					// Pausemovetime fix (update pausemovetime according to current explod time)
-					if (crun.stWgi().ikemenver[0] != 0 || crun.stWgi().ikemenver[1] != 0) && t > 0 {
+					if (sys.workingState.ikemenver[0] != 0 || sys.workingState.ikemenver[1] != 0) && t > 0 {
 						e.pausemovetime = e.time + t
 					}
 				})
@@ -6892,7 +6922,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 				e.blendmode = int32(blendmode)
 			})*/
 			case explod_anim:
-				if c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0 { // You could not modify this one in Mugen
+				if sys.workingState.ikemenver[0] != 0 || sys.workingState.ikemenver[1] != 0 { // You could not modify this one in Mugen
 					apn := crun.playerNo // Default to own player number
 					spn := crun.playerNo
 					if animPN >= 0 {
@@ -7017,7 +7047,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 					})
 				}
 			case explod_interpolation:
-				if c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0 {
+				if sys.workingState.ikemenver[0] != 0 || sys.workingState.ikemenver[1] != 0 {
 					interpolation := exp[0].evalB(c)
 					eachExpl(func(e *Explod) {
 						if e.interpolate != interpolation && e.interpolate_time[0] > 0 {
@@ -7263,8 +7293,8 @@ func (sc afterImage) Run(c *Char, _ []int32) bool {
 	// TODO: If afterimages were refactored to not change PalFX of existing images, chars could update them as well
 	crun.aimg = newAfterImage()
 
-	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 &&
-		c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 1 {
+	if sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 &&
+		sys.workingState.mugenver[0] == 1 && sys.workingState.mugenver[1] == 1 {
 		crun.aimg.palfx[0].invertblend = -2
 	}
 	crun.aimg.time = 1
@@ -7860,7 +7890,8 @@ func (sc hitDef) Run(c *Char, _ []int32) bool {
 	crun.hitdef.reset(crun, nil)
 
 	// Mugen 1.1 behavior if invertblend param is omitted
-	if c.stWgi().mugenver[0] == 1 && c.stWgi().mugenver[1] == 1 && c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+	if sys.workingState.mugenver[0] == 1 && sys.workingState.mugenver[1] == 1 &&
+		sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 {
 		crun.hitdef.palfx.invertblend = -2
 	}
 
@@ -7876,7 +7907,7 @@ func (sc hitDef) Run(c *Char, _ []int32) bool {
 	// What happens is throws have hitonce = 1 and unhittabletime > 0 by default
 	// In WinMugen, when the attr of Hitdef is set to 'Throw' and the pausetime
 	// on the attacker's side is greater than 1, it no longer executes every frame
-	//if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.stWgi().mugenver[0] != 1 && // Not crun
+	//if sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 && sys.workingState.mugenver[0] != 1 && // Not crun
 	//	crun.hitdef.attr&int32(AT_AT) != 0 && crun.hitdef.pausetime > 0 && crun.moveContact() == 1 { // crun
 	//	crun.hitdef.attr = 0
 	//	return false
@@ -9933,7 +9964,7 @@ func (sc lifeAdd) Run(c *Char, _ []int32) bool {
 		case lifeAdd_value:
 			v := exp[0].evalI(c)
 			// Mugen forces absolute parameter when healing characters
-			if v > 0 && c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+			if v > 0 && sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 {
 				abs = true
 			}
 			crun.lifeAdd(float64(v), kill, abs)
@@ -10905,7 +10936,7 @@ func (sc defenceMulSet) Run(c *Char, _ []int32) bool {
 	var mulType int32 = 1
 
 	// Change default behavior for Mugen chars
-	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+	if sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 {
 		onHit = true
 		mulType = 0
 	}
@@ -13348,7 +13379,7 @@ func (sc targetRedLifeAdd) Run(c *Char, _ []int32) bool {
 		return true
 	})
 	// Mugen forces absolute parameter when healing characters
-	if vl > 0 && c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+	if vl > 0 && sys.workingState.ikemenver[0] == 0 && sys.workingState.ikemenver[1] == 0 {
 		abs = true
 	}
 	tar := crun.getTarget(tid, tidx)
@@ -15299,6 +15330,8 @@ type StateBytecode struct {
 	block     StateBlock
 	ctrlsps   []int32
 	numVars   int32
+	ikemenver [3]uint16
+	mugenver  [2]uint16
 }
 
 // StateDef bytecode creation function

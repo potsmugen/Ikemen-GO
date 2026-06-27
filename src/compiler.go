@@ -6704,7 +6704,7 @@ func cnsStringArray(arg string) ([]string, error) {
 
 // Forwards state compiling to CNS or ZSS branches as appropriate
 func (c *CharCompiler) stateCompile(states map[int32]StateBytecode,
-	filename string, dirs []string, negoverride bool, constants map[string]float32) error {
+	filename string, dirs []string, negoverride bool, constants map[string]float32, isCommon bool) error {
 
 	// Determine type from extension
 	isZss := HasExtension(filename, ".zss")
@@ -6742,14 +6742,15 @@ func (c *CharCompiler) stateCompile(states map[int32]StateBytecode,
 	// Compile as ZSS
 	// Note that "negoverride" is ignored
 	if isZss {
-		return c.stateCompileZSS(states, filename, filetext, constants)
+		return c.stateCompileZSS(states, filename, filetext, constants, isCommon)
 	}
 
 	// Compile as CNS
-	return c.stateCompileCNS(states, filename, filetext, negoverride, constants)
+	return c.stateCompileCNS(states, filename, filetext, negoverride, constants, isCommon)
 }
 
-func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename, filetext string, negoverride bool, constants map[string]float32) error {
+func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename,
+	filetext string, negoverride bool, constants map[string]float32, isCommon bool) error {
 	// Reset ZSS mode
 	c.zssMode = false
 
@@ -6805,7 +6806,18 @@ func (c *CharCompiler) stateCompileCNS(states map[int32]StateBytecode, filename,
 		if err != nil {
 			return errmes(err)
 		}
+
 		sbc := newStateBytecode(c.playerNo)
+
+		// Store engine version
+		if isCommon {
+			sbc.ikemenver = EngineIkemenVer
+			sbc.mugenver  = [2]uint16{1, 1} // Just in case
+		} else {
+			sbc.ikemenver = sys.cgi[c.playerNo].ikemenver
+			sbc.mugenver  = sys.cgi[c.playerNo].mugenver
+		}
+
 		if _, ok := states[c.stateNo]; ok && c.stateNo < 0 {
 			*sbc = states[c.stateNo]
 		}
@@ -7929,7 +7941,8 @@ func (c *CharCompiler) stateBlock(line *string, bl *StateBlock, root bool,
 	return c.wrongClosureToken()
 }
 
-func (c *CharCompiler) stateCompileZSS(states map[int32]StateBytecode, filename, filetext string, constants map[string]float32) error {
+func (c *CharCompiler) stateCompileZSS(states map[int32]StateBytecode,
+	filename, filetext string, constants map[string]float32, isCommon bool) error {
 	// Enable ZSS mode
 	// TODO: There's some overlap between this flag and sys.ignoreMostErrors
 	c.zssMode = true
@@ -7996,7 +8009,18 @@ func (c *CharCompiler) stateCompileZSS(states map[int32]StateBytecode, filename,
 					return errmes(c.wrongClosureToken())
 				}
 			}
+
 			sbc := newStateBytecode(c.playerNo)
+
+			// Store engine version
+			if isCommon {
+				sbc.ikemenver = EngineIkemenVer
+				sbc.mugenver  = [2]uint16{1, 1} // Just in case
+			} else {
+				sbc.ikemenver = sys.cgi[c.playerNo].ikemenver
+				sbc.mugenver  = sys.cgi[c.playerNo].mugenver
+			}
+
 			if _, ok := states[c.stateNo]; ok && c.stateNo < 0 {
 				*sbc = states[c.stateNo]
 			}
@@ -8040,6 +8064,16 @@ func (c *CharCompiler) stateCompileZSS(states map[int32]StateBytecode, filename,
 
 			// Start compiling
 			fun := BytecodeFunction{}
+
+			// Store engine version
+			if isCommon {
+				fun.ikemenver = EngineIkemenVer
+				fun.mugenver  = [2]uint16{1, 1} // Just in case
+			} else {
+				fun.ikemenver = sys.cgi[c.playerNo].ikemenver
+				fun.mugenver  = sys.cgi[c.playerNo].mugenver
+			}
+
 			c.vars = make(map[string]uint8)
 
 			// Parse arguments
@@ -8324,7 +8358,7 @@ func (c *CharCompiler) Compile(pn int, def string, constants map[string]float32)
 	for _, s := range st {
 		if len(s) > 0 {
 			if err := c.stateCompile(states, s, []string{def, "", sys.motif.Def, "data/"},
-				sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0, constants); err != nil {
+				sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0, constants, false); err != nil {
 				return nil, err
 			}
 		}
@@ -8332,14 +8366,14 @@ func (c *CharCompiler) Compile(pn int, def string, constants map[string]float32)
 	// Compile states in command file
 	if len(cmd) > 0 {
 		if err := c.stateCompile(states, cmd, []string{def, "", sys.motif.Def, "data/"},
-			sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0, constants); err != nil {
+			sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0, constants, false); err != nil {
 			return nil, err
 		}
 	}
 	// Compile states in stcommon state file
 	if len(stcommon) > 0 {
 		if err := c.stateCompile(states, stcommon, []string{def, "", sys.motif.Def, "data/"},
-			sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0, constants); err != nil {
+			sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0, constants, false); err != nil {
 			return nil, err
 		}
 	}
@@ -8347,7 +8381,7 @@ func (c *CharCompiler) Compile(pn int, def string, constants map[string]float32)
 	for _, key := range SortedKeys(sys.cfg.Common.States) {
 		for _, v := range sys.cfg.Common.States[key] {
 			if err := c.stateCompile(states, v, []string{def, sys.motif.Def, sys.fightScreen.def, "", "data/"},
-				false, constants); err != nil {
+				false, constants, true); err != nil {
 				return nil, err
 			}
 		}
