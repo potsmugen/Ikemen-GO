@@ -195,6 +195,7 @@ func (c *Camera) Init() {
 
 	// Set screen position immediately so that char triggers and postype will be correct in the first frame of the round
 	// https://github.com/ikemen-engine/Ikemen-GO/issues/3600
+	// Update: This is probably no longer necessary since camera action was moved before character action, but acts as a safeguard
 	c.setScreenPos(c.Pos[0], c.Pos[1], c.Scale/c.BaseScale())
 }
 

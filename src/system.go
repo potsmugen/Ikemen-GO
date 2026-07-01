@@ -2579,6 +2579,18 @@ func (s *System) action() {
 	s.clearSpriteData()
 
 	var x, y, scl float32 = s.cam.Pos[0], s.cam.Pos[1], s.cam.Scale / s.cam.BaseScale()
+
+	// Run camera
+	// Handling the camera first makes camera triggers more accurate
+	// In Mugen, the camera is seemingly updated after each character instead, making each character have a different perception of it
+	x, y, scl = s.cam.action(x, y, scl, s.supertime > 0 || s.pausetime > 0)
+
+	// Lower the precision to prevent errors in Pos X.
+	if !s.cam.ZoomEnable {
+		x = float32(math.Ceil(float64(x)*4-0.5) / 4)
+	}
+
+	s.cam.Update(scl, x, y)
 	s.cam.ResetTracking()
 
 	// Update round state
@@ -2606,10 +2618,10 @@ func (s *System) action() {
 		if Abs(s.cam.minLeft-s.xmin) < 0.0001 {
 			s.xmin = s.cam.minLeft
 		}
+
 		// Z axis player limits
 		s.zmin = s.stage.topbound * s.stage.localscl
 		s.zmax = s.stage.botbound * s.stage.localscl
-		//s.bgPalFX.step()
 
 		if s.envcol_time > 0 {
 			s.envcol_time--
@@ -2666,31 +2678,11 @@ func (s *System) action() {
 		s.globalTick()
 	}
 
-	// Run camera
-	x, y, scl = s.cam.action(x, y, scl, s.supertime > 0 || s.pausetime > 0)
-
 	// Character intro skipping
 	if s.tickNextFrame() {
 		s.runIntroSkip()
 	}
 
-	if !s.cam.ZoomEnable {
-		// Lower the precision to prevent errors in Pos X.
-		x = float32(math.Ceil(float64(x)*4-0.5) / 4)
-	}
-	s.cam.Update(scl, x, y)
-	s.xmin = s.cam.ScreenPos[0] + s.cam.Offset[0] + s.screenleft()
-	s.xmax = s.cam.ScreenPos[0] + s.cam.Offset[0] + float32(s.gameWidth)/s.cam.Scale - s.screenright()
-	if s.xmin > s.xmax {
-		s.xmin = (s.xmin + s.xmax) / 2
-		s.xmax = s.xmin
-	}
-	if Abs(s.cam.maxRight-s.xmax) < 0.0001 {
-		s.xmax = s.cam.maxRight
-	}
-	if Abs(s.cam.minLeft-s.xmin) < 0.0001 {
-		s.xmin = s.cam.minLeft
-	}
 	s.charList.xScreenBound()
 
 	for i := range s.projs {
