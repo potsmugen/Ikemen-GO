@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	_ "net/http/pprof"
+	"net/http"
+
 	"github.com/veandco/go-sdl2/sdl"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -56,6 +59,10 @@ func closeLog(f *os.File) {
 }
 
 func main() {
+	go func() {
+		fmt.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
 	realMain()
 }
 
