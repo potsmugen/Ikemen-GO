@@ -2521,7 +2521,12 @@ func (e *Explod) resetInterpolation(pfd *PalFXDef) {
 }
 
 func (e *Explod) trueFacing() float32 {
-	return e.facing * e.relativef
+	// return e.facing * e.relativef
+	// This new way is a bit more robust
+	if (e.facing < 0) != (e.relativef < 0) {
+		return -1
+	}
+	return 1
 }
 
 type ProjStatus int32
@@ -12944,7 +12949,7 @@ func (c *Char) cueDebugDraw() {
 		sys.debugcross.Add(crosshair, x, y, c.facing)
 		// Add GroundLevel indicator
 		if c.prevGroundLevel != 0 {
-			gLevel := []ClsnFinal{{rect: [4]float32{-4, 0, 4, 1}, angle: 0}}
+			gLevel := []ClsnFinal{{rect: [4]float32{-2, 0, 2, 1}, angle: 0}}
 			sys.debugcross.Add(gLevel, x, c.prevGroundLevel*c.localscl, c.facing)
 		}
 	}
@@ -13585,8 +13590,8 @@ func (cl *CharList) hitDetectionPlayer(getter *Char) {
 				}
 			}
 
+			// Inherit parent's or root's juggle points
 			if c.helperIndex != 0 {
-				// Inherit parent's or root's juggle points
 				if c.inheritJuggle == 1 && c.parent(false) != nil {
 					for _, v := range getter.ghv.targetedBy {
 						if v[0] == c.parent(false).id {
@@ -13607,16 +13612,16 @@ func (cl *CharList) hitDetectionPlayer(getter *Char) {
 			// In Mugen, you can no longer hit a standing target if you don't have enough points
 			// In Mugen, you can juggle any enemy if they're not your target yet
 			// If IkemenVersion, the rules are a little more consistent
-			canjuggle := false
+			canJuggle := false
 			if c.asf(ASF_nojugglecheck) ||
 				c.juggle <= getter.ghv.getJuggle(c.id, c.gi().data.airjuggle) ||
 				(c.gi().ikemenver[0] != 0 || c.gi().ikemenver[1] != 0) && getter.hittmp < 2 ||
 				(c.gi().ikemenver[0] == 0 && c.gi().ikemenver[1] == 0 && !c.hasTarget(getter.id)) {
-				canjuggle = true
+				canJuggle = true
 			}
 
 			// If getter can be hit by this Hitdef
-			if canjuggle && c.hitdef.hitonce >= 0 && !c.hasTargetOfHitdef(getter.id) &&
+			if canJuggle && c.hitdef.hitonce >= 0 && !c.hasTargetOfHitdef(getter.id) &&
 				(c.hitdef.reversal_attr <= 0 || !getter.hasTargetOfHitdef(c.id)) &&
 				getter.hittableByChar(c, &c.hitdef, c.ss.stateType, false) {
 
@@ -13641,7 +13646,7 @@ func (cl *CharList) hitDetectionPlayer(getter *Char) {
 						// Attacker hitpauses were off by 1 frame in WinMugen. Mugen 1.0 fixed it
 						// The way this should actually happen is that WinMugen chars have 1 subtracted from their hitpause in bytecode.go
 						// But because of the order that events happen in in Ikemen, it must be fixed the other way around
-						hpfix := c.gi().ikemenver[0] != 0 || c.gi().ikemenver[1] != 0 || c.gi().mugenver[0] == 1
+						hpFix := c.gi().ikemenver[0] != 0 || c.gi().ikemenver[1] != 0 || c.gi().mugenver[0] == 1
 
 						if Abs(hitResult) == 1 {
 							if mvc {
@@ -13718,12 +13723,12 @@ func (cl *CharList) hitDetectionPlayer(getter *Char) {
 									getter.hittmp = -1
 								}
 								if !getter.csf(CSF_gethit) {
-									getter.hitPauseTime = Max(1, c.hitdef.pausetime[1]+Btoi(hpfix))
+									getter.hitPauseTime = Max(1, c.hitdef.pausetime[1]+Btoi(hpFix))
 								}
 							}
 							if !c.csf(CSF_gethit) && (getter.ss.stateType == ST_A && c.hitdef.air_type != HT_None ||
 								getter.ss.stateType != ST_A && c.hitdef.ground_type != HT_None) {
-								c.hitPauseTime = Max(1, c.hitdef.pausetime[0]+Btoi(hpfix))
+								c.hitPauseTime = Max(1, c.hitdef.pausetime[0]+Btoi(hpFix))
 								// In Mugen, the hitpause only actually takes effect in the next frame
 								// In Mugen, despite hit type None being supposed to apply hitpause, that doesn't happen
 								// Curiously, if a HitOverride is used the hitpause will be restored
@@ -13735,7 +13740,7 @@ func (cl *CharList) hitDetectionPlayer(getter *Char) {
 								c.mctime = -1
 							}
 							if !c.csf(CSF_gethit) {
-								c.hitPauseTime = Max(1, c.hitdef.guard_pausetime[0]+Btoi(hpfix))
+								c.hitPauseTime = Max(1, c.hitdef.guard_pausetime[0]+Btoi(hpFix))
 							}
 						}
 						if c.hitdef.hitonce > 0 {
@@ -13889,14 +13894,14 @@ func (cl *CharList) hitDetectionProjectile(getter *Char) {
 			// Projectile juggling is a little different from player juggling
 			// In Mugen, they check juggle points even if the enemy is not yet a target or even falling at all
 			// IkemenVersion once again makes the logic more consistent
-			canjuggle := false
+			canJuggle := false
 			if c.asf(ASF_nojugglecheck) ||
 				(c.gi().ikemenver[0] != 0 || c.gi().ikemenver[1] != 0) && getter.hittmp < 2 ||
 				p.hitdef.air_juggle <= getter.ghv.getJuggle(c.id, c.gi().data.airjuggle) {
-				canjuggle = true
+				canJuggle = true
 			}
 
-			if canjuggle && !(getter.stchtmp && (getter.csf(CSF_gethit) || getter.acttmp > 0)) &&
+			if canJuggle && !(getter.stchtmp && (getter.csf(CSF_gethit) || getter.acttmp > 0)) &&
 				(!ap_projhit || p.hitdef.attr&int32(AT_AP) == 0) &&
 				(p.hitpause <= 0 || p.contactflag) && p.curmisstime <= 0 && p.hitdef.hitonce >= 0 &&
 				getter.hittableByChar(c, &p.hitdef, ST_N, true) {
