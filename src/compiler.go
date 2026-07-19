@@ -1994,11 +1994,11 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 
 		switch vname {
 		case "back":
-			opc = OC_ex2_clsnvar_left
+			opc = OC_ex2_clsnvar_back
 		case "top":
 			opc = OC_ex2_clsnvar_top
 		case "front":
-			opc = OC_ex2_clsnvar_right
+			opc = OC_ex2_clsnvar_front
 		case "bottom":
 			opc = OC_ex2_clsnvar_bottom
 		default:
@@ -6521,6 +6521,8 @@ func (c *CharCompiler) paramClsnType(is IniSection, sc *StateControllerBase, par
 		}
 		var box int32
 		switch strings.ToLower(data) {
+		case "all":
+			box = -1
 		case "none":
 			box = 0
 		case "clsn1":
