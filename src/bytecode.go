@@ -14968,6 +14968,7 @@ const (
 	transformClsn_group byte = iota
 	transformClsn_scale
 	transformClsn_angle
+	transformClsn_pivot
 	transformClsn_redirectid
 )
 
@@ -14980,6 +14981,7 @@ func (sc transformClsn) Run(c *Char, _ []int32) bool {
 	scale := [2]float32{1, 1}
 	angle := float32(0)
 	group := int32(-1) // all
+	pivot := [2]float32{0, 0}
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
@@ -14990,9 +14992,13 @@ func (sc transformClsn) Run(c *Char, _ []int32) bool {
 			if len(exp) > 1 {
 				scale[1] = exp[1].evalF(c)
 			}
-			crun.updateClsnScale()
 		case transformClsn_angle:
 			angle = exp[0].evalF(c)
+		case transformClsn_pivot:
+			pivot[0] = exp[0].evalF(c)
+			if len(exp) > 1 {
+				pivot[1] = exp[1].evalF(c)
+			}
 		}
 		return true
 	})
@@ -15002,7 +15008,7 @@ func (sc transformClsn) Run(c *Char, _ []int32) bool {
 	case group == 0:
 		// Reset all
 		for i := range crun.clsnTransforms {
-			crun.clsnTransforms[i].Reset()
+			crun.clsnTransforms[i].reset()
 		}
 	case group == -1:
 		// Apply to all groups
@@ -15010,13 +15016,15 @@ func (sc transformClsn) Run(c *Char, _ []int32) bool {
 			t := &crun.clsnTransforms[i]
 			t.scale[0] *= scale[0]
 			t.scale[1] *= scale[1]
-			t.angle += angle
+			t.angle = angle
+			t.pivot = pivot
 		}
 	case group >= 1 && group <= 3:
 		t := &crun.clsnTransforms[group - 1]
 		t.scale[0] *= scale[0]
 		t.scale[1] *= scale[1]
-		t.angle += angle
+		t.angle = angle
+		t.pivot = pivot
 	default:
 		sys.appendToConsole(crun.warn() + fmt.Sprintf("Invalid group %d in TransformClsn", group))
 	}
