@@ -1877,3 +1877,14 @@ func SafeGo(f func()) {
 func CalculateAspect[T int | int32 | float32 | float64](w, h T) float32 {
 	return float32(w) / float32(h)
 }
+
+// Ensures a rectangle is represented as "left, top, right, bottom"
+func NormalizeRect(rect [4]float32) [4]float32 {
+	if rect[0] > rect[2] {
+		rect[0], rect[2] = rect[2], rect[0]
+	}
+	if rect[1] > rect[3] {
+		rect[1], rect[3] = rect[3], rect[1]
+	}
+	return rect
+}
