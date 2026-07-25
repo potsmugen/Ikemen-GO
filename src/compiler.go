@@ -1925,6 +1925,8 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			bv1 = BytecodeInt(2)
 		case "size":
 			bv1 = BytecodeInt(3)
+		case "dummy":
+			bv1 = BytecodeInt(4)
 		default:
 			return bvNone(), Error("Invalid collision box type: " + c1type)
 		}
@@ -1976,6 +1978,8 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			bv1 = BytecodeInt(2)
 		case "size":
 			bv1 = BytecodeInt(3)
+		case "dummy":
+			bv1 = BytecodeInt(4)
 		default:
 			return bvNone(), Error(fmt.Sprintf("Invalid Clsn type: %s", ctype))
 		}
@@ -6531,6 +6535,8 @@ func (c *CharCompiler) paramClsnType(is IniSection, sc *StateControllerBase, par
 			box = 2
 		case "size":
 			box = 3
+		case "dummy":
+			box = 4
 		default:
 			return Error("Invalid Clsn type for " + paramName + ": " + data)
 		}
