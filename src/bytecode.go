@@ -7544,6 +7544,7 @@ const (
 	hitDef_ground_velocity_y
 	hitDef_ground_velocity_z
 	hitDef_guard_velocity
+	hitDef_cornerpush_legacydefaults
 	hitDef_ground_cornerpush_velmul
 	hitDef_ground_cornerpush_veloff
 	hitDef_guard_cornerpush_velmul
@@ -7896,6 +7897,8 @@ func (sc hitDef) runSub(c *Char, hd *HitDef, paramID byte, exp []BytecodeExp) {
 		if len(exp) > 2 {
 			hd.guard_velocity[2] = exp[2].evalF(c)
 		}
+	case hitDef_cornerpush_legacydefaults:
+		hd.cornerpush_legacydefaults = exp[0].evalB(c)
 	case hitDef_ground_cornerpush_velmul:
 		hd.ground_cornerpush_velmul = exp[0].evalF(c)
 	case hitDef_ground_cornerpush_veloff:
