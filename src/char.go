@@ -687,6 +687,7 @@ type HitDef struct {
 	guard_velocity             [3]float32
 	air_velocity               [3]float32
 	airguard_velocity          [3]float32
+	cornerpush_legacydefaults  bool
 	ground_cornerpush_veloff   float32
 	ground_cornerpush_velmul   float32
 	air_cornerpush_veloff      float32
@@ -830,6 +831,7 @@ func (hd *HitDef) reset(c *Char, proj *Projectile) {
 		guard_cornerpush_veloff:    float32(math.NaN()),
 		airguard_cornerpush_veloff: float32(math.NaN()),
 
+		ground_cornerpush_velmul:   float32(math.NaN()), // Not strictly necessary, but keeps all defaults together in finalizeParams
 		air_cornerpush_velmul:      float32(math.NaN()),
 		down_cornerpush_velmul:     float32(math.NaN()),
 		guard_cornerpush_velmul:    float32(math.NaN()),
@@ -928,12 +930,9 @@ func (hd *HitDef) reset(c *Char, proj *Projectile) {
 		hd.guard_dist_z = [2]float32{c.size.proj.attack.dist.depth[0], c.size.proj.attack.dist.depth[1]}
 	}
 
-	// Cornerpush friction default value depends on engine version
-	// We only need to set "ground" here. Others will use "ifnanset" later
+	// Version-dependent defaults
 	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
-		hd.ground_cornerpush_velmul = 0.7
-	} else {
-		hd.ground_cornerpush_velmul = -1
+		hd.cornerpush_legacydefaults = true
 	}
 
 	// PalFX
@@ -1030,21 +1029,28 @@ func (hd *HitDef) finalizeParams(c *Char, proj *Projectile) {
 
 	ifierrset(&hd.air_fall, Btoi(hd.ground_fall))
 
-	// Cornerpush defaults to same as respective velocities if character has Ikemenversion, instead of Mugen magic numbers
-	if hd.attr&int32(ST_A) != 0 {
-		ifnanset(&hd.ground_cornerpush_veloff, 0)
-	} else {
-		if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
-			ifnanset(&hd.ground_cornerpush_veloff, hd.guard_velocity[0]*1.3)
+	// Determine whether to use Mugen's arbitrary values or just inherit ground.velocity 1:1
+	if hd.cornerpush_legacydefaults {
+		if hd.attr&int32(ST_A) != 0 {
+			ifnanset(&hd.ground_cornerpush_veloff, 0)
 		} else {
-			ifnanset(&hd.ground_cornerpush_veloff, hd.ground_velocity[0])
+			ifnanset(&hd.ground_cornerpush_veloff, hd.guard_velocity[0]*1.3)
 		}
+	} else {
+		ifnanset(&hd.ground_cornerpush_veloff, hd.ground_velocity[0])
 	}
 
 	ifnanset(&hd.air_cornerpush_veloff, hd.ground_cornerpush_veloff)
 	ifnanset(&hd.down_cornerpush_veloff, hd.ground_cornerpush_veloff)
 	ifnanset(&hd.guard_cornerpush_veloff, hd.ground_cornerpush_veloff)
 	ifnanset(&hd.airguard_cornerpush_veloff, hd.ground_cornerpush_veloff)
+
+	// Determine whether to use Mugen's arbitrary value or modern target-based friction
+	if hd.cornerpush_legacydefaults {
+		ifnanset(&hd.ground_cornerpush_velmul, 0.7)
+	} else {
+		ifnanset(&hd.ground_cornerpush_velmul, -1)
+	}
 
 	ifnanset(&hd.air_cornerpush_velmul, hd.ground_cornerpush_velmul)
 	ifnanset(&hd.down_cornerpush_velmul, hd.ground_cornerpush_velmul)
@@ -9798,14 +9804,14 @@ func (c *Char) checkCornerPush() (pushDist float32, pushMul float32) {
 
 		// Determine friction multiplier
 		// A negative value uses the target's friction
-		if c.mhv.cornerpush_velmul >= 0 {
-			pushMul = c.mhv.cornerpush_velmul
-		} else {
+		if c.mhv.cornerpush_velmul < 0 {
 			if getter.ss.stateType == ST_C || getter.ss.stateType == ST_L {
 				pushMul = getter.getCrouchFriction()
 			} else {
 				pushMul = getter.getStandFriction()
 			}
+		} else {
+			pushMul = c.mhv.cornerpush_velmul
 		}
 
 		// Apply cornerpush only if the target is cornered and actually confined to the screen
