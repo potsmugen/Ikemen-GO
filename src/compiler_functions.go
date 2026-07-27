@@ -1979,6 +1979,10 @@ func (c *CharCompiler) hitDefSub(is IniSection, sc *StateControllerBase) error {
 		hitDef_air_fall, VT_Bool, 1, false); err != nil {
 		return err
 	}
+	if err := c.paramValue(is, sc, "air.cornerpush.velmul",
+		hitDef_air_cornerpush_velmul, VT_Float, 1, false); err != nil {
+		return err
+	}
 	if err := c.paramValue(is, sc, "air.cornerpush.veloff",
 		hitDef_air_cornerpush_veloff, VT_Float, 1, false); err != nil {
 		return err
@@ -1989,6 +1993,10 @@ func (c *CharCompiler) hitDefSub(is IniSection, sc *StateControllerBase) error {
 	}
 	if err := c.paramValue(is, sc, "down.velocity",
 		hitDef_down_velocity, VT_Float, 3, false); err != nil {
+		return err
+	}
+	if err := c.paramValue(is, sc, "down.cornerpush.velmul",
+		hitDef_down_cornerpush_velmul, VT_Float, 1, false); err != nil {
 		return err
 	}
 	if err := c.paramValue(is, sc, "down.cornerpush.veloff",
@@ -2108,12 +2116,24 @@ func (c *CharCompiler) hitDefSub(is IniSection, sc *StateControllerBase) error {
 		hitDef_guard_velocity, VT_Float, 3, false); err != nil {
 		return err
 	}
+	if err := c.paramValue(is, sc, "ground.cornerpush.velmul",
+		hitDef_ground_cornerpush_velmul, VT_Float, 1, false); err != nil {
+		return err
+	}
 	if err := c.paramValue(is, sc, "ground.cornerpush.veloff",
 		hitDef_ground_cornerpush_veloff, VT_Float, 1, false); err != nil {
 		return err
 	}
+	if err := c.paramValue(is, sc, "guard.cornerpush.velmul",
+		hitDef_guard_cornerpush_velmul, VT_Float, 1, false); err != nil {
+		return err
+	}
 	if err := c.paramValue(is, sc, "guard.cornerpush.veloff",
 		hitDef_guard_cornerpush_veloff, VT_Float, 1, false); err != nil {
+		return err
+	}
+	if err := c.paramValue(is, sc, "airguard.cornerpush.velmul",
+		hitDef_airguard_cornerpush_velmul, VT_Float, 1, false); err != nil {
 		return err
 	}
 	if err := c.paramValue(is, sc, "airguard.cornerpush.veloff",
@@ -6570,7 +6590,7 @@ func (c *CharCompiler) getHitVarSet(is IniSection, sc *StateControllerBase) (Sta
 			return err
 		}
 		if err := c.paramValue(is, sc, "crouch.friction",
-			getHitVarSet_crouchfriction, VT_Float, 1, false); err != nil {
+			getHitVarSet_crouch_friction, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "ctrltime",
@@ -6706,7 +6726,7 @@ func (c *CharCompiler) getHitVarSet(is IniSection, sc *StateControllerBase) (Sta
 			return err
 		}
 		if err := c.paramValue(is, sc, "stand.friction",
-			getHitVarSet_standfriction, VT_Float, 1, false); err != nil {
+			getHitVarSet_stand_friction, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "slidetime",
