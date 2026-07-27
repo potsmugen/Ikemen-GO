@@ -2116,6 +2116,10 @@ func (c *CharCompiler) hitDefSub(is IniSection, sc *StateControllerBase) error {
 		hitDef_guard_velocity, VT_Float, 3, false); err != nil {
 		return err
 	}
+	if err := c.paramValue(is, sc, "cornerpush.legacydefaults",
+		hitDef_cornerpush_legacydefaults, VT_Bool, 1, false); err != nil {
+		return err
+	}
 	if err := c.paramValue(is, sc, "ground.cornerpush.velmul",
 		hitDef_ground_cornerpush_velmul, VT_Float, 1, false); err != nil {
 		return err
