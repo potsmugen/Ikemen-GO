@@ -11844,6 +11844,36 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile) (hitResult int32) 
 	return
 }
 
+func (c *Char) stateTypeAllowsGuard() bool {
+	switch c.ss.stateType {
+	case ST_S:
+		return !c.asf(ASF_nostandguard)
+	case ST_C:
+		return !c.asf(ASF_nocrouchguard)
+	case ST_A:
+		return !c.asf(ASF_noairguard)
+	// No stateType L
+	}
+	return false
+}
+
+// Logic to allow changing into state 120
+// Extracted because it must be checked at both start and end of frame
+func (c *Char) shouldStartGuard() bool {
+	// In Mugen, characters *can* change into the guarding state while paused
+	// They can still block in Ikemen despite not being allowed to change state here
+	return !c.pauseBool &&
+		!c.inGuardState() &&
+		!c.asf(ASF_nohardcodedkeys) &&
+		c.inguarddist &&
+		c.scf(SCF_guard) &&
+		c.ctrl() && // No state 52 here. Only when setting SCF_guard
+		(c.helperIndex == 0 || c.controller >= 0) &&
+		c.keyctrl[0] &&
+		c.cmd != nil &&
+		c.cmd[0].Buffer.Bb > 0
+}
+
 func (c *Char) actionPrepare() {
 	if c.minus != 3 || c.csf(CSF_destroy) || c.scf(SCF_disabled) {
 		return
@@ -11871,7 +11901,7 @@ func (c *Char) actionPrepare() {
 			// In Mugen, characters can perform basic actions even if they are KO
 			if !c.asf(ASF_nohardcodedkeys) {
 				if c.ctrl() {
-					if c.scf(SCF_guard) && c.inguarddist && !c.inGuardState() && c.ss.stateType != ST_L && c.cmd[0].Buffer.Bb > 0 {
+					if c.shouldStartGuard() {
 						c.changeState(120, -1, -1, "") // Start guarding
 					} else if !c.asf(ASF_nojump) && c.ss.stateType == ST_S && c.cmd[0].Buffer.Ub > 0 &&
 						(!(sys.intro < 0 && sys.intro > -sys.fightScreen.round.over_waittime) || c.asf(ASF_postroundinput)) {
@@ -12096,30 +12126,26 @@ func (c *Char) actionRun() {
 		c.ss.sb.run(c)
 	}
 
-	// Guarding instructions
+	// Toggle guard special flag
+	// This is signaled in Mugen by the purple Clsn2 in debug mode
+	// Mugen allows guarding in state 52 even without control, for some reason
+	// It seems like Mugen sets this flag during hit detection instead. Similarly to inguarddist
 	c.unsetSCF(SCF_guard)
-	if ((c.scf(SCF_ctrl) || c.ss.no == 52) &&
-		c.ss.moveType == MT_I || c.inGuardState()) && c.cmd != nil &&
-		(c.cmd[0].Buffer.Bb > 0 || c.asf(ASF_autoguard)) &&
-		(c.ss.stateType == ST_S && !c.asf(ASF_nostandguard) ||
-			c.ss.stateType == ST_C && !c.asf(ASF_nocrouchguard) ||
-			c.ss.stateType == ST_A && !c.asf(ASF_noairguard)) {
+	if c.stateTypeAllowsGuard() &&
+		c.ss.moveType == MT_I &&
+		(c.scf(SCF_ctrl) || c.ss.no == 52) &&
+		c.cmd != nil && (c.cmd[0].Buffer.Bb > 0 || c.asf(ASF_autoguard)) { // AutoGuard sets the flag without changing into state 120
 		c.setSCF(SCF_guard)
 	}
 
-	if !c.pauseBool {
-		if c.keyctrl[0] && c.cmd != nil {
-			if c.ctrl() && (c.controller >= 0 || c.helperIndex == 0) {
-				if !c.asf(ASF_nohardcodedkeys) {
-					if c.inguarddist && c.scf(SCF_guard) && !c.inGuardState() && c.cmd[0].Buffer.Bb > 0 {
-						c.changeState(120, -1, -1, "")
-						// In Mugen the characters *can* change to the guarding states during pauses
-						// They can still block in Ikemen despite not changing state here
-					}
-				}
-			}
-		}
+	// Change into guard start state
+	// The guard special flag and the guard state are two related but separate concepts
+	// Mugen doesn't do this at end of frame. Only beginning of frame
+	// However that leads to the case where the player has already returned to an idle state but still can't block
+	if c.shouldStartGuard() {
+		c.changeState(120, -1, -1, "")
 	}
+
 	// Run state +1
 	// Uses minus -4 because its properties are similar
 	c.minus = -4
@@ -12858,6 +12884,9 @@ func (c *Char) cueDebugDraw() {
 					debugType = &sys.debugc2hb // Partially invincible
 				case c.inguarddist && c.scf(SCF_guard):
 					debugType = &sys.debugc2grd // Guarding
+					// Mugen does not check inguarddist here
+					// This shows that the inner workings of its SCF_guard are different from ours
+					// Maybe it is flagged during hit detection, much like inguarddist. Which isn't necessarily better
 				default:
 					debugType = &sys.debugc2 // Normal
 				}
