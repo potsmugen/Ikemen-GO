@@ -6880,6 +6880,7 @@ func (c *Char) destroy() {
 			if t.bindToId == c.id {
 				t.selfState(5050, -1, -1, -1, "")
 				t.gethitBindClear()
+				sys.appendToConsole(t.warn() + fmt.Sprintf("SelfState from being bound to destroyed helper: %v", c.name))
 			}
 			t.ghv.dropPlayerId(c.id)
 		}
