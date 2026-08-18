@@ -267,7 +267,10 @@ func readFSText(pre string, is IniSection, str string, ln int16, f map[int]*Fnt,
 
 	txt.lay = *ReadLayout(pre, is, ln)
 
-	txt.pfxtime = ReadPalFX(pre+"palfx.", is, txt.palfx)
+	ReadPalFX(pre+"palfx.", is, txt.palfx)
+
+	// Save the PalFX's initial time for later resetting
+	txt.pfxtime = txt.palfx.time
 
 	// The color parameter overrides the PalFX for sprite fonts, so it must be parsed after it
 	if txt.font[3] >= 0 && txt.font[4] >= 0 && txt.font[5] >= 0 {
