@@ -3775,7 +3775,7 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 		idx := int(sys.bcStack.Pop().ToI())
 		group := int32(sys.bcStack.Pop().ToI()) // DON'T ASK WHY BUT 0 CAUSES ERRORS, 3 DOES NOT
 		v := float32(math.NaN())
-		clsn := c.getClsn(group)
+		clsn := c.getClsnLocal(group)
 		if clsn != nil && idx >= 0 && idx < len(clsn) {
 			switch opc {
 			case OC_ex2_clsnvar_back:
@@ -3788,7 +3788,7 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 				v = clsn[idx].rect[3]
 			}
 		}
-		sys.bcStack.PushF(v / oc.localscl)
+		sys.bcStack.PushF(v * c.localscl / oc.localscl)
 	case OC_ex2_debugmode_accel:
 		sys.bcStack.PushF(sys.debugAccel)
 	case OC_ex2_debugmode_clsndisplay:
