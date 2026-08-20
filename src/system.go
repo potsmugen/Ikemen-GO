@@ -293,6 +293,8 @@ type System struct {
 	usePalette          bool
 	gameRunning         bool
 	escPending          bool
+	hitDetectionSort    []*Char
+	projectileTradeSort []*Projectile
 
 	msaa               int32
 	externalShaders    [][][]byte
@@ -2643,6 +2645,10 @@ func (s *System) globalCollision() {
 	}
 
 	s.charList.collisionDetection()
+
+	// Clear temporary slices to release their pointers
+	s.hitDetectionSort = PointerSliceReset(s.hitDetectionSort)
+	s.projectileTradeSort = PointerSliceReset(s.projectileTradeSort)
 }
 
 /*
