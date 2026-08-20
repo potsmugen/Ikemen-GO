@@ -293,6 +293,8 @@ type System struct {
 	usePalette          bool
 	gameRunning         bool
 	escPending          bool
+	hitDetectionSort    []*Char
+	projectileTradeSort []*Projectile
 
 	msaa               int32
 	externalShaders    [][][]byte
