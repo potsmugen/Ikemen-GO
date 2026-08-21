@@ -6426,12 +6426,10 @@ func (sc explod) Run(c *Char, _ []int32) bool {
 			e.projection = Projection(exp[0].evalI(c))
 		case explod_window:
 			if len(exp) >= 4 {
-				e.window = [4]float32{
-					exp[0].evalF(c) * redirscale,
-					exp[1].evalF(c) * redirscale,
-					exp[2].evalF(c) * redirscale,
-					exp[3].evalF(c) * redirscale,
-				}
+				e.window[0] = exp[0].evalF(c) * redirscale
+				e.window[1] = exp[1].evalF(c) * redirscale
+				e.window[2] = exp[2].evalF(c) * redirscale
+				e.window[3] = exp[3].evalF(c) * redirscale
 			} else {
 				sys.appendToConsole(crun.warn() + "invalid explod window")
 			}
@@ -7062,12 +7060,10 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 			case explod_window:
 				if len(exp) >= 4 {
 					eachExpl(func(e *Explod) {
-						e.window = [4]float32{
-							exp[0].evalF(c) * redirscale,
-							exp[1].evalF(c) * redirscale,
-							exp[2].evalF(c) * redirscale,
-							exp[3].evalF(c) * redirscale,
-						}
+						e.window[0] = exp[0].evalF(c) * redirscale
+						e.window[1] = exp[1].evalF(c) * redirscale
+						e.window[2] = exp[2].evalF(c) * redirscale
+						e.window[3] = exp[3].evalF(c) * redirscale
 					})
 				} else {
 					sys.appendToConsole(crun.warn() + "invalid explod window")
@@ -14479,12 +14475,10 @@ func (sc modifyStageVar) Run(c *Char, _ []int32) bool {
 			}
 		case modifyStageVar_shadow_window:
 			if len(exp) >= 4 {
-				s.sdw.window = [4]float32{
-					exp[0].evalF(c) * scaleratio,
-					exp[1].evalF(c) * scaleratio,
-					exp[2].evalF(c) * scaleratio,
-					exp[3].evalF(c) * scaleratio,
-				}
+				s.sdw.window[0] = exp[0].evalF(c) * scaleratio
+				s.sdw.window[1] = exp[1].evalF(c) * scaleratio
+				s.sdw.window[2] = exp[2].evalF(c) * scaleratio
+				s.sdw.window[3] = exp[3].evalF(c) * scaleratio
 			} else {
 				sys.appendToConsole(c.warn() + "invalid shadow.window")
 			}
@@ -14529,12 +14523,10 @@ func (sc modifyStageVar) Run(c *Char, _ []int32) bool {
 			}
 		case modifyStageVar_reflection_window:
 			if len(exp) >= 4 {
-				s.reflection.window = [4]float32{
-					exp[0].evalF(c) * scaleratio,
-					exp[1].evalF(c) * scaleratio,
-					exp[2].evalF(c) * scaleratio,
-					exp[3].evalF(c) * scaleratio,
-				}
+				s.reflection.window[0] = exp[0].evalF(c) * scaleratio
+				s.reflection.window[1] = exp[1].evalF(c) * scaleratio
+				s.reflection.window[2] = exp[2].evalF(c) * scaleratio
+				s.reflection.window[3] = exp[3].evalF(c) * scaleratio
 			} else {
 				sys.appendToConsole(c.warn() + "invalid reflection.window")
 			}
@@ -15101,12 +15093,10 @@ func (sc transformSprite) Run(c *Char, _ []int32) bool {
 		switch paramID {
 		case transformSprite_window:
 			if len(exp) >= 4 {
-				crun.window = [4]float32{
-					exp[0].evalF(c) * redirscale,
-					exp[1].evalF(c) * redirscale,
-					exp[2].evalF(c) * redirscale,
-					exp[3].evalF(c) * redirscale,
-				}
+				crun.window[0] = exp[0].evalF(c) * redirscale
+				crun.window[1] = exp[1].evalF(c) * redirscale
+				crun.window[2] = exp[2].evalF(c) * redirscale
+				crun.window[3] = exp[3].evalF(c) * redirscale
 			} else {
 				sys.appendToConsole(crun.warn() + "invalid TransformSprite window")
 			}
@@ -15366,12 +15356,10 @@ func (sc modifyShadow) Run(c *Char, _ []int32) bool {
 			}
 		case modifyShadow_window:
 			if len(exp) >= 4 {
-				crun.shadowWindow = [4]float32{
-					exp[0].evalF(c) * redirscale,
-					exp[1].evalF(c) * redirscale,
-					exp[2].evalF(c) * redirscale,
-					exp[3].evalF(c) * redirscale,
-				}
+				crun.shadowWindow[0] = exp[0].evalF(c) * redirscale
+				crun.shadowWindow[1] = exp[1].evalF(c) * redirscale
+				crun.shadowWindow[2] = exp[2].evalF(c) * redirscale
+				crun.shadowWindow[3] = exp[3].evalF(c) * redirscale
 			} else {
 				sys.appendToConsole(crun.warn() + "invalid ModifyShadow window")
 			}
@@ -15468,12 +15456,10 @@ func (sc modifyReflection) Run(c *Char, _ []int32) bool {
 			}
 		case modifyReflection_window:
 			if len(exp) >= 4 {
-				crun.reflectWindow = [4]float32{
-					exp[0].evalF(c) * redirscale,
-					exp[1].evalF(c) * redirscale,
-					exp[2].evalF(c) * redirscale,
-					exp[3].evalF(c) * redirscale,
-				}
+				crun.reflectWindow[0] = exp[0].evalF(c) * redirscale
+				crun.reflectWindow[1] = exp[1].evalF(c) * redirscale
+				crun.reflectWindow[2] = exp[2].evalF(c) * redirscale
+				crun.reflectWindow[3] = exp[3].evalF(c) * redirscale
 			} else {
 				sys.appendToConsole(crun.warn() + "invalid ModifyReflection window")
 			}
