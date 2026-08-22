@@ -1736,10 +1736,8 @@ type Explod struct {
 	syncLayer           int32
 	syncId              int32
 	aimg                *AfterImage
-	//lockSpriteFacing     bool
 	localscl   float32
 	localcoord float32
-	//blendmode            int32
 	start_animelem       int32
 	start_scale          [2]float32
 	start_alpha          [2]int32
@@ -2138,7 +2136,7 @@ func (e *Explod) update() {
 		}
 	}
 
-	if sys.tickFrame() && act {
+	if act && sys.tickFrame() {
 		e.anim.UpdateSprite()
 	}
 
@@ -2230,9 +2228,6 @@ func (e *Explod) cueDraw() {
 	act := e.canAct()
 
 	facing := e.trueFacing()
-	//if e.lockSpriteFacing {
-	//	facing = -1
-	//}
 
 	var pfx *PalFX
 	if e.palfx != nil && (!e.anim.isCommonFX() || e.ownpal) {
@@ -2388,7 +2383,7 @@ func (e *Explod) cueDraw() {
 }
 
 func (e *Explod) Interpolate(act bool, scale *[2]float32, alpha *[2]int32, rot *Rotation, fLength *float32, xshear *float32) {
-	if sys.tickNextFrame() && act {
+	if act && sys.tickNextFrame() {
 		// Determine progress (inverted)
 		t := float32(e.interpolate_time[1]) / float32(e.interpolate_time[0])
 
@@ -7364,10 +7359,7 @@ func (c *Char) commitExplod(i int) {
 			}
 			if j < 2 {
 				e.scale[j] = 1
-				//if e.blendmode == 1 {
-				//if e.trans == TT_add { // Any add?
 				e.alpha[j] = 255
-				//}
 			}
 			e.rot = Rotation{}
 		}
