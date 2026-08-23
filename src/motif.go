@@ -3396,6 +3396,12 @@ func (me *MotifMenu) step(m *Motif) {
 		m.fadeIn.step()
 	}
 
+	// Drive the fightscreen's fade when quitting since sys.action() is paused
+	// TODO: Maybe we should be using the motif's fadeout here. Would require no workarounds
+	if sys.endMatch && me.state == ME_ClosingOut {
+		sys.fightScreen.round.fadeOut.step()
+	}
+
 	pm := me.pauseMenu(m)
 	switch me.state {
 	case ME_OpeningOut:
@@ -3414,6 +3420,15 @@ func (me *MotifMenu) step(m *Motif) {
 			me.state = ME_Open
 		}
 	case ME_ClosingOut:
+		// If exiting match from the pause menu
+		if sys.endMatch {
+			if sys.fightScreen.round.fadeOut.isActive() {
+				return
+			}
+			me.reopenLock = true
+			me.reset(m)
+			return
+		}
 		if m.fadeOut.isActive() {
 			return
 		}
@@ -3439,7 +3454,7 @@ func (me *MotifMenu) runLua(m *Motif) {
 	}
 	if ok, err := ExecFunc(sys.luaLState, "menuRun"); err != nil {
 		sys.luaLState.RaiseError("Error executing Lua code: %v\n", err.Error())
-	} else if !ok && !sys.endMatch {
+	} else if !ok {
 		me.requestClose(m)
 	}
 }
@@ -3514,11 +3529,16 @@ func (ch *MotifChallenger) step(m *Motif) {
 		startFadeOut(m.ChallengerInfo.FadeOut.FadeData, m.fadeOut, false, m.fadePolicy)
 		ch.endTimer = ch.counter + m.fadeOut.timeRemaining
 	}
-	sys.setGSF(GSF_nobardisplay)
-	sys.setGSF(GSF_nomusic)
-	sys.setGSF(GSF_timerfreeze)
+
+	// These were a convenience. Motif should block these things directly or with system flags instead
+	//sys.setGSF(GSF_nobardisplay) // They already hide without this
+	//sys.setGSF(GSF_nomusic) // Checked in tickSound()
+	//sys.setGSF(GSF_timerfreeze) // Now redundant because game pauses
+
 	if ch.counter == m.ChallengerInfo.Pause.Time {
-		sys.pausetime = m.ChallengerInfo.Time + m.ChallengerInfo.FadeOut.FadeData.duration()
+		// Motif shouldn't touch game variables
+		// https://github.com/ikemen-engine/Ikemen-GO/issues/3684
+		//sys.pausetime = m.ChallengerInfo.Time + m.ChallengerInfo.FadeOut.FadeData.duration()
 		sys.stopAllCharSounds()
 	}
 	if ch.counter == m.ChallengerInfo.Snd.Time {
