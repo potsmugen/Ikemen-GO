@@ -1628,12 +1628,6 @@ func (ai *AfterImage) isActive() bool {
 }
 
 func (ai *AfterImage) recAndCue(sd *SpriteData, playerNo int, rec bool, hitpause bool) {
-	// Record first so the current frame can be cued immediately
-	// https://github.com/ikemen-engine/Ikemen-GO/issues/1227
-	if rec || hitpause && ai.ignorehitpause {
-		ai.recAfterImg(sd, hitpause)
-	}
-
 	end := (Min(Min(ai.reccount, int32(len(ai.imgs))), ai.length) / ai.framegap) * ai.framegap
 
 	// Cue afterimage frames from the history buffer at every framegap interval
@@ -1677,6 +1671,12 @@ func (ai *AfterImage) recAndCue(sd *SpriteData, playerNo int, rec bool, hitpause
 
 			// Note: Afterimages don't cast shadows or reflections
 		}
+	}
+
+	// Moving this block before the loop would fix https://github.com/ikemen-engine/Ikemen-GO/issues/1227
+	// But that is less efficient because then all afterimages duplicate the current frame of the character
+	if rec || hitpause && ai.ignorehitpause {
+		ai.recAfterImg(sd, hitpause)
 	}
 }
 
