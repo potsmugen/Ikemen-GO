@@ -126,6 +126,35 @@ func Abs[T int | int32 | int64 | float32 | float64](val T) (res T) {
 }
 
 func Pow(x, y float32) float32 {
+	// Fast path for non-negative integer exponents that can be represented in float32
+	if y >= 0 && y < (1<<24) && y == float32(int(y)) {
+		n := uint(y)
+		// Fastest path for small exponents
+		switch n {
+		case 0:
+			return 1
+		case 1:
+			return x
+		case 2:
+			return x * x
+		case 3:
+			return x * x * x
+		case 4:
+			x2 := x * x
+			return x2 * x2
+		}
+		// Loop-based squaring for larger exponents
+		result := float32(1)
+		for n > 0 {
+			if n&1 != 0 {
+				result *= x
+			}
+			x *= x
+			n >>= 1
+		}
+		return result
+	}
+	// General-purpose fallback
 	return float32(math.Pow(float64(x), float64(y)))
 }
 
