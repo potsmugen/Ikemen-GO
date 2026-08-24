@@ -2,7 +2,7 @@ module github.com/ikemen-engine/Ikemen-GO
 
 go 1.20
 
-replace github.com/gopxl/beep/v2 => github.com/gopxl/beep/v2 v2.1.1-0.20240921133731-defe79638e99
+replace github.com/gopxl/beep/v2 => github.com/potsmugen/beep/v2 v2.0.0-20260824175951-997bd5f733f3
 
 require (
 	github.com/Eiton/vulkan v0.0.0-20251125114215-6585a2a8590b
@@ -45,5 +45,5 @@ require (
 	github.com/samhocevar/go-meltysynth v0.0.0-20230403180939-aca4a036cb16 // indirect
 	golang.org/x/exp v0.0.0-20220609121020-a51bd0440498
 	golang.org/x/image v0.22.0
-	golang.org/x/sys v0.18.0
+	golang.org/x/sys v0.25.0
 )
