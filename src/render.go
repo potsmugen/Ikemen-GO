@@ -84,6 +84,7 @@ type Renderer interface {
 	SetModelIndexData(bufferIndex uint32, values ...uint32)
 
 	RenderQuad()
+	RenderQuadBatch(vertexCount int32)
 	RenderElements(mode PrimitiveMode, count, offset int)
 	RenderShadowMapElements(mode PrimitiveMode, count, offset int)
 	RenderCubeMap(envTexture Texture, cubeTexture Texture)
@@ -142,6 +143,12 @@ var gfxFont FontRenderer
 
 // Counter for unique texture cache serial numbers
 var textureSerialNumber uint64
+
+// Reusable buffers for batched sprite vertices (quads)
+var (
+    quadVertexScratch []float32
+    tileScratch       []float32
+)
 
 // Blend constants
 type BlendFunc int
@@ -476,8 +483,38 @@ func transformTextQuad(x1, y1, x2, y2, x3, y3, x4, y4, rxadd float32,
 	return x1, y1, x2, y2, x3, y3, x4, y4
 }
 
+// Helper to transform a point by a 4x4 matrix
+func transformPoint(mat mgl.Mat4, x, y float32) (float32, float32) {
+    v := mat.Mul4x1(mgl.Vec4{x, y, 0, 1})
+    return v[0], v[1]
+}
+
+// Helper to append a quad as two triangles to the batch
+func appendTransformedQuadTriangles(batch []float32, mat mgl.Mat4, x1, y1, x2, y2, x3, y3, x4, y4 float32) []float32 {
+	uvBias := float32(0.000002)
+	p2x, p2y := transformPoint(mat, x2, y2)
+	p3x, p3y := transformPoint(mat, x3, y3)
+	p1x, p1y := transformPoint(mat, x1, y1)
+	p4x, p4y := transformPoint(mat, x4, y4)
+
+	// Vertices are laid out in triangle strip order, matching the single quad order
+	if len(batch) > 0 {
+		lastX, lastY, lastU, lastV := batch[len(batch)-4], batch[len(batch)-3], batch[len(batch)-2], batch[len(batch)-1]
+		batch = append(batch, lastX, lastY, lastU, lastV)
+		batch = append(batch, p2x, p2y, 1, 1-uvBias)
+	}
+	batch = append(batch,
+		p2x, p2y, 1, 1-uvBias,
+		p3x, p3y, 1, 0,
+		p1x, p1y, uvBias, 1-uvBias,
+		p4x, p4y, uvBias, 0,
+	)
+	return batch
+}
+
 // Render a quad with optional horizontal tiling
-func renderSpriteHTile(modelview mgl.Mat4, x1, y1, x2, y2, x3, y3, x4, y4, dy, width float32, rp RenderParams) {
+// Now accumulates into batch instead of drawing immediately
+func renderSpriteHTile(batch []float32, modelview mgl.Mat4, x1, y1, x2, y2, x3, y3, x4, y4, dy, width float32, rp RenderParams) []float32 {
 	//            p3
 	//    p4 o-----o-----o- - -o
 	//      /      |      \     ` .
@@ -542,8 +579,12 @@ func renderSpriteHTile(modelview mgl.Mat4, x1, y1, x2, y2, x3, y3, x4, y4, dy, w
 			mat = mat.Mul4(mgl.Translate3D(-rotCenterX, -rotCenterY, 0))
 		}
 
-		drawQuads(mat, x1d, y1, x2d, y2, x3d, y3, x4d, y4)
+		// Batching: append transformed quad instead of drawQuads
+		//drawQuads(mat, x1d, y1, x2d, y2, x3d, y3, x4d, y4)
+		batch = appendTransformedQuadTriangles(batch, mat, x1d, y1, x2d, y2, x3d, y3, x4d, y4)
 	}
+
+	return batch
 }
 
 func renderSpriteQuad(modelview mgl.Mat4, rp RenderParams) {
@@ -559,6 +600,7 @@ func renderSpriteQuad(modelview mgl.Mat4, rp RenderParams) {
 	//	pers = Abs(rp.xbs) / Abs(rp.xts)
 	//}
 
+	// Early return for rotated, non‑tiled sprite. Keep as is
 	if !rp.rot.IsZero() && rp.tile.xflag == 0 && rp.tile.yflag == 0 {
 		// TODO: This block makes shadows ignore their own yscale when in perspective
 		// However, when we disable it, regular shadows are scaled incorrectly even with the smallest roation
@@ -578,12 +620,17 @@ func renderSpriteQuad(modelview mgl.Mat4, rp RenderParams) {
 		drawQuads(modelview, x1, y1, x2, y2, x3, y3, x4, y4)
 		return
 	}
+
+	// Reset quads scratch buffer
+	batch := quadVertexScratch[:0]
+
 	if rp.tile.yflag == 1 && rp.xbs != 0 {
 		x1 += rp.rxadd * rp.ys * float32(rp.size[1])
 		x2 = x1 + rp.xbs*float32(rp.size[0])
 		x1d, y1d, x2d, y2d, x3d, y3d, x4d, y4d := x1, y1, x2, y2, x3, y3, x4, y4
 		n := 0
-		var xy []float32
+		xy := tileScratch[:0]
+
 		for {
 			x1d, y1d = x4d, y4d+rp.ys*rp.vs*((float32(rp.tile.yspacing)+float32(rp.size[1]))/rp.yas-float32(rp.size[1]))
 			x2d, y2d = x3d, y1d
@@ -604,6 +651,7 @@ func renderSpriteQuad(modelview mgl.Mat4, rp RenderParams) {
 			n += 1
 			xy = append(xy, x1d, x2d, x3d, x4d, y1d, y2d, y3d, y4d)
 		}
+
 		for {
 			if len(xy) == 0 {
 				break
@@ -611,10 +659,16 @@ func renderSpriteQuad(modelview mgl.Mat4, rp RenderParams) {
 			x1d, x2d, x3d, x4d, y1d, y2d, y3d, y4d, xy = xy[len(xy)-8], xy[len(xy)-7], xy[len(xy)-6], xy[len(xy)-5], xy[len(xy)-4], xy[len(xy)-3], xy[len(xy)-2], xy[len(xy)-1], xy[:len(xy)-8]
 			if (0 > y1d || 0 > y4d) &&
 				(y1d > float32(-sys.scrrect[3]) || y4d > float32(-sys.scrrect[3])) {
-				renderSpriteHTile(modelview, x1d, y1d, x2d, y2d, x3d, y3d, x4d, y4d, y1d-y1, float32(rp.size[0]), rp)
+				// Batching: accumulate instead of calling renderSpriteHTile right away
+				//renderSpriteHTile(modelview, x1d, y1d, x2d, y2d, x3d, y3d, x4d, y4d, y1d-y1, float32(rp.size[0]), rp)
+				batch = renderSpriteHTile(batch, modelview, x1d, y1d, x2d, y2d, x3d, y3d, x4d, y4d, y1d-y1, float32(rp.size[0]), rp)
 			}
 		}
+
+		// Update scratch buffer with new capacity
+		tileScratch = xy
 	}
+
 	if rp.tile.yflag == 0 || rp.xts != 0 {
 		x1 += rp.rxadd * rp.ys * float32(rp.size[1])
 		x2 = x1 + rp.xbs*float32(rp.size[0])
@@ -630,7 +684,9 @@ func renderSpriteQuad(modelview mgl.Mat4, rp RenderParams) {
 			}
 			if (0 > y1 || 0 > y4) &&
 				(y1 > float32(-sys.scrrect[3]) || y4 > float32(-sys.scrrect[3])) {
-				renderSpriteHTile(modelview, x1, y1, x2, y2, x3, y3, x4, y4, y1-oy, float32(rp.size[0]), rp)
+				// Batching: accumulate via renderSpriteHTile (which handles horizontal tiling internally)
+				//renderSpriteHTile(modelview, x1, y1, x2, y2, x3, y3, x4, y4, y1-oy, float32(rp.size[0]), rp)
+				batch = renderSpriteHTile(batch, modelview, x1, y1, x2, y2, x3, y3, x4, y4, y1-oy, float32(rp.size[0]), rp)
 			}
 			if rp.tile.yflag != 1 && n != 0 {
 				n--
@@ -649,6 +705,21 @@ func renderSpriteQuad(modelview mgl.Mat4, rp RenderParams) {
 			y1 = y2
 		}
 	}
+
+	// Batching: draw everything at once
+	if len(batch) > 0 {
+		// Set modelview to identity because vertices are already transformed
+		identity := mgl.Ident4()
+		gfx.SetUniformMatrix("modelview", identity[:])
+		// x1x2x4x3 is not used for non‑trapezoid sprites; set to safe default
+		gfx.SetUniformF("x1x2x4x3", 0, 0, 0, 0)
+
+		gfx.SetVertexData(batch...)
+		gfx.RenderQuadBatch(int32(len(batch) / 4)) // 4 floats per vertex
+	}
+
+	// Update scratch buffer with new capacity
+    quadVertexScratch = batch
 }
 
 func initRenderSpriteQuad(rp *RenderParams) {
