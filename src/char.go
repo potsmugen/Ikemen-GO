@@ -1673,6 +1673,7 @@ func (ai *AfterImage) isActive() bool {
 func (ai *AfterImage) recAndCue(sd *SpriteData, playerNo int, rec bool, hitpause bool) {
 	end := (Min(Min(ai.reccount, int32(len(ai.imgs))), ai.length) / ai.framegap) * ai.framegap
 
+	// Cue afterimage frames from the history buffer at every framegap interval
 	for i := ai.framegap; i <= end; i += ai.framegap {
 		// Respect AfterImageMax
 		if sys.afterImageCount[playerNo] >= sys.cfg.Config.AfterImageMax {
@@ -1715,6 +1716,10 @@ func (ai *AfterImage) recAndCue(sd *SpriteData, playerNo int, rec bool, hitpause
 		}
 	}
 
+	// Moving this block before the loop would fix https://github.com/ikemen-engine/Ikemen-GO/issues/1227
+	// But that is less efficient because then "framegap = 1" afterimages duplicate the current frame of the character
+	// Ikemen's way is also truer to Mugen's documentation:
+	// "The character's frames are stored in a history buffer, and are displayed *after a delay* as afterimages."
 	if rec || hitpause && ai.ignorehitpause {
 		ai.recAfterImg(sd, hitpause)
 	}
@@ -13550,84 +13555,85 @@ func (cl *CharList) replace(newChar *Char, pn, idx int) bool {
 func (cl *CharList) commandUpdate() {
 	// Iterate players
 	for i, p := range sys.chars {
-		if len(p) > 0 {
-			root := p[0]
-			// The async Turns loader keeps its standby root disabled while populating command lists.
-			if root.scf(SCF_disabled) {
+		if len(p) == 0 {
+			continue
+		}
+		root := p[0]
+		// The async Turns loader keeps its standby root disabled while populating command lists.
+		if root.scf(SCF_disabled) {
+			continue
+		}
+		// Select a random command for AI cheating
+		// The way this only allows one command to be cheated at a time may be the cause of issue #2022
+		cheat := int32(-1)
+		if root.controller < 0 {
+			if sys.roundState() == 2 && RandF32(0, sys.aiLevel[i]/2+32) > 32 { // TODO: Balance AI scaling
+				cheat = Rand(0, int32(len(root.cmd[root.ss.sb.playerNo].Commands))-1)
+			}
+		}
+		// Iterate root and helpers
+		for _, c := range p {
+			act := true
+			if sys.supertime > 0 {
+				act = c.superMovetime != 0
+			} else if sys.pausetime > 0 && c.pauseMovetime == 0 {
+				act = false
+			}
+			// Auto turning check for the root
+			// Having this here makes B and F inputs reverse the same instant the character turns
+			if act && c.helperIndex == 0 && (c.scf(SCF_ctrl) || sys.roundState() > 2) &&
+				(c.ss.no == 0 || c.ss.no == 11 || c.ss.no == 20 ||
+					c.ss.no == 52 && (c.animTime() == 0 || (c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0))) {
+				c.autoTurn()
+			}
+
+			// Update Forward/Back flipping flag
+			c.updateFBFlip()
+
+			// Safety guard: prevent indexing cmd slices when they may be empty.
+			if len(c.cmd) == 0 || (c.helperIndex > 0 && len(root.cmd) == 0) {
 				continue
 			}
-			// Select a random command for AI cheating
-			// The way this only allows one command to be cheated at a time may be the cause of issue #2022
-			cheat := int32(-1)
-			if root.controller < 0 {
-				if sys.roundState() == 2 && RandF32(0, sys.aiLevel[i]/2+32) > 32 { // TODO: Balance AI scaling
-					cheat = Rand(0, int32(len(root.cmd[root.ss.sb.playerNo].Commands))-1)
-				}
-			}
-			// Iterate root and helpers
-			for _, c := range p {
-				act := true
-				if sys.supertime > 0 {
-					act = c.superMovetime != 0
-				} else if sys.pausetime > 0 && c.pauseMovetime == 0 {
-					act = false
-				}
-				// Auto turning check for the root
-				// Having this here makes B and F inputs reverse the same instant the character turns
-				if act && c.helperIndex == 0 && (c.scf(SCF_ctrl) || sys.roundState() > 2) &&
-					(c.ss.no == 0 || c.ss.no == 11 || c.ss.no == 20 ||
-						c.ss.no == 52 && (c.animTime() == 0 || (c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0))) {
-					c.autoTurn()
-				}
-
-				// Update Forward/Back flipping flag
-				c.updateFBFlip()
-
-				// Safety guard: prevent indexing cmd slices when they may be empty.
-				if len(c.cmd) == 0 || (c.helperIndex > 0 && len(root.cmd) == 0) {
+			if (c.helperIndex == 0 || c.helperIndex > 0 && &c.cmd[0] != &root.cmd[0]) &&
+				c.cmd[0].InputUpdate(c, c.controller) {
+				// Clear input buffers and skip the rest of the loop
+				// This used to apply only to the root, but that caused some issues with helper-based custom input systems
+				if c.inputWait() || c.asf(ASF_noinput) {
+					for i := range c.cmd {
+						c.cmd[i].BufReset()
+					}
 					continue
 				}
-				if (c.helperIndex == 0 || c.helperIndex > 0 && &c.cmd[0] != &root.cmd[0]) &&
-					c.cmd[0].InputUpdate(c, c.controller) {
-					// Clear input buffers and skip the rest of the loop
-					// This used to apply only to the root, but that caused some issues with helper-based custom input systems
-					if c.inputWait() || c.asf(ASF_noinput) {
-						for i := range c.cmd {
-							c.cmd[i].BufReset()
-						}
-						continue
+				hpbuf := false
+				pausebuf := false
+				winbuf := false
+				// Buffer during hitpause
+				if c.hitPause() && c.gi().constants["input.pauseonhitpause"] != 0 { // TODO: Deprecated constant
+					hpbuf = true
+					// In Winmugen, commands were buffered for one extra frame after hitpause (but not after Pause/SuperPause)
+					// This was fixed in Mugen 1.0
+					if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.stWgi().mugenver[0] != 1 {
+						winbuf = true
 					}
-					hpbuf := false
-					pausebuf := false
-					winbuf := false
-					// Buffer during hitpause
-					if c.hitPause() && c.gi().constants["input.pauseonhitpause"] != 0 { // TODO: Deprecated constant
-						hpbuf = true
-						// In Winmugen, commands were buffered for one extra frame after hitpause (but not after Pause/SuperPause)
-						// This was fixed in Mugen 1.0
-						if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 && c.stWgi().mugenver[0] != 1 {
-							winbuf = true
-						}
-					}
-					// Buffer during Pause and SuperPause
-					if sys.supertime > 0 {
-						if !act && sys.supertime <= sys.superendcmdbuftime {
-							pausebuf = true
-						}
-					} else if sys.pausetime > 0 {
-						if !act && sys.pausetime <= sys.pauseendcmdbuftime {
-							pausebuf = true
-						}
-					}
-					// Update commands
-					for i := range c.cmd {
-						extratime := Btoi(hpbuf || pausebuf) + Btoi(winbuf)
-						helperbug := c.helperIndex != 0 && c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0
-						c.cmd[i].Step(c.controller < 0, helperbug, hpbuf, pausebuf, extratime)
-					}
-					// Enable AI cheated command
-					c.cpucmd = cheat
 				}
+				// Buffer during Pause and SuperPause
+				if sys.supertime > 0 {
+					if !act && sys.supertime <= sys.superendcmdbuftime {
+						pausebuf = true
+					}
+				} else if sys.pausetime > 0 {
+					if !act && sys.pausetime <= sys.pauseendcmdbuftime {
+						pausebuf = true
+					}
+				}
+				// Update commands
+				for i := range c.cmd {
+					extratime := Btoi(hpbuf || pausebuf) + Btoi(winbuf)
+					helperbug := c.helperIndex != 0 && c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0
+					c.cmd[i].Step(c.controller < 0, helperbug, hpbuf, pausebuf, extratime)
+				}
+				// Enable AI cheated command
+				c.cpucmd = cheat
 			}
 		}
 	}
