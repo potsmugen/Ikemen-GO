@@ -3413,7 +3413,6 @@ type CharGlobalInfo struct {
 	movement                CharMovement
 	states                  map[int32]*StateBytecode
 	callFuncs               map[string]BytecodeFunction
-	hitPauseToggleFlagCount int32
 	quotes                  [MaxQuotes]string
 	movelists               map[int]string
 	portraitscale           float32
@@ -3429,6 +3428,7 @@ type CharGlobalInfo struct {
 	defenceBase             int32
 	canMutateStage          bool // Determines if the stage should be included in save states
 	customShaders           []string
+	//hitPauseToggleFlagCount int32
 }
 
 func newCharGlobalInfo() CharGlobalInfo {
