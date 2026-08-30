@@ -4502,7 +4502,7 @@ func (bf BytecodeFunction) run(c *Char, ret []uint8) (changeState bool) {
 	for _, sc := range bf.ctrls {
 		// Do not check ignorehitpause here. The function call already did it
 		//switch sc.(type) {
-		//case StateBlock:
+		//case *StateBlock:
 		//default:
 		//	if c.hitPause() {
 		//		continue
@@ -4592,7 +4592,7 @@ func newStateBlock() *StateBlock {
 	return &StateBlock{persistent: 1, persistentIndex: -1, ignorehitpause: -2}
 }
 
-func (b StateBlock) Run(c *Char, ps []int32) (changeState bool) {
+func (b *StateBlock) Run(c *Char, ps []int32) (changeState bool) {
 	c.currentSctrlIndex = b.persistentIndex
 	// For Mugen compatibility, if in hitpause and this SCTRL has the same index
 	// as the SCTRL that triggered a ChangeState during the hitpause
@@ -4679,7 +4679,7 @@ func (b StateBlock) Run(c *Char, ps []int32) (changeState bool) {
 			if !interrupt {
 				for _, sc := range b.ctrls {
 					switch sc.(type) {
-					case StateBlock:
+					case *StateBlock:
 					default:
 						if !b.ctrlsIgnorehitpause && c.hitPause() {
 							continue
@@ -4734,7 +4734,7 @@ func (b StateBlock) Run(c *Char, ps []int32) (changeState bool) {
 		}
 		for _, sc := range b.ctrls {
 			switch sc.(type) {
-			case StateBlock:
+			case *StateBlock:
 			default:
 				if !b.ctrlsIgnorehitpause && c.hitPause() {
 					continue
@@ -15649,9 +15649,15 @@ func (sb *StateBytecode) init(c *Char) {
 }
 
 func (sb *StateBytecode) run(c *Char) (changeState bool) {
+	// sb == c.ss.sb picks c.ss.ps (normal state) vs sb.ctrlsps (negative state)
+	// TODO: Maybe this could be better
+	ctrlsps := sb.ctrlsps
+	if sb == c.ss.sb {
+		ctrlsps = c.ss.ps
+	}
 	sys.bcVar = sys.bcVarStack.Alloc(int(sb.numVars))
 	sys.workingState = sb
-	changeState = sb.block.Run(c, sb.ctrlsps)
+	changeState = sb.block.Run(c, ctrlsps)
 	if len(sys.bcStack) != 0 {
 		LogMessage(sys.cgi[sb.playerNo].def)
 		for _, v := range sys.bcStack {
