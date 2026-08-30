@@ -6024,7 +6024,7 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 			sys.chars[pn] = nil
 			sys.cgi[pn].states = nil
 			sys.cgi[pn].palettedata = nil
-			sys.cgi[pn].hitPauseToggleFlagCount = 0
+			//sys.cgi[pn].hitPauseToggleFlagCount = 0
 			return 1
 		}
 		if memberNo >= nsel {
@@ -6542,7 +6542,7 @@ func (l *Loader) load() {
 					if atcpn < 0 || atcpn >= len(sys.stageList[0].attachedchardef) || sys.stageList[0].attachedchardef[atcpn] == "" {
 						sys.chars[i] = nil
 						sys.cgi[i].states = nil
-						sys.cgi[i].hitPauseToggleFlagCount = 0
+						//sys.cgi[i].hitPauseToggleFlagCount = 0
 						charDone[i] = true
 						continue
 					}
@@ -6571,7 +6571,7 @@ func (l *Loader) load() {
 					if !charDone[j] {
 						sys.chars[j] = nil
 						sys.cgi[j].states = nil
-						sys.cgi[j].hitPauseToggleFlagCount = 0
+						//sys.cgi[j].hitPauseToggleFlagCount = 0
 						charDone[j] = true
 					}
 				}
