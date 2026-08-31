@@ -8365,7 +8365,7 @@ func (c *CharCompiler) Compile(pn int, def string, constants map[string]float32)
 
 	// Compile states
 	sys.stringPool[pn].Clear()
-	sys.cgi[pn].hitPauseToggleFlagCount = 0
+	//sys.cgi[pn].hitPauseToggleFlagCount = 0
 
 	// Compile state files
 	for _, s := range st {
