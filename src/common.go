@@ -1937,7 +1937,7 @@ func CalculateAspect[T int | int32 | float32 | float64](w, h T) float32 {
 }
 
 // Ensures a rectangle is represented as "left, top, right, bottom"
-func NormalizeRect(rect [4]float32) [4]float32 {
+func NormalizeRect[T int | int32 | int64 | float32 | float64](rect [4]T) [4]T {
 	if rect[0] > rect[2] {
 		rect[0], rect[2] = rect[2], rect[0]
 	}
