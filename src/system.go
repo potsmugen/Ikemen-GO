@@ -250,6 +250,8 @@ type System struct {
 	charList            CharList
 	cgi                 [MaxPlayerNo]CharGlobalInfo
 	turnsPreloadMember  [2]int // -1 = none; otherwise selected Turns member index to load into side+2
+	preloadedChars      [2]*Char // For Turns background loading
+	preloadedCharsMutex sync.Mutex
 	selMutex            sync.RWMutex
 	loadMutex           sync.Mutex
 	ignoreMostErrors    bool
@@ -1171,6 +1173,8 @@ drained:
 		s.chars[i] = nil
 		s.cgi[i].palno = -1
 	}
+	// preloadedChars isn't cleared here: this function's one caller, loadCancel(), already
+	// calls s.loader.reset() immediately before this, which clears it.
 
 	if s.stage != nil {
 		s.stage.destroy()
@@ -3498,15 +3502,16 @@ func (s *System) roundEndDecision() bool {
 		l := [2]float32{}
 		for i := 0; i < 2; i++ { // Check life percentage of each team
 			for j := i; j < MaxSimul*2; j += 2 {
-				if len(s.chars[j]) > 0 {
-					if s.chars[j][0].teamside == -1 {
-						continue
-					}
-					if s.tmode[i] == TM_Simul || s.tmode[i] == TM_Tag {
-						l[i] += (float32(s.chars[j][0].life) / float32(s.numSimul[i])) / float32(s.chars[j][0].lifeMax)
-					} else {
-						l[i] += float32(s.chars[j][0].life) / float32(s.chars[j][0].lifeMax)
-					}
+				if len(s.chars[j]) == 0 {
+					continue
+				}
+				if s.chars[j][0].teamside == -1 {
+					continue
+				}
+				if s.tmode[i] == TM_Simul || s.tmode[i] == TM_Tag {
+					l[i] += (float32(s.chars[j][0].life) / float32(s.numSimul[i])) / float32(s.chars[j][0].lifeMax)
+				} else {
+					l[i] += float32(s.chars[j][0].life) / float32(s.chars[j][0].lifeMax)
 				}
 			}
 		}
@@ -4494,7 +4499,12 @@ func (bk *RoundStartBackup) Restore() {
 			continue
 		}
 
-		// Staged Turns preload can create standby P3/P4 after roundBackup.Save()
+		// Defensive: a slot can hold live chars now with no matching Save()-time backup.
+		// The Turns-preload cause this once guarded against can't happen anymore - a
+		// staged member never touches sys.chars until promotion (see getPreloadedChar/
+		// setPreloadedChar), and promotion always replaces an already-backed-up slot,
+		// never creates one from nothing. Kept in case a mid-round reload (reloadCharSlot)
+		// populates a slot Save() didn't know about.
 		if len(bk.charBackup[i]) == 0 {
 			sys.clearPlayerAssets(i, true)
 			sys.removePlayerFromCharList(i)
@@ -5751,10 +5761,10 @@ func (s *System) startNextTurnsPreload() {
 		if member <= 0 || member >= int(s.numTurns[team]) || member >= len(s.sel.selected[team]) {
 			continue
 		}
-		pn := team + 2 // one hidden standby slot per Turns side
-		if len(s.chars[pn]) > 0 && s.chars[pn][0] != nil &&
-			s.chars[pn][0].memberNo == member &&
-			s.chars[pn][0].selectNo == s.sel.selected[team][member][0] {
+		// Desired member is already fully preloaded and waiting to be promoted
+		if sb := s.getPreloadedChar(team); sb != nil &&
+			sb.memberNo == member &&
+			sb.selectNo == s.sel.selected[team][member][0] {
 			continue
 		}
 		next[team] = member
@@ -5875,35 +5885,48 @@ func (s *System) removePlayerFromCharList(pn int) {
 	}
 }
 
-func (s *System) setBGTurnsSlotState(chars []*Char, slot int, active bool) {
+// getPreloadedChar, setPreloadedChar and clearPreloadedChars are the only sanctioned way to touch
+// preloadedChars: it's written by the loader goroutine and read/promoted by the main one.
+func (s *System) getPreloadedChar(team int) *Char {
+	s.preloadedCharsMutex.Lock()
+	defer s.preloadedCharsMutex.Unlock()
+	return s.preloadedChars[team]
+}
+
+func (s *System) setPreloadedChar(team int, c *Char) {
+	s.preloadedCharsMutex.Lock()
+	defer s.preloadedCharsMutex.Unlock()
+	s.preloadedChars[team] = c
+}
+
+func (s *System) clearPreloadedChars() {
+	s.preloadedCharsMutex.Lock()
+	defer s.preloadedCharsMutex.Unlock()
+	s.preloadedChars = [2]*Char{}
+}
+
+// Set up a promoted Turns fighter's slot-scoped fields (team, controller, life-recovery guard).
+// A background-preloaded member never has these applied while staged: it isn't reachable through
+// sys.chars or CharList until this call, so there's nothing to hide behind disabled/standby flags.
+func (s *System) activateTurnsSlot(chars []*Char, slot int) {
 	team := slot & 1
 	for _, ch := range chars {
 		if ch == nil {
 			continue
 		}
-		if active {
-			ch.teamside = team
-			ch.unsetSCF(SCF_disabled)
-			ch.unsetSCF(SCF_standby)
-			if ch.helperIndex == 0 {
-				ch.controller = slot
-				if s.aiLevel[slot] != 0 {
-					ch.controller ^= -1
-				}
-				// Defensive: the real round initialization will run next, but
-				// never let a promoted preloaded fighter enter as already dead.
-				if ch.life <= 0 {
-					ch.life = Max(1, ch.lifeMax)
-					ch.redLife = ch.life
-				}
+		ch.teamside = team
+		ch.unsetSCF(SCF_disabled)
+		ch.unsetSCF(SCF_standby)
+		if ch.helperIndex == 0 {
+			ch.controller = slot
+			if s.aiLevel[slot] != 0 {
+				ch.controller ^= -1
 			}
-		} else {
-			ch.teamside = -1
-			ch.setSCF(SCF_disabled)
-			ch.setSCF(SCF_standby)
-			ch.setCtrl(false)
-			if ch.helperIndex == 0 {
-				ch.controller = slot
+			// Defensive: the real round initialization will run next, but
+			// never let a promoted preloaded fighter enter as already dead.
+			if ch.life <= 0 {
+				ch.life = Max(1, ch.lifeMax)
+				ch.redLife = ch.life
 			}
 		}
 	}
@@ -5919,31 +5942,29 @@ func (s *System) activateNextTurnsFighters() {
 		if nextMember < 0 || nextMember >= int(s.numTurns[team]) {
 			continue
 		}
-		dst := team
-		src := team + 2
-		if src < 0 || src >= MaxSimul*2 {
+		// Incoming fighter comes from the standby holder, never from sys.chars: it isn't live yet
+		incoming := s.getPreloadedChar(team)
+		if incoming == nil || incoming.memberNo != nextMember {
 			continue
 		}
-		if len(s.chars[src]) == 0 || s.chars[src][0] == nil ||
-			s.chars[src][0].memberNo != nextMember {
+		dst := team
+		src := team + 2 // slot incoming was compiled under while on standby
+		if src < 0 || src >= MaxSimul*2 {
 			continue
 		}
 		outgoingPower := s.chars[dst][0].power
 		s.removePlayerFromCharList(dst)
-		s.removePlayerFromCharList(src)
-		oldDst, oldSrc := dst, src
-		s.chars[dst], s.chars[src] = s.chars[src], s.chars[dst]
-		s.cgi[dst], s.cgi[src] = s.cgi[src], s.cgi[dst]
-		s.stringPool[dst], s.stringPool[src] = s.stringPool[src], s.stringPool[dst]
-		s.remapCharSlotRefs(s.chars[dst], oldSrc, dst)
-		s.remapCharSlotRefs(s.chars[src], oldDst, src)
+		s.removePlayerFromCharList(src) // defensive: src should already be empty going into this
+		s.chars[dst] = []*Char{incoming}
+		s.setPreloadedChar(team, nil)
+		s.cgi[dst] = s.cgi[src]
+		s.stringPool[dst] = s.stringPool[src]
+		s.remapCharSlotRefs(s.chars[dst], src, dst)
 		s.rebindCgiStateOwners(dst)
-		s.rebindCgiStateOwners(src)
 		s.workingChar = nil
 		s.workingState = nil
-		s.setBGTurnsSlotState(s.chars[dst], dst, true)
+		s.activateTurnsSlot(s.chars[dst], dst)
 		s.chars[dst][0].power = outgoingPower
-		s.setBGTurnsSlotState(s.chars[src], src, false)
 		if s.chars[dst][0].id < 0 {
 			s.chars[dst][0].id = s.newCharId()
 		}
@@ -5953,6 +5974,12 @@ func (s *System) activateNextTurnsFighters() {
 			}
 		}
 		s.charList.enemyNearChanged = true
+
+		// Outgoing (just-defeated) fighter is discarded, matching legacy Turns behavior.
+		// Slot is left clean for the next background preload to compile into.
+		s.chars[src] = nil
+		s.cgi[src] = CharGlobalInfo{}
+		s.stringPool[src] = *NewStringPool()
 	}
 }
 
@@ -6004,12 +6031,12 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 		if memberNo >= nsel {
 			return 0
 		}
-		if sys.turnsPreloadActive() &&
-			len(sys.chars[pn]) > 0 &&
-			sys.chars[pn][0] != nil &&
-			sys.chars[pn][0].memberNo == memberNo &&
-			sys.chars[pn][0].selectNo == teamSel[memberNo][0] {
-			return 1
+		if sys.turnsPreloadActive() {
+			if sb := sys.getPreloadedChar(team); sb != nil &&
+				sb.memberNo == memberNo &&
+				sb.selectNo == teamSel[memberNo][0] {
+				return 1
+			}
 		}
 	} else if !attached && sys.roundsExisted[team] > 0 {
 		return 1
@@ -6184,25 +6211,17 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 		p.teamside = p.playerNo & 1
 	}
 
-	// Commit character to system
-	sys.chars[pn] = make([]*Char, 1)
-	sys.chars[pn][0] = p
-	if !attached && tm == TM_Turns && sys.cfg.Config.TurnsLoading {
-		sys.setBGTurnsSlotState(sys.chars[pn], pn, pn < 2 && !sys.turnsPreloadActive())
-	}
-
-	// Load character
+	// Load character. Kept off sys.chars until fully loaded and compiled: that slice is the
+	// live/running char list, and other systems read it unconditionally every frame.
 	if !sameChar {
 		if l.cancelRequested() || l.state == LS_Cancel || sys.gameEnd {
 			return 0
 		}
 		if l.err = p.load(cdef); l.err != nil {
 			if errors.Is(l.err, ErrLoadingCanceled) {
-				sys.chars[pn] = nil
 				l.state = LS_Cancel
 				return 0
 			}
-			sys.chars[pn] = nil
 			if attached {
 				tstr = fmt.Sprintf("WARNING: Failed to load new attached char: %v", cdef)
 			} else {
@@ -6211,14 +6230,12 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 			return -1
 		}
 		if l.cancelRequested() || l.state == LS_Cancel || sys.gameEnd {
-			sys.chars[pn] = nil
 			l.state = LS_Cancel
 			return 0
 		}
 
 		// Compile character states
-		if sys.cgi[pn].states, l.err = newCharCompiler().Compile(p.playerNo, cdef, p.gi().constants); l.err != nil {
-			sys.chars[pn] = nil
+		if sys.cgi[pn].states, l.err = newCharCompiler().Compile(p, cdef); l.err != nil {
 			if attached {
 				tstr = fmt.Sprintf("WARNING: Failed to compile new attached char states: %v", cdef)
 			} else {
@@ -6226,6 +6243,27 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 			}
 			return -1
 		}
+	}
+
+	// Commit character now that loading and compiling both succeeded.
+	// Three mutually exclusive cases, not two nested ones: an ordinary character, a
+	// background Turns preload (goes to the standby holder, not sys.chars), or the
+	// Turns active slot (goes to sys.chars like normal, plus slot activation).
+	turnsLoading := !attached && tm == TM_Turns && sys.cfg.Config.TurnsLoading
+	if turnsLoading {
+		if sys.turnsPreloadActive() {
+			// Not live yet, so it goes into the standby holder instead of sys.chars, which is
+			// meant to be the live char list. Stays exactly as newChar() made it - no
+			// disabled/standby flags needed, since it simply isn't reachable through sys.chars
+			// or CharList until promoted.
+			sys.setPreloadedChar(team, p)
+		} else {
+			// This is the active slot (0 or 1), not a background preload.
+			sys.chars[pn] = []*Char{p}
+			sys.activateTurnsSlot(sys.chars[pn], pn)
+		}
+	} else {
+		sys.chars[pn] = []*Char{p}
 	}
 
 	// Setup selected palette
@@ -6570,28 +6608,32 @@ func (l *Loader) load() {
 }
 
 func (l *Loader) reset() {
-	// Already idle
-	if l.state == LS_NotYet {
+	switch l.state {
+	case LS_NotYet:
+		// Idle already: no loader goroutine running, and preloadedChars can only be written
+		// while Loading, so there's nothing here that needs clearing.
 		return
-	}
-
-	if l.state == LS_Loading {
-		// Ensure the loader goroutine gets a cooperative cancel signal.
+	case LS_Loading:
+		// Ensure the loader goroutine gets a cooperative cancel signal, then wait for it to exit.
 		l.requestCancel()
 		l.state = LS_Cancel
 		<-l.loadExit
-	} else {
-		// Loader already stopped
-		// Don't wait on loadExit because that can hang if nothing is left to receive
+	default:
+		// Loader already stopped; don't wait on loadExit since nothing is left to receive.
 		select {
 		case <-l.loadExit:
 		default:
 		}
 	}
+
 	l.state = LS_NotYet
 	l.err = nil
 	l.cancelCh = nil
 	l.cancelOnce = sync.Once{}
+
+	// The loader goroutine - the only other writer of preloadedChars - is guaranteed stopped
+	// by this point, so it's safe to clear whatever it produced.
+	sys.clearPreloadedChars()
 
 	// Drop palette selections from a cancelled load
 	for i := range sys.cgi {

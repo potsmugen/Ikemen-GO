@@ -4029,23 +4029,10 @@ func (c *Char) si() *SelectChar {
 	return &sys.sel.charlist[c.selectNo]
 }
 
-func (c *Char) bgLoadedTurnsRoot() bool {
-	return sys.cfg.Config.TurnsLoading &&
-		c.helperIndex == 0 &&
-		c.playerNo >= 0 &&
-		c.playerNo < MaxSimul*2 &&
-		sys.tmode[c.playerNo&1] == TM_Turns
-}
-
 func (c *Char) ocd() *OverrideCharData {
 	team := c.teamside
-	if c.teamside == -1 {
-		// BG-loaded Turns roots are hidden from gameplay with teamside -1, but their per-member overrides still belong to their real side.
-		if c.bgLoadedTurnsRoot() {
-			team = c.playerNo & 1
-		} else {
-			team = 2
-		}
+	if team == -1 {
+		team = 2
 	}
 	if team < 0 || team > 2 || c.memberNo < 0 {
 		return newOverrideCharData()
@@ -6342,13 +6329,8 @@ func (c *Char) rightEdge() float32 {
 
 func (c *Char) roundsExisted() int32 {
 	if c.teamside == -1 {
-		// BG-loaded Turns keeps inactive team members resident as standby players. //They must still initialize like fresh entrants until their turn actually comes.
-		if c.bgLoadedTurnsRoot() && c.memberNo >= 0 {
-			team := c.playerNo & 1
-			if int32(c.memberNo) >= sys.wins[team^1] {
-				return 0
-			}
-		}
+		// Attached characters (e.g. stage props) persist across rounds rather than
+		// being freshly (re)initialized each round like a team member.
 		return sys.roundNo - 1
 	}
 	return sys.roundsExisted[c.playerNo&1]
@@ -13610,6 +13592,8 @@ func (cl *CharList) commandUpdate() {
 		}
 		root := p[0]
 		// The async Turns loader keeps its standby root disabled while populating command lists.
+		// Update: Not strictly necessary anymore since preloaded chars are no longer written to sys.chars
+		// Mugen also doesn't skip these. But at the moment it's harmless either way
 		if root.scf(SCF_disabled) {
 			continue
 		}

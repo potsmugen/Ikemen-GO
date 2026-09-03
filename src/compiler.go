@@ -8116,7 +8116,9 @@ func (c *CharCompiler) stateCompileZSS(states map[int32]*StateBytecode, filename
 }
 
 // Compile a character definition file
-func (c *CharCompiler) Compile(pn int, def string, constants map[string]float32) (map[int32]*StateBytecode, error) {
+func (c *CharCompiler) Compile(p *Char, def string) (map[int32]*StateBytecode, error) {
+	pn := p.playerNo
+	constants := p.gi().constants
 	c.playerNo = pn
 	states := make(map[int32]*StateBytecode)
 
@@ -8194,16 +8196,15 @@ func (c *CharCompiler) Compile(pn int, def string, constants map[string]float32)
 	lines, lnidx = SplitAndTrim(str, "\n"), 0
 
 	// Initialize command list data
-	char := sys.chars[pn][0]
-	if char.cmd == nil {
-		char.cmd = make([]CommandList, MaxPlayerNo)
+	if p.cmd == nil {
+		p.cmd = make([]CommandList, MaxPlayerNo)
 		// Create one single input buffer and link it to all command lists
 		buffer := NewInputBuffer()
-		for i := range char.cmd {
-			char.cmd[i] = *NewCommandList(buffer)
+		for i := range p.cmd {
+			p.cmd[i] = *NewCommandList(buffer)
 		}
 	}
-	c.cmdl = &char.cmd[pn]
+	c.cmdl = &p.cmd[pn]
 	remap, defaults, ckr := true, true, NewCommandKeyRemap()
 
 	var cmds []IniSection
