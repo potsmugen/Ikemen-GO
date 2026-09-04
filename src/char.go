@@ -4071,9 +4071,7 @@ func (c *Char) resetModifyPlayer() {
 	// c.teamside already assigned by loadCharacter()
 }
 
-func (c *Char) load(def string) error {
-	gi := &sys.cgi[c.playerNo]
-
+func (c *Char) load(def string, gi *CharGlobalInfo) error {
 	// We keep the SFF so that loadSff() can reuse it if the same character is selected/reloaded
 	oldSff := gi.sff
 
@@ -4446,13 +4444,13 @@ func (c *Char) load(def string) error {
 						is.ReadF32("jump.back", &gi.velocity.jump.back)
 						is.ReadF32("jump.fwd", &gi.velocity.jump.fwd)
 						// Running and air jumps default to regular jump velocities
-						c.gi().velocity.runjump.back[0] = c.gi().velocity.jump.back
-						c.gi().velocity.runjump.back[1] = c.gi().velocity.jump.neu[1]
-						c.gi().velocity.runjump.fwd[0] = c.gi().velocity.jump.fwd
-						c.gi().velocity.runjump.fwd[1] = c.gi().velocity.jump.neu[1]
-						c.gi().velocity.airjump.neu = c.gi().velocity.jump.neu
-						c.gi().velocity.airjump.back = c.gi().velocity.jump.back
-						c.gi().velocity.airjump.fwd = c.gi().velocity.jump.fwd
+						gi.velocity.runjump.back[0] = gi.velocity.jump.back
+						gi.velocity.runjump.back[1] = gi.velocity.jump.neu[1]
+						gi.velocity.runjump.fwd[0] = gi.velocity.jump.fwd
+						gi.velocity.runjump.fwd[1] = gi.velocity.jump.neu[1]
+						gi.velocity.airjump.neu = gi.velocity.jump.neu
+						gi.velocity.airjump.back = gi.velocity.jump.back
+						gi.velocity.airjump.fwd = gi.velocity.jump.fwd
 						is.ReadF32("runjump.back",
 							&gi.velocity.runjump.back[0], &gi.velocity.runjump.back[1])
 						is.ReadF32("runjump.fwd",

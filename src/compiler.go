@@ -21,6 +21,8 @@ type CharCompiler struct {
 	norange          bool
 	token            string
 	playerNo         int
+	gi               *CharGlobalInfo // Target CGI for this compile, decoupled from sys.cgi[playerNo] so a
+	// background Turns preload compiles into its own staging area instead of racing sys.cgi.
 	scmap            map[string]scFunc
 	block            *StateBlock
 	lines            []string
@@ -6483,7 +6485,7 @@ func (c *CharCompiler) paramTrans(is IniSection, sc *StateControllerBase, prefix
 		// You couldn't define alpha for "sub" type in Mugen, so we'll lock it to defaults for Mugen characters
 		// https://github.com/ikemen-engine/Ikemen-GO/issues/3868
 		// TODO: They can still do it in the AIR format, so this might be moot
-		if tt == TT_sub && sys.cgi[c.playerNo].ikemenver[0] == 0 && sys.cgi[c.playerNo].ikemenver[1] == 0 {
+		if tt == TT_sub && c.gi.ikemenver[0] == 0 && c.gi.ikemenver[1] == 0 {
 			exp[0] = sc.iToExp(defsrc)[0]
 			exp[1] = sc.iToExp(defdst)[0]
 		}
@@ -8116,10 +8118,11 @@ func (c *CharCompiler) stateCompileZSS(states map[int32]*StateBytecode, filename
 }
 
 // Compile a character definition file
-func (c *CharCompiler) Compile(p *Char, def string) (map[int32]*StateBytecode, error) {
+func (c *CharCompiler) Compile(p *Char, def string, gi *CharGlobalInfo) (map[int32]*StateBytecode, error) {
 	pn := p.playerNo
-	constants := p.gi().constants
+	constants := gi.constants
 	c.playerNo = pn
+	c.gi = gi
 	states := make(map[int32]*StateBytecode)
 
 	// Load initial data from definition file
@@ -8140,11 +8143,11 @@ func (c *CharCompiler) Compile(p *Char, def string) (map[int32]*StateBytecode, e
 			if info {
 				info = false
 				// Read MugenVersion and IkemenVersion
-				sys.cgi[pn].mugenver = ParseMugenVersion(is["mugenversion"])
-				sys.cgi[pn].ikemenver = ParseIkemenVersion(is["ikemenversion"])
+				gi.mugenver = ParseMugenVersion(is["mugenversion"])
+				gi.ikemenver = ParseIkemenVersion(is["ikemenversion"])
 				// Ikemen characters adopt Mugen 1.1 version as a safeguard
-				if sys.cgi[pn].ikemenver[0] != 0 || sys.cgi[pn].ikemenver[1] != 0 {
-					sys.cgi[pn].mugenver = [2]uint16{1, 1}
+				if gi.ikemenver[0] != 0 || gi.ikemenver[1] != 0 {
+					gi.mugenver = [2]uint16{1, 1}
 				}
 			}
 		case "files":
@@ -8312,7 +8315,7 @@ func (c *CharCompiler) Compile(p *Char, def string) (map[int32]*StateBytecode, e
 		// Parse the command string and populate steps
 		err = cm.ReadCommandSymbols(is["command"], ckr)
 		if err != nil {
-			if sys.ignoreMostErrors && sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0 {
+			if sys.ignoreMostErrors && gi.ikemenver[0] == 0 && gi.ikemenver[1] == 0 {
 				// Mugen characters ignore command definition errors
 			} else {
 				return nil, Error(cmd + ":\nname = " + is["name"] +
@@ -8321,7 +8324,7 @@ func (c *CharCompiler) Compile(p *Char, def string) (map[int32]*StateBytecode, e
 		}
 
 		// Apply backward compatibiliy quirks
-		if sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0 {
+		if gi.ikemenver[0] == 0 && gi.ikemenver[1] == 0 {
 			cm.ApplyBackwardCompatibility(pn)
 		}
 
@@ -8331,13 +8334,12 @@ func (c *CharCompiler) Compile(p *Char, def string) (map[int32]*StateBytecode, e
 	// Reset string pool
 	// String values will stay valid for as long as this character stays loaded
 	sys.stringPool[pn].Clear()
-	//sys.cgi[pn].hitPauseToggleFlagCount = 0
 
 	// Compile state files
 	for _, s := range st {
 		if len(s) > 0 {
 			if err := c.stateCompile(states, s, []string{def, "", sys.motif.Def, "data/"},
-				sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0, constants); err != nil {
+				gi.ikemenver[0] == 0 && gi.ikemenver[1] == 0, constants); err != nil {
 				return nil, err
 			}
 		}
@@ -8345,14 +8347,14 @@ func (c *CharCompiler) Compile(p *Char, def string) (map[int32]*StateBytecode, e
 	// Compile states in command file
 	if len(cmd) > 0 {
 		if err := c.stateCompile(states, cmd, []string{def, "", sys.motif.Def, "data/"},
-			sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0, constants); err != nil {
+			gi.ikemenver[0] == 0 && gi.ikemenver[1] == 0, constants); err != nil {
 			return nil, err
 		}
 	}
 	// Compile states in stcommon state file
 	if len(stcommon) > 0 {
 		if err := c.stateCompile(states, stcommon, []string{def, "", sys.motif.Def, "data/"},
-			sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0, constants); err != nil {
+			gi.ikemenver[0] == 0 && gi.ikemenver[1] == 0, constants); err != nil {
 			return nil, err
 		}
 	}
@@ -8366,7 +8368,7 @@ func (c *CharCompiler) Compile(p *Char, def string) (map[int32]*StateBytecode, e
 		}
 	}
 	// Store functions in Global Info (static data), accessible to all instances
-	sys.cgi[pn].callFuncs = c.funcs
+	gi.callFuncs = c.funcs
 	return states, nil
 }
 
@@ -8378,5 +8380,5 @@ func (c *CharCompiler) charWarn() string {
 	if c.zssMode {
 		offset = 0
 	}
-	return fmt.Sprintf("WARNING: %v's state %v in %v, line %v: ", sys.cgi[c.playerNo].name, c.stateNo, file, c.i+offset)
+	return fmt.Sprintf("WARNING: %v's state %v in %v, line %v: ", c.gi.name, c.stateNo, file, c.i+offset)
 }

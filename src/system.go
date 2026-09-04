@@ -250,8 +250,10 @@ type System struct {
 	charList            CharList
 	cgi                 [MaxPlayerNo]CharGlobalInfo
 	turnsPreloadMember  [2]int // -1 = none; otherwise selected Turns member index to load into side+2
-	preloadedChars      [2]*Char // For Turns background loading
-	preloadedCharsMutex sync.Mutex
+	preloadedChars      [2]*Char // Fully loaded, not-yet-promoted Turns member. Never touches sys.chars until promoted.
+	preloadedCgi        [2]CharGlobalInfo // That member's compiled data. Never touches sys.cgi until promoted either.
+	preloadedCharsMutex sync.Mutex // Guards preloadedChars/preloadedCgi: written by the loader goroutine, read/promoted by the main one.
+	// Access these only through getPreloadedChar/getPreloadedCharAndCgi/setPreloadedChar/clearPreloadedChars below - never the fields directly.
 	selMutex            sync.RWMutex
 	loadMutex           sync.Mutex
 	ignoreMostErrors    bool
@@ -5885,24 +5887,35 @@ func (s *System) removePlayerFromCharList(pn int) {
 	}
 }
 
-// getPreloadedChar, setPreloadedChar and clearPreloadedChars are the only sanctioned way to touch
-// preloadedChars: it's written by the loader goroutine and read/promoted by the main one.
+// getPreloadedChar, getPreloadedCharAndCgi, setPreloadedChar and clearPreloadedChars are the only
+// sanctioned way to touch preloadedChars/preloadedCgi: written by the loader goroutine, read and
+// promoted by the main one.
 func (s *System) getPreloadedChar(team int) *Char {
 	s.preloadedCharsMutex.Lock()
 	defer s.preloadedCharsMutex.Unlock()
 	return s.preloadedChars[team]
 }
 
-func (s *System) setPreloadedChar(team int, c *Char) {
+// getPreloadedCharAndCgi returns both under a single lock acquisition, so a caller that needs both
+// (i.e. promotion) can't observe the char from one preload and the cgi from a different one.
+func (s *System) getPreloadedCharAndCgi(team int) (*Char, CharGlobalInfo) {
+	s.preloadedCharsMutex.Lock()
+	defer s.preloadedCharsMutex.Unlock()
+	return s.preloadedChars[team], s.preloadedCgi[team]
+}
+
+func (s *System) setPreloadedChar(team int, c *Char, gi CharGlobalInfo) {
 	s.preloadedCharsMutex.Lock()
 	defer s.preloadedCharsMutex.Unlock()
 	s.preloadedChars[team] = c
+	s.preloadedCgi[team] = gi
 }
 
 func (s *System) clearPreloadedChars() {
 	s.preloadedCharsMutex.Lock()
 	defer s.preloadedCharsMutex.Unlock()
 	s.preloadedChars = [2]*Char{}
+	s.preloadedCgi = [2]CharGlobalInfo{}
 }
 
 // Set up a promoted Turns fighter's slot-scoped fields (team, controller, life-recovery guard).
@@ -5943,7 +5956,7 @@ func (s *System) activateNextTurnsFighters() {
 			continue
 		}
 		// Incoming fighter comes from the standby holder, never from sys.chars: it isn't live yet
-		incoming := s.getPreloadedChar(team)
+		incoming, incomingCgi := s.getPreloadedCharAndCgi(team)
 		if incoming == nil || incoming.memberNo != nextMember {
 			continue
 		}
@@ -5956,8 +5969,8 @@ func (s *System) activateNextTurnsFighters() {
 		s.removePlayerFromCharList(dst)
 		s.removePlayerFromCharList(src) // defensive: src should already be empty going into this
 		s.chars[dst] = []*Char{incoming}
-		s.setPreloadedChar(team, nil)
-		s.cgi[dst] = s.cgi[src]
+		s.setPreloadedChar(team, nil, CharGlobalInfo{})
+		s.cgi[dst] = incomingCgi
 		s.stringPool[dst] = s.stringPool[src]
 		s.remapCharSlotRefs(s.chars[dst], src, dst)
 		s.rebindCgiStateOwners(dst)
@@ -5997,6 +6010,18 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 	teamSel := make([][2]int, len(sys.sel.selected[team]))
 	copy(teamSel, sys.sel.selected[team])
 	sys.selMutex.RUnlock()
+
+	// Whether this load's compiled data belongs in the standby holder (preloadedCgi) instead of
+	// sys.cgi[pn]: true only for a background Turns preload, never for the active slot itself.
+	// preloading is stable for the whole call: nothing else can touch turnsPreloadMember while
+	// this loader goroutine is running (see startNextTurnsPreload's own state==LS_Loading guard).
+	turnsLoading := !attached && tm == TM_Turns && sys.cfg.Config.TurnsLoading
+	preloading := turnsLoading && sys.turnsPreloadActive()
+	var stagingGi CharGlobalInfo
+	gi := &sys.cgi[pn]
+	if preloading {
+		gi = &stagingGi
+	}
 	if l.cancelRequested() || l.state == LS_Cancel || sys.gameEnd {
 		return 0
 	}
@@ -6103,12 +6128,12 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 	defer func() {
 		sys.loadTime(tnow, tstr, false, true)
 		// Mugen compatibility mode indicator
-		if sys.cgi[pn].ikemenver[0] == 0 && sys.cgi[pn].ikemenver[1] == 0 {
-			if sys.cgi[pn].mugenver[0] == 1 && sys.cgi[pn].mugenver[1] == 1 {
+		if gi.ikemenver[0] == 0 && gi.ikemenver[1] == 0 {
+			if gi.mugenver[0] == 1 && gi.mugenver[1] == 1 {
 				sys.appendToConsole("Using Mugen 1.1 compatibility mode.")
-			} else if sys.cgi[pn].mugenver[0] == 1 && sys.cgi[pn].mugenver[1] == 0 {
+			} else if gi.mugenver[0] == 1 && gi.mugenver[1] == 0 {
 				sys.appendToConsole("Using Mugen 1.0 compatibility mode.")
-			} else if sys.cgi[pn].mugenver[0] != 1 {
+			} else if gi.mugenver[0] != 1 {
 				sys.appendToConsole("Using WinMugen compatibility mode.")
 			} else {
 				sys.appendToConsole("Character with unknown engine version.")
@@ -6217,7 +6242,7 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 		if l.cancelRequested() || l.state == LS_Cancel || sys.gameEnd {
 			return 0
 		}
-		if l.err = p.load(cdef); l.err != nil {
+		if l.err = p.load(cdef, gi); l.err != nil {
 			if errors.Is(l.err, ErrLoadingCanceled) {
 				l.state = LS_Cancel
 				return 0
@@ -6235,7 +6260,7 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 		}
 
 		// Compile character states
-		if sys.cgi[pn].states, l.err = newCharCompiler().Compile(p, cdef); l.err != nil {
+		if gi.states, l.err = newCharCompiler().Compile(p, cdef, gi); l.err != nil {
 			if attached {
 				tstr = fmt.Sprintf("WARNING: Failed to compile new attached char states: %v", cdef)
 			} else {
@@ -6245,18 +6270,26 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 		}
 	}
 
+	// Setup selected palette. Must happen before the commit below: setPreloadedChar takes gi by
+	// value, so any write to *gi after that call would only mutate the local stagingGi, never the
+	// copy already stored in preloadedCgi.
+	selectPalno := 1
+	if pal, ok := sys.sel.palOverwrite[pn]; ok && pal > 0 {
+		selectPalno = pal
+	} else if !attached {
+		// Get palette number from select screen choice
+		selectPalno = teamSel[memberNo][1]
+	}
+	gi.palno = int32(selectPalno)
+
 	// Commit character now that loading and compiling both succeeded.
-	// Three mutually exclusive cases, not two nested ones: an ordinary character, a
-	// background Turns preload (goes to the standby holder, not sys.chars), or the
-	// Turns active slot (goes to sys.chars like normal, plus slot activation).
-	turnsLoading := !attached && tm == TM_Turns && sys.cfg.Config.TurnsLoading
 	if turnsLoading {
-		if sys.turnsPreloadActive() {
+		if preloading {
 			// Not live yet, so it goes into the standby holder instead of sys.chars, which is
 			// meant to be the live char list. Stays exactly as newChar() made it - no
 			// disabled/standby flags needed, since it simply isn't reachable through sys.chars
 			// or CharList until promoted.
-			sys.setPreloadedChar(team, p)
+			sys.setPreloadedChar(team, p, stagingGi)
 		} else {
 			// This is the active slot (0 or 1), not a background preload.
 			sys.chars[pn] = []*Char{p}
@@ -6265,16 +6298,6 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 	} else {
 		sys.chars[pn] = []*Char{p}
 	}
-
-	// Setup selected palette
-	selectPalno := 1
-	if pal, ok := sys.sel.palOverwrite[pn]; ok && pal > 0 {
-		selectPalno = pal
-	} else if !attached {
-		// Get palette number from select screen choice
-		selectPalno = teamSel[memberNo][1]
-	}
-	sys.cgi[pn].palno = int32(selectPalno)
 
 	// Apply per-launch map overrides prepared from Lua/loadStart.
 	if !attached {
