@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -1921,9 +1922,11 @@ func SafeGo(f func()) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
+				// recover() discards the original stack, so capture it here before re-panicking
+				stack := debug.Stack()
 				// Forward the panic to the main thread, where dialogs and shutdown are safe
 				sys.mainThreadTask <- func() {
-					panic(r)
+					panic(fmt.Errorf("%v\n\nOriginal goroutine stack:\n%s", r, stack))
 				}
 			}
 		}()
