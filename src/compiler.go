@@ -1341,20 +1341,8 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		*in = (*in)[i+1:]
 		return nil
 	}
-	eqne := func(f func() error) error { // Equal, not equal
-		not, err := c.checkEquality(in)
-		if err != nil {
-			return err
-		}
-		if err := f(); err != nil {
-			return err
-		}
-		if not {
-			out.append(OC_blnot)
-		}
-		return nil
-	}
-	eqne2 := func(f func(not bool) error) error { // Like eqne but the "not" operation must be handled manually
+
+	eqne := func(f func(not bool) error) error { // Equal, not equal. Caller handles negation itself
 		not, err := c.checkEquality(in)
 		if err != nil {
 			return err
@@ -1364,6 +1352,46 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		}
 		return nil
 	}
+
+	// For moveType, stateType and such triggers
+	// Each can either be compared against specific flags or keywords, or used bare to return a string
+	// This looks ahead to decide
+	flagTrigger := func(pushSelf func(), tryKeyword func() (matched bool, err error)) error {
+		savedIn := *in
+		peekTok := c.tokenizer(in)
+		*in = savedIn
+		if peekTok != "=" && peekTok != "!=" {
+			pushSelf()
+			return nil
+		}
+		return eqne(func(not bool) error {
+			matched, err := tryKeyword()
+			if err != nil {
+				return err
+			}
+			if matched {
+				if not {
+					out.append(OC_blnot)
+				}
+				return nil
+			}
+			pushSelf()
+			var be2 BytecodeExp
+			bv2, err := c.expGrls(&be2, in)
+			if err != nil {
+				return err
+			}
+			out.append(be2...)
+			out.appendValue(bv2)
+			if not {
+				out.append(OC_ne)
+			} else {
+				out.append(OC_eq)
+			}
+			return nil
+		})
+	}
+
 	// Parses a flag. Returns flag and error.
 	flagSub := func() (int32, error) {
 		flg := int32(0)
@@ -1403,6 +1431,7 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		}
 		return flg, nil
 	}
+
 	var be1, be2, be3 BytecodeExp
 	var bv1, bv2, bv3 BytecodeValue
 	var be BytecodeExp
@@ -2026,7 +2055,7 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			out.append(OC_ex_)
 			opc = OC_ex_selfcommand
 		}
-		if err := eqne(func() error {
+		if err := eqne(func(not bool) error {
 			if err := text(); err != nil {
 				return err
 			}
@@ -2035,6 +2064,9 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 				return Error("Command doesn't exist: " + c.token)
 			}
 			out.appendI32Op(opc, int32(sys.stringPool[c.playerNo].Add(c.token)))
+			if not {
+				out.append(OC_blnot)
+			}
 			return nil
 		}); err != nil {
 			return bvNone(), err
@@ -2746,31 +2778,55 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		switch isFlag {
 		case 1:
 			// attr
-			hda := func() error {
-				if attr, err := c.trgAttr(in); err != nil {
-					return err
-				} else {
-					out.append(OC_ex_)
-					out.appendI32Op(opc, attr)
+			savedIn := *in
+			peekTok := c.tokenizer(in)
+			*in = savedIn
+			if peekTok == "=" || peekTok == "!=" {
+				hda := func(not bool) error {
+					if attr, err := c.trgAttr(in); err != nil {
+						return err
+					} else {
+						out.append(OC_ex_)
+						out.appendI32Op(opc, attr)
+					}
+					if not {
+						out.append(OC_blnot)
+					}
+					return nil
 				}
-				return nil
-			}
-			if err := eqne(hda); err != nil {
-				return bvNone(), err
+				if err := eqne(hda); err != nil {
+					return bvNone(), err
+				}
+			} else {
+				// No comparison. Push the current attr as a string
+				out.append(OC_ex_)
+				out.appendI32Op(opc, -1)
 			}
 		case 2:
 			// hit/guard flag
-			hgf := func() error {
-				if flg, err := flagSub(); err != nil {
-					return err
-				} else {
-					out.append(OC_ex_)
-					out.appendI32Op(opc, flg)
+			savedIn := *in
+			peekTok := c.tokenizer(in)
+			*in = savedIn
+			if peekTok == "=" || peekTok == "!=" {
+				hgf := func(not bool) error {
+					if flg, err := flagSub(); err != nil {
+						return err
+					} else {
+						out.append(OC_ex_)
+						out.appendI32Op(opc, flg)
+					}
+					if not {
+						out.append(OC_blnot)
+					}
 					return nil
 				}
-			}
-			if err := eqne(hgf); err != nil {
-				return bvNone(), err
+				if err := eqne(hgf); err != nil {
+					return bvNone(), err
+				}
+			} else {
+				// No comparison. Push the current guard flag as a string
+				out.append(OC_ex_)
+				out.appendI32Op(opc, -1)
 			}
 		case 0:
 			// no flag
@@ -2831,20 +2887,34 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), err
 		}
 	case "hitdefattr":
-		hda := func() error {
-			if attr, err := c.trgAttr(in); err != nil {
-				return err
-			} else {
-				out.appendI32Op(OC_hitdefattr, attr)
+		savedIn := *in
+		peekTok := c.tokenizer(in)
+		*in = savedIn
+		if peekTok == "=" || peekTok == "!=" {
+			hda := func(not bool) error {
+				// Case 1: valid comparison
+				if attr, err := c.trgAttr(in); err != nil {
+					return err
+				} else {
+					out.appendI32Op(OC_hitdefattr, attr)
+				}
+				if not {
+					out.append(OC_blnot)
+				}
+				return nil
 			}
-			return nil
-		}
-		if err := eqne(hda); err != nil {
-			if c.zssMode || !sys.ignoreMostErrors {
-				return bvNone(), err
+			if err := eqne(hda); err != nil {
+				// Case 2: malformed attr string
+				// We need to tolerate this case in CNS for the sake of backward compatibility
+				if c.zssMode || !sys.ignoreMostErrors {
+					return bvNone(), err
+				}
+				sys.appendToConsole(c.charWarn() + "HitDefAttr Missing '=' or '!='")
+				out.appendValue(BytecodeBool(false))
 			}
-			sys.appendToConsole(c.charWarn() + "HitDefAttr Missing '=' or '!='")
-			out.appendValue(BytecodeBool(false))
+		} else {
+			// Case 3: bare usage. Push the current attr as a string like "SCA, NA"
+			out.appendI32Op(OC_hitdefattr, -1)
 		}
 	case "hitdefvar":
 		if err := c.checkOpeningParenthesis(in); err != nil {
@@ -2967,16 +3037,28 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			return bvNone(), Error("Invalid HitDefVar argument: " + c.token)
 		}
 		if isFlag {
-			if err := eqne(func() error {
-				if flg, err := flagSub(); err != nil {
-					return err
-				} else {
-					out.append(OC_ex3_)
-					out.appendI32Op(opc, flg)
-					return nil
+			savedIn := *in
+			peekTok := c.tokenizer(in)
+			*in = savedIn
+			if peekTok == "=" || peekTok == "!=" {
+				if err := eqne(func(not bool) error {
+					if flg, err := flagSub(); err != nil {
+						return err
+					} else {
+						out.append(OC_ex3_)
+						out.appendI32Op(opc, flg)
+						if not {
+							out.append(OC_blnot)
+						}
+						return nil
+					}
+				}); err != nil {
+					return bvNone(), err
 				}
-			}); err != nil {
-				return bvNone(), err
+			} else {
+				// No comparison. Push the current flag as a string
+				out.append(OC_ex3_)
+				out.appendI32Op(opc, -1)
 			}
 		} else {
 			out.append(OC_ex3_)
@@ -3045,11 +3127,22 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 	case "movereversed":
 		out.append(OC_movereversed)
 	case "movetype", "p2movetype", "prevmovetype":
-		// Flag triggers still require a comparison. They don't push strings containing the flags
+		// The flag here is from a fixed set (A/H/I), not a string
+		// It compiles straight to a MoveType number without involving the string pool
 		trname := c.token
-		if err := eqne2(func(not bool) error {
+		pushSelf := func() {
+			if trname == "prevmovetype" {
+				out.append(OC_ex_, OC_ex_prevmovetype, 0)
+			} else {
+				if trname == "p2movetype" {
+					out.appendI32Op(OC_p2, 0)
+				}
+				out.append(OC_movetype, 0)
+			}
+		}
+		if err := flagTrigger(pushSelf, func() (bool, error) {
 			if len(c.token) == 0 {
-				return Error(trname + " trigger requires a comparison")
+				return false, Error(trname + " trigger requires a comparison")
 			}
 			var mt MoveType
 			switch c.token[0] {
@@ -3060,20 +3153,19 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			case 'h':
 				mt = MT_H
 			default:
-				return Error("Invalid MoveType: " + c.token)
+				// TODO: Figure out how to keep these explicit errors
+				//return Error("Invalid MoveType: " + c.token)
+				return false, nil
 			}
 			if trname == "prevmovetype" {
 				out.append(OC_ex_, OC_ex_prevmovetype, OpCode(mt>>15))
 			} else {
 				if trname == "p2movetype" {
-					out.appendI32Op(OC_p2, 2+Btoi(not))
+					out.appendI32Op(OC_p2, 0)
 				}
 				out.append(OC_movetype, OpCode(mt>>15))
 			}
-			if not {
-				out.append(OC_blnot)
-			}
-			return nil
+			return true, nil
 		}); err != nil {
 			return bvNone(), err
 		}
@@ -3500,7 +3592,7 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 
 		bv3 := BytecodeInt(0)
 		if isFlag {
-			if err := eqne2(func(not bool) error {
+			if err := eqne(func(not bool) error {
 				var flg int32
 				var err error
 				if opc == OC_ex2_projvar_attr {
@@ -3540,17 +3632,30 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 	case "random":
 		out.append(OC_random)
 	case "reversaldefattr":
-		hda := func() error {
-			if attr, err := c.trgAttr(in); err != nil {
-				return err
-			} else {
-				out.append(OC_ex_)
-				out.appendI32Op(OC_ex_reversaldefattr, attr)
+		savedIn := *in
+		peekTok := c.tokenizer(in)
+		*in = savedIn
+		if peekTok == "=" || peekTok == "!=" {
+			hda := func(not bool) error {
+				if attr, err := c.trgAttr(in); err != nil {
+					return err
+				} else {
+					out.append(OC_ex_)
+					out.appendI32Op(OC_ex_reversaldefattr, attr)
+				}
+				if not {
+					out.append(OC_blnot)
+				}
+				return nil
 			}
-			return nil
-		}
-		if err := eqne(hda); err != nil {
-			return bvNone(), err
+			if err := eqne(hda); err != nil {
+				return bvNone(), err
+			}
+		} else {
+			// No comparison. Push the current reversal_attr as a string
+			// -1<<31 is an internal "already updated" marker. Masked off before converting
+			out.append(OC_ex_)
+			out.appendI32Op(OC_ex_reversaldefattr, -1)
 		}
 	case "rightedge":
 		out.append(OC_rightedge)
@@ -3653,9 +3758,19 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		out.append(OC_stateno)
 	case "statetype", "p2statetype", "prevstatetype":
 		trname := c.token
-		if err := eqne2(func(not bool) error {
+		pushSelf := func() {
+			if trname == "prevstatetype" {
+				out.append(OC_ex_, OC_ex_prevstatetype, 0)
+			} else {
+				if trname == "p2statetype" {
+					out.appendI32Op(OC_p2, 0)
+				}
+				out.append(OC_statetype, 0)
+			}
+		}
+		if err := flagTrigger(pushSelf, func() (bool, error) {
 			if len(c.token) == 0 {
-				return Error(trname + " trigger requires a comparison")
+				return false, Error(trname + " trigger requires a comparison")
 			}
 			var st StateType
 			switch c.token[0] {
@@ -3668,20 +3783,18 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			case 'l':
 				st = ST_L
 			default:
-				return Error("Invalid StateType: " + c.token)
+				//return Error("Invalid StateType: " + c.token)
+				return false, nil
 			}
 			if trname == "prevstatetype" {
 				out.append(OC_ex_, OC_ex_prevstatetype, OpCode(st))
 			} else {
 				if trname == "p2statetype" {
-					out.appendI32Op(OC_p2, 2+Btoi(not))
+					out.appendI32Op(OC_p2, 0)
 				}
 				out.append(OC_statetype, OpCode(st))
 			}
-			if not {
-				out.append(OC_blnot)
-			}
-			return nil
+			return true, nil
 		}); err != nil {
 			return bvNone(), err
 		}
@@ -3933,9 +4046,10 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		out.append(OC_const_)
 		out.append(opc)
 	case "teammode":
-		if err := eqne(func() error {
+		pushSelf := func() { out.append(OC_teammode, 255) }
+		if err := flagTrigger(pushSelf, func() (bool, error) {
 			if len(c.token) == 0 {
-				return Error("TeamMode trigger requires a comparison")
+				return false, Error("TeamMode trigger requires a comparison")
 			}
 			var tm TeamMode
 			switch c.token {
@@ -3948,10 +4062,10 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			case "tag":
 				tm = TM_Tag
 			default:
-				return Error("Invalid TeamMode: " + c.token)
+				return false, nil
 			}
 			out.append(OC_teammode, OpCode(tm))
-			return nil
+			return true, nil
 		}); err != nil {
 			return bvNone(), err
 		}
@@ -5028,9 +5142,10 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 	case "pausetime":
 		out.append(OC_ex_, OC_ex_pausetime)
 	case "physics":
-		if err := eqne(func() error {
+		pushSelf := func() { out.append(OC_ex_, OC_ex_physics, 0) }
+		if err := flagTrigger(pushSelf, func() (bool, error) {
 			if len(c.token) == 0 {
-				return Error("Physics trigger requires a comparison")
+				return false, Error("Physics trigger requires a comparison")
 			}
 			var st StateType
 			switch c.token[0] {
@@ -5043,10 +5158,11 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			case 'n':
 				st = ST_N
 			default:
-				return Error("Invalid Physics type: " + c.token)
+				//return Error("Invalid Physics type: " + c.token)
+				return false, nil
 			}
 			out.append(OC_ex_, OC_ex_physics, OpCode(st))
-			return nil
+			return true, nil
 		}); err != nil {
 			return bvNone(), err
 		}
