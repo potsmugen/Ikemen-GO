@@ -1,0 +1,40 @@
+name: Wiki documentation notification
+
+on:
+  pull_request_target:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  notify:
+    if: github.event.label.name == 'docs-needed'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify PR author
+        uses: actions/github-script@v9
+        env:
+          COMMENT_BODY: |
+            <!-- wiki-docs-required -->
+            @AUTHOR@ this PR requires a wiki update before it can be merged.
+
+            Please:
+            - update the relevant wiki page(s);
+            - mark newly added features with **`(nightly build only)` directly in the relevant heading**;
+            - reply here with the wiki page link(s) when finished.
+
+            A maintainer will review the documentation and remove the `docs-needed` label when it is ready.
+        with:
+          script: |
+            const author = context.payload.pull_request.user.login;
+            const body = process.env.COMMENT_BODY.replace('@AUTHOR@', '@' + author);
+
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body
+            });

@@ -1,0 +1,32 @@
+name: Wiki documentation gate
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
+      - unlabeled
+      - ready_for_review
+
+permissions:
+  contents: read
+
+jobs:
+  wiki-docs:
+    name: Wiki documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check documentation requirement
+        env:
+          DOCS_REQUIRED: ${{ contains(github.event.pull_request.labels.*.name, 'docs-needed') }}
+        run: |
+          if [ "$DOCS_REQUIRED" = "true" ]; then
+            echo "::error::Wiki documentation is required before this PR can be merged."
+            echo "::error::Update the wiki, mark new features as Nightly-only, and reply to the PR with the wiki page link."
+            exit 1
+          fi
+
+          echo "No outstanding wiki documentation requirement."
