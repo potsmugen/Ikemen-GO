@@ -1174,6 +1174,7 @@ const (
 	OC_ex3_hitdefvar_fall_zvelocity
 	OC_ex3_animloopcount
 	OC_ex3_prevctrl
+	OC_ex3_inrunstate
 )
 
 type StringPool struct {
@@ -4702,6 +4703,8 @@ func (be BytecodeExp) run_ex3(c *Char, i *int, oc *Char) {
 		}
 	case OC_ex3_prevctrl:
 		sys.bcStack.PushB(c.prevCtrl)
+	case OC_ex3_inrunstate:
+		sys.bcStack.PushB(c.inRunState)
 	default:
 		LogMessage("%v", be[*i-1])
 		c.panic("Invalid bytecode OpCode encountered")
@@ -6109,6 +6112,7 @@ func (sc runState) Run(c *Char, _ []int32) bool {
 		case runState_value:
 			v = exp[0].evalI(c)
 		case runState_playerno:
+			// Player numbers are 1-indexed in scripts
 			pn = int(exp[0].evalI(c)) - 1
 		}
 		return true
