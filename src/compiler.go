@@ -442,6 +442,7 @@ var triggerMap = map[string]int{
 	"playerno":           1,
 	"playernoexist":      1,
 	"prevanim":           1,
+	"prevctrl":           1,
 	"prevmovetype":       1,
 	"prevstatetype":      1,
 	"projclsnoverlap":    1,
@@ -3352,6 +3353,8 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		out.append(OC_playeridexist)
 	case "prevanim":
 		out.append(OC_ex_, OC_ex_prevanim)
+	case "prevctrl":
+		out.append(OC_ex3_, OC_ex3_prevctrl)
 	case "prevstateno":
 		out.append(OC_prevstateno)
 	case "projcanceltime":
