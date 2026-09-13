@@ -3670,6 +3670,7 @@ type Char struct {
 	cpucmd               int32
 	offset               [2]float32
 	stchtmp              bool
+	prevCtrl             bool // Ctrl before the last time it was set. Updated even when set to the same value
 	inguarddist          bool
 	pushed               bool
 	hitdefContact        bool
@@ -5114,6 +5115,7 @@ func (c *Char) validatePlayerNo(pn int, pname, scname string) bool {
 */
 
 func (c *Char) setCtrl(ctrl bool) {
+	c.prevCtrl = c.scf(SCF_ctrl)
 	if ctrl {
 		c.setSCF(SCF_ctrl)
 	} else {

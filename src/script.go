@@ -10013,6 +10013,10 @@ func triggerFunctions(l *lua.LState) {
 		l.Push(lua.LNumber(sys.debugWC.prevAnimNo))
 		return 1
 	})
+	luaRegister(l, "prevCtrl", func(*lua.LState) int {
+		l.Push(lua.LBool(sys.debugWC.prevCtrl))
+		return 1
+	})
 	luaRegister(l, "prevMoveType", func(*lua.LState) int {
 		s := sys.debugWC.ss.prevMoveType.TriggerValue()
 		l.Push(lua.LString(s))
