@@ -5106,6 +5106,7 @@ func (c *Char) validatePlayerNo(pn int, pname, scname string) bool {
 */
 
 func (c *Char) setCtrl(ctrl bool) {
+	c.prevCtrl = c.scf(SCF_ctrl)
 	if ctrl {
 		c.setSCF(SCF_ctrl)
 	} else {
