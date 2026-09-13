@@ -1173,6 +1173,7 @@ const (
 	OC_ex3_hitdefvar_fall_yvelocity
 	OC_ex3_hitdefvar_fall_zvelocity
 	OC_ex3_animloopcount
+	OC_ex3_prevctrl
 )
 
 type StringPool struct {
@@ -4699,6 +4700,8 @@ func (be BytecodeExp) run_ex3(c *Char, i *int, oc *Char) {
 		} else {
 			sys.bcStack.PushI(c.anim.loopcount)
 		}
+	case OC_ex3_prevctrl:
+		sys.bcStack.PushB(c.prevCtrl)
 	default:
 		LogMessage("%v", be[*i-1])
 		c.panic("Invalid bytecode OpCode encountered")
