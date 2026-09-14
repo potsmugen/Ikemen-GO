@@ -1146,6 +1146,7 @@ type GetHitVar struct {
 	fall_xvelocity       float32
 	fall_yvelocity       float32
 	fall_zvelocity       float32
+	fall_time            int32
 	fall_recover         bool
 	fall_recovertime     int32
 	fall_damage          int32
@@ -3630,7 +3631,6 @@ type Char struct {
 	guardPointsMax int32
 	redLife        int32
 	juggle         int32
-	fallTime       int32
 	localcoord     float32 // Char localcoord[0] scaled to game resolution
 	localscl       float32 // Ratio between 320 and the localcoord of the current state
 	animlocalscl   float32
@@ -3846,7 +3846,6 @@ func (c *Char) clearState() {
 	c.pcid = 0
 	c.counterHit = false
 	c.hitdefContact = false
-	c.fallTime = 0
 	c.makeDustSpacing = 0
 	c.hitStateChangeIdx = -1
 	c.pushAffectTeam = 1
@@ -5663,7 +5662,7 @@ func (c *Char) botBoundDist() float32 {
 }
 
 func (c *Char) canRecover() bool {
-	return c.ghv.fall_recover && c.fallTime >= c.ghv.fall_recovertime
+	return c.ghv.fall_recover && c.ghv.fall_time >= c.ghv.fall_recovertime
 }
 
 func (c *Char) comboCount() int32 {
@@ -11568,8 +11567,8 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile) (hitResult int32) 
 				ghv.forcecrouch = hd.forcecrouch != 0
 
 				// For some reason Mugen only resets this one on hit
-				// TODO: That seems unnecessary and changing it would allow this to be inside ghv as well
-				getter.fallTime = 0
+				// Ikemen resets it either on guard or hit, which is more consistent with the others
+				//getter.fallTime = 0
 
 				if hd.unhittabletime[1] >= 0 {
 					getter.unhittableTime = hd.unhittabletime[1]
@@ -12526,7 +12525,9 @@ func (c *Char) actionRun() {
 					c.ghv.hitshaketime--
 				}
 				if c.ghv.fallflag {
-					c.fallTime++
+					// In Mugen, this one steps even during hitshake
+					// Which seems wrong. But it's used in the canRecover trigger, so changing it would be a breaking change
+					c.ghv.fall_time++
 				}
 			} else {
 				if c.hittmp > 0 {
@@ -14090,7 +14091,7 @@ func (cl *CharList) hitDetectionPlayer(c *Char) {
 						getter.ghv.playerno = c.playerNo
 						getter.ghv.playerid = c.id
 						getter.ghv.teamside = c.hitdef.teamside
-						getter.fallTime = 0
+						getter.ghv.fall_time = 0
 
 						// Fall flag
 						if c.hitdef.forcenofall {
