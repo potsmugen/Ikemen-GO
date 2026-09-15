@@ -4618,8 +4618,8 @@ func (c *Char) load(def string, gi *CharGlobalInfo) error {
 	}
 
 	// Read animations
-	var animFilename string
-	gi.animTable = NewAnimationTable()
+	// One compiler for every source, so common files only fill in gaps
+	ac := newAnimCompiler(gi.sff, &gi.palettedata.palList, true)
 
 	if len(anim) > 0 {
 		if err := LoadFile(&anim, []string{def, "", "data/"}, "", func(filename string) error {
@@ -4627,13 +4627,7 @@ func (c *Char) load(def string, gi *CharGlobalInfo) error {
 			if err != nil {
 				return err
 			}
-
-			animFilename = filename
-			gi.animTable.filename = filename
-
-			lines, i := SplitAndTrim(str, "\n"), 0
-			for gi.animTable.readAction(gi.sff, &gi.palettedata.palList, lines, &i, true) != nil {
-			}
+			ac.compileText(filename, str)
 			return nil
 		}); err != nil {
 			return err
@@ -4648,20 +4642,7 @@ func (c *Char) load(def string, gi *CharGlobalInfo) error {
 				if err != nil {
 					return err
 				}
-
-				// Create a temporary table for finer control and local error logging
-				tmp := NewAnimationTable()
-				tmp.filename = filename
-				lines, i := SplitAndTrim(txt, "\n"), 0
-				for tmp.readAction(gi.sff, &gi.palettedata.palList, lines, &i, true) != nil {
-				}
-
-				// Merge temporary table with the char's
-				for no, a := range tmp.anims {
-					if gi.animTable.anims[no] == nil {
-						gi.animTable.anims[no] = a
-					}
-				}
+				ac.compileText(filename, txt)
 				return nil
 			}); err != nil {
 				return err
@@ -4669,12 +4650,8 @@ func (c *Char) load(def string, gi *CharGlobalInfo) error {
 		}
 	}
 
-	// Resolve Copy Action after all sources have been merged
-	// This only works because we didn't use ReadAnimationTable here, which would've done it per file
-	gi.animTable.resolveCopyAction()
-
-	// Final merged table keeps the main filename
-	gi.animTable.filename = animFilename
+	// Copy Action resolves across every source at once
+	gi.animTable = ac.finalize()
 
 	// Load sounds
 	if len(sound) > 0 {
