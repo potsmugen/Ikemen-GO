@@ -5290,6 +5290,8 @@ type hitBy StateControllerBase
 
 const (
 	hitBy_attr byte = iota
+	hitBy_group
+	hitBy_index
 	hitBy_playerid
 	hitBy_playerno
 	hitBy_slot
@@ -5305,8 +5307,10 @@ func (sc hitBy) runSub(c *Char, crun *Char, not bool) {
 	pno := int(-1)
 	pid := int32(-1)
 	stk := false
+	grp := int32(-1)
+	idx := int32(-1)
 
-	set := func(slot int, attr, time int32, pno int, pid int32, stk bool) {
+	set := func(slot int, attr, time int32, pno int, pid int32, stk bool, grp, idx int32) {
 		if slot < 0 {
 			return
 		} else if slot >= len(crun.hitby) {
@@ -5318,6 +5322,8 @@ func (sc hitBy) runSub(c *Char, crun *Char, not bool) {
 		crun.hitby[slot].playerno = pno - 1
 		crun.hitby[slot].playerid = pid
 		crun.hitby[slot].stack = stk
+		crun.hitby[slot].clsngroup = grp
+		crun.hitby[slot].clsnindex = idx
 	}
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
@@ -5334,11 +5340,15 @@ func (sc hitBy) runSub(c *Char, crun *Char, not bool) {
 			pid = exp[0].evalI(c)
 		case hitBy_stack:
 			stk = exp[0].evalB(c)
+		case hitBy_group:
+			grp = exp[0].evalI(c)
+		case hitBy_index:
+			idx = exp[0].evalI(c)
 		}
 		return true
 	})
 
-	set(slot, attr, time, pno, pid, stk)
+	set(slot, attr, time, pno, pid, stk, grp, idx)
 }
 
 func (sc hitBy) Run(c *Char, _ []int32) bool {

@@ -56,6 +56,20 @@ func (c *CharCompiler) hitBySub(is IniSection, sc *StateControllerBase, sctrlNam
 	}); err != nil {
 		return err
 	}
+	// Clsn group uses the same named values as OverrideClsn and TransformClsn
+	if _, ok := is["group"]; ok {
+		new = true
+	}
+	if err := c.paramClsnType(is, sc, "group", hitBy_group); err != nil {
+		return err
+	}
+	if err := c.stateParam(is, "index", false, func(data string) error {
+		new = true
+		c.scAdd(sc, hitBy_index, data, VT_Int, 1)
+		return nil
+	}); err != nil {
+		return err
+	}
 
 	// Shared parameters
 	if err := c.paramValue(is, sc, "time", hitBy_time, VT_Int, 1, false); err != nil {

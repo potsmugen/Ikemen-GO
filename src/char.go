@@ -1331,11 +1331,13 @@ type HitBy struct {
 	not      bool
 	playerid int32
 	playerno int
-	stack    bool
+	stack     bool
+	clsngroup int32 // Clsn group this slot applies to. -1 for any
+	clsnindex int32 // Box index within that group. -1 for any
 }
 
 func (hb *HitBy) clear() {
-	*hb = HitBy{}
+	*hb = HitBy{clsngroup: -1, clsnindex: -1}
 }
 
 type HitOverride struct {
@@ -3743,6 +3745,7 @@ type Char struct {
 	pctype               ProjContact
 	pctime, pcid         int32
 	clsnBuffers          [4][]ClsnFinal // Pre-allocated slices for collision checks
+	clsnFilterBuf        []ClsnFinal    // Vulnerable subset of clsnBuffers during hit checks
 	stillLoading         bool // Compiler safeguard
 	prevCtrl             bool
 	//soundChannels        SoundChannels // Moved to system
@@ -10688,7 +10691,7 @@ func (c *Char) resetClsnModifiers() {
 	}
 }
 
-func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32) bool {
+func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32, reqcheck bool) bool {
 	// Safety checks
 	if p.anim == nil || c.curFrame == nil || c.scf(SCF_standby) || c.scf(SCF_disabled) {
 		return false
@@ -10709,7 +10712,7 @@ func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32) bool {
 
 	// Loop through all characters and check collision
 	for _, charSingle := range charTotal {
-		if charSingle.projClsnCheckSingle(p, cbox, pbox) {
+		if charSingle.projClsnCheckSingle(p, cbox, pbox, reqcheck) {
 			return true
 		}
 	}
@@ -10717,7 +10720,7 @@ func (c *Char) projClsnCheck(p *Projectile, cbox, pbox int32) bool {
 	return false
 }
 
-func (c *Char) projClsnCheckSingle(p *Projectile, cbox, pbox int32) bool {
+func (c *Char) projClsnCheckSingle(p *Projectile, cbox, pbox int32, reqcheck bool) bool {
 	// Safety checks
 	if p.anim == nil || c.scf(SCF_standby) || c.scf(SCF_disabled) {
 		return false
@@ -10752,6 +10755,22 @@ func (c *Char) projClsnCheckSingle(p *Projectile, cbox, pbox int32) bool {
 	boxes2 := c.getClsnWorld(cbox)
 	if len(boxes2) == 0 {
 		return false
+	}
+
+	// Drop character boxes that are invincible to this HitDef
+	if reqcheck && (cbox == 1 || cbox == 2) && c.hasBoxHitBy() {
+		if owner := p.owner(); owner != nil {
+			buf := c.clsnFilterBuf[:0]
+			for i, b := range boxes2 {
+				if c.attrCheckBox(cbox, int32(i), owner, &p.hitdef, ST_N) {
+					buf = append(buf, b)
+				}
+			}
+			c.clsnFilterBuf, boxes2 = buf, buf
+			if len(boxes2) == 0 {
+				return false
+			}
+		}
 	}
 
 	// Check for overlap
@@ -10798,7 +10817,7 @@ func (c *Char) projClsnOverlapTrigger(index int, targetID, boxType int32) bool {
 		}
 	}
 
-	return target.projClsnCheck(proj, boxType, 1) || target.projClsnCheck(proj, boxType, 2)
+	return target.projClsnCheck(proj, boxType, 1, false) || target.projClsnCheck(proj, boxType, 2, false)
 }
 
 func (c *Char) clsnCheck(getter *Char, charbox, getterbox int32, reqcheck bool) bool {
@@ -10878,6 +10897,21 @@ func (c *Char) clsnCheckSingle(getter *Char, charbox, getterbox int32, reqcheck 
 		return false
 	}
 
+	// Drop getter boxes that are invincible to this HitDef
+	// Skipped for ReversalDef, which attrCheck also exempts from HitBy checks
+	if reqcheck && c.hitdef.reversal_attr <= 0 && (getterbox == 1 || getterbox == 2) && getter.hasBoxHitBy() {
+		buf := getter.clsnFilterBuf[:0]
+		for i, b := range boxes2 {
+			if getter.attrCheckBox(getterbox, int32(i), c, &c.hitdef, c.ss.stateType) {
+				buf = append(buf, b)
+			}
+		}
+		getter.clsnFilterBuf, boxes2 = buf, buf
+		if len(boxes2) == 0 {
+			return false
+		}
+	}
+
 	// Check for overlap
 	overlap, _, _ := sys.clsnOverlap(
 		boxes1,
@@ -10903,7 +10937,7 @@ func (c *Char) hitByAttrTrigger(attr int32) bool {
 	attrsca := attr & int32(ST_MASK)
 
 	// Compare given attributes to character's HitBy slots
-	return c.checkHitByAllSlots(-1, -1, attr, attrsca)
+	return c.checkHitByAllSlots(-1, -1, -1, -1, attr, attrsca)
 }
 
 // Check vulnerability in a single HitBy slot
@@ -10935,7 +10969,7 @@ func (c *Char) checkHitBySlot(hb HitBy, getterno int, getterid, ghdattr, attrsca
 
 // checkHitByAllSlots evaluates all of the character's HitBy/NotHitBy slots
 // to determine if the character is vulnerable to the current attack.
-func (c *Char) checkHitByAllSlots(getterno int, getterid, ghdattr, attrsca int32) bool {
+func (c *Char) checkHitByAllSlots(boxgroup, boxindex int32, getterno int, getterid, ghdattr, attrsca int32) bool {
 	stackHit := false
 	hasStackSlot := false
 	nonStackHit := true
@@ -10943,6 +10977,11 @@ func (c *Char) checkHitByAllSlots(getterno int, getterid, ghdattr, attrsca int32
 	for _, hb := range c.hitby {
 		// Skip inactive slots
 		if hb.time == 0 {
+			continue
+		}
+
+		// Skip slots restricted to another box. A -1 query skips every restricted slot
+		if (hb.clsngroup >= 0 && hb.clsngroup != boxgroup) || (hb.clsnindex >= 0 && hb.clsnindex != boxindex) {
 			continue
 		}
 
@@ -11069,11 +11108,30 @@ func (c *Char) attrCheck(getter *Char, ghd *HitDef, gstyp StateType) bool {
 	}
 
 	// HitBy and NotHitBy checks
-	if !c.checkHitByAllSlots(getter.playerNo, getter.id, ghd.attr, attrsca) {
+	if !c.checkHitByAllSlots(-1, -1, getter.playerNo, getter.id, ghd.attr, attrsca) {
 		return false
 	}
 
 	return true
+}
+
+// Per box vulnerability. Everything else in attrCheck is box independent
+func (c *Char) attrCheckBox(boxgroup, boxindex int32, getter *Char, ghd *HitDef, gstyp StateType) bool {
+	attrsca := ghd.attr & int32(ST_MASK)
+	if getter.stWgi().ikemenver[0] == 0 && getter.stWgi().ikemenver[1] == 0 && gstyp != ST_N {
+		attrsca = int32(gstyp)
+	}
+	return c.checkHitByAllSlots(boxgroup, boxindex, getter.playerNo, getter.id, ghd.attr, attrsca)
+}
+
+// Whether any active slot is box specific, so the filtering can be skipped in the common case
+func (c *Char) hasBoxHitBy() bool {
+	for _, hb := range c.hitby {
+		if hb.time != 0 && (hb.clsngroup >= 0 || hb.clsnindex >= 0) {
+			return true
+		}
+	}
+	return false
 }
 
 // Check if the enemy's (c) HitDef should lose to the player's (getter), if applicable
@@ -12845,6 +12903,7 @@ func (c *Char) update() {
 					}
 					//if c.ghv.fallcount > 3 || c.ghv.down_recovertime <= 0 {
 					if c.ghv.down_recovertime <= 10 {
+						c.hitby[0].clear() // Lie down invincibility is always char-wide
 						c.hitby[0].flag = ^int32(ST_SCA)
 						c.hitby[0].time = 180 // Mugen uses infinite time here
 					}
@@ -13130,6 +13189,53 @@ func (c *Char) tick() {
 	}
 }
 
+// Fold the active HitBy slots affecting one box. A -1, -1 query checks the char as a whole
+func (c *Char) debugHitByState(boxgroup, boxindex int32) (hb, mtk bool, txt string, flags int32) {
+	flags = int32(ST_SCA) | int32(AT_ALL)
+
+	if c.unhittableTime > 0 {
+		return false, true, "", flags
+	}
+
+	for _, h := range c.hitby {
+		if h.time == 0 {
+			continue
+		}
+
+		// Skip slots restricted to another box
+		if (h.clsngroup >= 0 && h.clsngroup != boxgroup) || (h.clsnindex >= 0 && h.clsnindex != boxindex) {
+			continue
+		}
+
+		// If carrying invincibility from previous iterations
+		if h.stack && flags != int32(ST_SCA)|int32(AT_ALL) {
+			return true, false, "Stacked", flags
+		}
+
+		// Player-specific invincibility
+		if h.playerno >= 0 || h.playerid >= 0 {
+			return true, false, "Player-specific", flags
+		}
+
+		// Combine flags for HitBy and NotHitBy
+		if h.flag >= 0 {
+			if h.not {
+				// NotHitBy removes flags
+				flags &= ^h.flag
+			} else {
+				// HitBy keeps only allowed flags
+				flags &= h.flag
+			}
+		}
+	}
+
+	if flags != int32(ST_SCA)|int32(AT_ALL) {
+		return true, flags&int32(ST_SCA) == 0 || flags&int32(AT_ALL) == 0, "", flags
+	}
+
+	return false, false, "", flags
+}
+
 // Prepare collision boxes and debug text for drawing
 func (c *Char) cueDebugDraw() {
 	// Known issue: positions and player pushing resolve on different tick conditions,
@@ -13165,70 +13271,39 @@ func (c *Char) cueDebugDraw() {
 			// Check invincibility to decide box colors
 			boxes2 := c.getClsnWorld(2)
 			if len(boxes2) > 0 {
-				flags := int32(ST_SCA) | int32(AT_ALL)
-				hb, mtk := false, false
+				// Char-wide state drives the debug text
+				hb, mtk, txt, flags := c.debugHitByState(-1, -1)
+				nhbtxt = txt
 
-				if c.unhittableTime > 0 {
-					mtk = true
-				} else {
-					for _, h := range c.hitby {
-						if h.time == 0 {
-							continue
-						}
-
-						// If carrying invincibility from previous iterations
-						if h.stack && flags != int32(ST_SCA)|int32(AT_ALL) {
-							nhbtxt = "Stacked"
-							hb = true
-							mtk = false
-							break
-						}
-
-						// Player-specific invincibility
-						if h.playerno >= 0 || h.playerid >= 0 {
-							nhbtxt = "Player-specific"
-							hb = true
-							mtk = false
-							break
-						}
-
-						// Combine flags for HitBy and NotHitBy
-						if h.flag >= 0 {
-							if h.not {
-								// NotHitBy removes flags
-								flags &= ^h.flag
-							} else {
-								// HitBy keeps only allowed flags
-								flags &= h.flag
-							}
-						}
-					}
-
-					// If not stacked and not player-specific
-					if nhbtxt == "" && flags != int32(ST_SCA)|int32(AT_ALL) {
-						hb = true
-						mtk = flags&int32(ST_SCA) == 0 || flags&int32(AT_ALL) == 0
+				// Decide which debug box to use for one box's invincibility
+				pick := func(inv, full bool) *DebugClsn {
+					switch {
+					case c.scf(SCF_standby):
+						return &sys.debugc2stb // Standby
+					case full:
+						return &sys.debugc2mtk // Fully invincible
+					case inv:
+						return &sys.debugc2hb // Partially invincible
+					case (c.inguarddist && c.scf(SCF_guard)) || c.guardflag != 0:
+						return &sys.debugc2grd // Guarding
+						// Mugen does not check inguarddist here
+						// This shows that the inner workings of its SCF_guard are different from ours
+						// Maybe it is flagged during hit detection, much like inguarddist. Which isn't necessarily better
+					default:
+						return &sys.debugc2 // Normal
 					}
 				}
 
-				// Decide which debug box to add
-				var debugType *DebugClsn
-				switch {
-				case c.scf(SCF_standby):
-					debugType = &sys.debugc2stb // Standby
-				case mtk:
-					debugType = &sys.debugc2mtk // Fully invincible
-				case hb:
-					debugType = &sys.debugc2hb // Partially invincible
-				case (c.inguarddist && c.scf(SCF_guard)) || c.guardflag != 0:
-					debugType = &sys.debugc2grd // Guarding
-					// Mugen does not check inguarddist here
-					// This shows that the inner workings of its SCF_guard are different from ours
-					// Maybe it is flagged during hit detection, much like inguarddist. Which isn't necessarily better
-				default:
-					debugType = &sys.debugc2 // Normal
+				// Color each box by its own invincibility. Unrestricted slots apply to every box
+				for i := range boxes2 {
+					bhb, bmtk, _, _ := c.debugHitByState(2, int32(i))
+					pick(bhb, bmtk).Add(boxes2[i:i+1], x + xoff, y + yoff, c.facing)
 				}
-				debugType.Add(boxes2, x + xoff, y + yoff, c.facing)
+
+				// Some invincibility only applies to specific boxes. The colors show which
+				if c.hasBoxHitBy() {
+					nhbtxt = "Box-specific"
+				}
 
 				// Add invulnerability text
 				if nhbtxt == "" {
@@ -14307,7 +14382,7 @@ func (cl *CharList) hitDetectionProjectile(getter *Char) {
 			if getter.atktmp != 0 && (getter.hitdef.affectteam == 0 ||
 				(p.hitdef.teamside != getter.teamside) == (getter.hitdef.affectteam > 0)) &&
 				getter.hitdef.hitflag&int32(HF_P) != 0 &&
-				getter.projClsnCheck(p, 1, 2) &&
+				getter.projClsnCheck(p, 1, 2, false) &&
 				sys.zAxisOverlap(getter.pos[2], getter.hitdef.attack_depth[0], getter.hitdef.attack_depth[1], getter.localscl,
 					p.pos[2], p.hitdef.attack_depth[0], p.hitdef.attack_depth[1], p.localscl) {
 				if getter.hitdef.p1stateno >= 0 && getter.stateChange1(getter.hitdef.p1stateno, getter.hitdef.statePN) {
@@ -14341,7 +14416,7 @@ func (cl *CharList) hitDetectionProjectile(getter *Char) {
 				//	getter.hittmp = int8(Btoi(getter.ghv.fallflag)) + 1
 				//}
 
-				if getter.projClsnCheck(p, p.hitdef.p2clsncheck, 1) &&
+				if getter.projClsnCheck(p, p.hitdef.p2clsncheck, 1, true) &&
 					sys.zAxisOverlap(p.pos[2], p.hitdef.attack_depth[0], p.hitdef.attack_depth[1], p.localscl,
 						getter.pos[2], getter.depthPlayer[0], getter.depthPlayer[1], getter.localscl) {
 
