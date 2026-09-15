@@ -5007,8 +5007,7 @@ func (s *Select) preloadCharAssets(ref int) error {
 			if err != nil {
 				return err
 			}
-			lines, lnidx := SplitAndTrim(str, "\n"), 0
-			at := ReadAnimationTable(sc.def, tempSff, &tempSff.palList, lines, &lnidx, false)
+			at := ReadAnimationTable(sc.def, tempSff, &tempSff.palList, str, false)
 			for vAnim := range s.charAnimPreload {
 				if animation := at.get(vAnim); animation != nil {
 					localAnims.addAnim(animation, vAnim)
@@ -5103,14 +5102,14 @@ func (s *Select) preloadStageAssets(ref int) error {
 		return nil
 	}
 	ss := s.stagelist[ref-1]
-	lines := []string{}
+	defText := ""
 	defPath := ss.def
 	if err := LoadFile(&defPath, nil, "", func(file string) error {
 		str, err := LoadText(file)
 		if err != nil {
 			return err
 		}
-		lines = SplitAndTrim(str, "\n")
+		defText = str
 		return nil
 	}); err != nil {
 		return err
@@ -5123,8 +5122,7 @@ func (s *Select) preloadStageAssets(ref int) error {
 	}
 
 	tempSff := newSff()
-	atidx := 0
-	at := ReadAnimationTable(ss.def, tempSff, &tempSff.palList, lines, &atidx, false)
+	at := ReadAnimationTable(ss.def, tempSff, &tempSff.palList, defText, false)
 	for v := range s.stageAnimPreload {
 		if anim := at.get(v); anim != nil {
 			localAnims.addAnim(anim, v)
