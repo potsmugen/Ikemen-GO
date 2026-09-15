@@ -56,6 +56,20 @@ func (c *CharCompiler) hitBySub(is IniSection, sc *StateControllerBase, sctrlNam
 	}); err != nil {
 		return err
 	}
+	// Clsn group uses the same named values as OverrideClsn and TransformClsn
+	if _, ok := is["group"]; ok {
+		new = true
+	}
+	if err := c.paramClsnType(is, sc, "clsngroup", hitBy_group); err != nil {
+		return err
+	}
+	if err := c.stateParam(is, "clsnindex", false, func(data string) error {
+		new = true
+		c.scAdd(sc, hitBy_index, data, VT_Int, 1)
+		return nil
+	}); err != nil {
+		return err
+	}
 
 	// Shared parameters
 	if err := c.paramValue(is, sc, "time", hitBy_time, VT_Int, 1, false); err != nil {
@@ -92,6 +106,7 @@ func (c *CharCompiler) hitBySub(is IniSection, sc *StateControllerBase, sctrlNam
 	}
 
 	// Cannot mix old and new syntax
+	// Technically we could allow value with clsngroup for instance, but it's better to start clean with the new syntax
 	if old && new {
 		msg := "Cannot mix old and new syntaxes in " + sctrlName
 		if c.zssMode {
