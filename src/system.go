@@ -3341,7 +3341,7 @@ func (s *System) stepRoundState() {
 		}
 		roundnotskip := s.gsf(GSF_roundnotskip)
 		skipEligible := skipCandidate && anyButton && !roundnotskip && !matchEndDialoguePending
-		if s.rollback.session != nil && s.rollback.session.config.LogsEnabled {
+		if s.rollback.session != nil && s.rollback.session.config.StateLogsEnabled {
 			s.rollback.session.log.logRoundSkipCheck(fadeoutStart, anyButton, roundnotskip, skipEligible, matchEndDialoguePending)
 		}
 		if skipEligible {
@@ -4331,7 +4331,7 @@ func (s *System) runNextRound() bool {
 	motifEndActive := s.motif.me.active
 	canAdvance := roundOver && !s.fightLoopEnd && (tickFrame || motifEndActive)
 	holdPostMatch := canAdvance && s.holdPostMatchForDialogue()
-	if s.rollback.session != nil && s.rollback.session.config.LogsEnabled && s.intro < 0 {
+	if s.rollback.session != nil && s.rollback.session.config.StateLogsEnabled && s.intro < 0 {
 		s.rollback.session.log.logRoundAdvanceCheck(roundOver, tickFrame, motifEndActive, s.fightLoopEnd, holdPostMatch, canAdvance)
 	}
 	if canAdvance {
