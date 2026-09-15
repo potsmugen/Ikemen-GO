@@ -5290,6 +5290,8 @@ type hitBy StateControllerBase
 
 const (
 	hitBy_attr byte = iota
+	hitBy_group
+	hitBy_index
 	hitBy_playerid
 	hitBy_playerno
 	hitBy_slot
@@ -5305,8 +5307,10 @@ func (sc hitBy) runSub(c *Char, crun *Char, not bool) {
 	pno := int(-1)
 	pid := int32(-1)
 	stk := false
+	grp := int32(-1)
+	idx := int32(-1)
 
-	set := func(slot int, attr, time int32, pno int, pid int32, stk bool) {
+	set := func(slot int, attr, time int32, pno int, pid int32, stk bool, grp, idx int32) {
 		if slot < 0 {
 			return
 		} else if slot >= len(crun.hitby) {
@@ -5318,6 +5322,8 @@ func (sc hitBy) runSub(c *Char, crun *Char, not bool) {
 		crun.hitby[slot].playerno = pno - 1
 		crun.hitby[slot].playerid = pid
 		crun.hitby[slot].stack = stk
+		crun.hitby[slot].clsngroup = grp
+		crun.hitby[slot].clsnindex = idx
 	}
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
@@ -5334,11 +5340,15 @@ func (sc hitBy) runSub(c *Char, crun *Char, not bool) {
 			pid = exp[0].evalI(c)
 		case hitBy_stack:
 			stk = exp[0].evalB(c)
+		case hitBy_group:
+			grp = exp[0].evalI(c)
+		case hitBy_index:
+			idx = exp[0].evalI(c)
 		}
 		return true
 	})
 
-	set(slot, attr, time, pno, pid, stk)
+	set(slot, attr, time, pno, pid, stk, grp, idx)
 }
 
 func (sc hitBy) Run(c *Char, _ []int32) bool {
@@ -8309,14 +8319,14 @@ func (sc hitDef) runSub(c *Char, hd *HitDef, paramID byte, exp []BytecodeExp) {
 		}
 	case hitDef_p2clsncheck:
 		v := exp[0].evalI(c)
-		if v == 0 || v == 1 || v == 2 || v == 3 {
+		if v >= 0 && v <= 4 {
 			hd.p2clsncheck = v
 		} else {
 			hd.p2clsncheck = -1
 		}
 	case hitDef_p2clsnrequire:
 		v := exp[0].evalI(c)
-		if v == 1 || v == 2 || v == 3 {
+		if v >= 1 && v <= 4 {
 			hd.p2clsnrequire = v
 		} else {
 			hd.p2clsnrequire = 0
@@ -9894,7 +9904,7 @@ func (sc modifyProjectile) Run(c *Char, _ []int32) bool {
 			case hitDef_p2clsncheck:
 				v1 := exp[0].evalI(c)
 				eachProj(func(p *Projectile) {
-					if v1 == 0 || v1 == 1 || v1 == 2 || v1 == 3 {
+					if v1 >= 0 && v1 <= 4 {
 						p.hitdef.p2clsncheck = v1
 					} else {
 						p.hitdef.p2clsncheck = -1
@@ -9903,7 +9913,7 @@ func (sc modifyProjectile) Run(c *Char, _ []int32) bool {
 			case hitDef_p2clsnrequire:
 				v1 := exp[0].evalI(c)
 				eachProj(func(p *Projectile) {
-					if v1 == 1 || v1 == 2 || v1 == 3 {
+					if v1 >= 1 && v1 <= 4 {
 						p.hitdef.p2clsnrequire = v1
 					} else {
 						p.hitdef.p2clsnrequire = 0
