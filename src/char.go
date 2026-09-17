@@ -642,7 +642,6 @@ type HitDef struct {
 	guard_velocity             [3]float32
 	air_velocity               [3]float32
 	airguard_velocity          [3]float32
-	cornerpush_legacydefaults  bool
 	ground_cornerpush_veloff   float32
 	ground_cornerpush_velmul   float32
 	air_cornerpush_veloff      float32
@@ -879,11 +878,6 @@ func (hd *HitDef) reset(c *Char, proj *Projectile) {
 		hd.guard_dist_z = [2]float32{c.size.proj.attack.dist.depth[0], c.size.proj.attack.dist.depth[1]}
 	}
 
-	// Version-dependent defaults
-	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
-		hd.cornerpush_legacydefaults = true
-	}
-
 	// PalFX
 	hd.palfx.mul = [3]int32{255, 255, 255}
 	hd.palfx.color = 1
@@ -904,6 +898,9 @@ func (hd *HitDef) finalizeParams(c *Char, proj *Projectile) {
 		hd.playerno = c.playerNo
 		hd.playerid = c.id
 	}
+
+	// Grab global info from working state
+	gi := c.stWgi()
 
 	if hd.attr&^int32(ST_MASK) == 0 {
 		hd.attr = 0
@@ -939,7 +936,7 @@ func (hd *HitDef) finalizeParams(c *Char, proj *Projectile) {
 
 	// In Mugen this one acts diferent from the documentation
 	// Ikemen characters follow the documentation since it makes more sense
-	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+	if gi.ikemenver[0] == 0 && gi.ikemenver[1] == 0 {
 		ifierrset(&hd.guard_hittime, hd.ground_slidetime)
 	} else {
 		ifierrset(&hd.guard_hittime, hd.ground_hittime)
@@ -978,8 +975,11 @@ func (hd *HitDef) finalizeParams(c *Char, proj *Projectile) {
 
 	ifierrset(&hd.air_fall, Btoi(hd.ground_fall))
 
+	// Check which cornerpush defaults to use
+	legacyCornerpush := gi.constants["hitdef.cornerpush.legacydefaults"] != 0
+
 	// Determine whether to use Mugen's arbitrary values or just inherit ground.velocity 1:1
-	if hd.cornerpush_legacydefaults {
+	if legacyCornerpush {
 		if hd.attr&int32(ST_A) != 0 {
 			ifnanset(&hd.ground_cornerpush_veloff, 0)
 		} else {
@@ -995,7 +995,7 @@ func (hd *HitDef) finalizeParams(c *Char, proj *Projectile) {
 	ifnanset(&hd.airguard_cornerpush_veloff, hd.ground_cornerpush_veloff)
 
 	// Determine whether to use Mugen's arbitrary value or modern target-based friction
-	if hd.cornerpush_legacydefaults {
+	if legacyCornerpush {
 		ifnanset(&hd.ground_cornerpush_velmul, 0.7)
 	} else {
 		ifnanset(&hd.ground_cornerpush_velmul, -1)
@@ -1009,30 +1009,30 @@ func (hd *HitDef) finalizeParams(c *Char, proj *Projectile) {
 	// Super attack behaviour
 	if hd.attr&int32(AT_AH) != 0 {
 		ifierrset(&hd.hitgetpower,
-			int32(c.gi().constants["super.attack.lifetopowermul"]*float32(hd.hitdamage)))
+			int32(gi.constants["super.attack.lifetopowermul"]*float32(hd.hitdamage)))
 		ifierrset(&hd.hitgivepower,
-			int32(c.gi().constants["super.gethit.lifetopowermul"]*float32(hd.hitdamage)))
+			int32(gi.constants["super.gethit.lifetopowermul"]*float32(hd.hitdamage)))
 		ifierrset(&hd.dizzypoints,
-			int32(c.gi().constants["super.lifetodizzypointsmul"]*float32(hd.hitdamage)))
+			int32(gi.constants["super.lifetodizzypointsmul"]*float32(hd.hitdamage)))
 		ifierrset(&hd.guardpoints,
-			int32(c.gi().constants["super.lifetoguardpointsmul"]*float32(hd.hitdamage)))
+			int32(gi.constants["super.lifetoguardpointsmul"]*float32(hd.hitdamage)))
 		ifierrset(&hd.hitredlife,
-			int32(c.gi().constants["super.lifetoredlifemul"]*float32(hd.hitdamage)))
+			int32(gi.constants["super.lifetoredlifemul"]*float32(hd.hitdamage)))
 		ifierrset(&hd.guardredlife,
-			int32(c.gi().constants["super.lifetoredlifemul"]*float32(hd.guarddamage)))
+			int32(gi.constants["super.lifetoredlifemul"]*float32(hd.guarddamage)))
 	} else {
 		ifierrset(&hd.hitgetpower,
-			int32(c.gi().constants["default.attack.lifetopowermul"]*float32(hd.hitdamage)))
+			int32(gi.constants["default.attack.lifetopowermul"]*float32(hd.hitdamage)))
 		ifierrset(&hd.hitgivepower,
-			int32(c.gi().constants["default.gethit.lifetopowermul"]*float32(hd.hitdamage)))
+			int32(gi.constants["default.gethit.lifetopowermul"]*float32(hd.hitdamage)))
 		ifierrset(&hd.dizzypoints,
-			int32(c.gi().constants["default.lifetodizzypointsmul"]*float32(hd.hitdamage)))
+			int32(gi.constants["default.lifetodizzypointsmul"]*float32(hd.hitdamage)))
 		ifierrset(&hd.guardpoints,
-			int32(c.gi().constants["default.lifetoguardpointsmul"]*float32(hd.hitdamage)))
+			int32(gi.constants["default.lifetoguardpointsmul"]*float32(hd.hitdamage)))
 		ifierrset(&hd.hitredlife,
-			int32(c.gi().constants["default.lifetoredlifemul"]*float32(hd.hitdamage)))
+			int32(gi.constants["default.lifetoredlifemul"]*float32(hd.hitdamage)))
 		ifierrset(&hd.guardredlife,
-			int32(c.gi().constants["default.lifetoredlifemul"]*float32(hd.guarddamage)))
+			int32(gi.constants["default.lifetoredlifemul"]*float32(hd.guarddamage)))
 	}
 
 	ifierrset(&hd.guardgetpower, int32(float32(hd.hitgetpower)*0.5))
@@ -1076,7 +1076,7 @@ func (hd *HitDef) finalizeParams(c *Char, proj *Projectile) {
 	// Ikemen characters can use it to update their StateDef juggle points
 	if hd.air_juggle == IErr {
 		hd.air_juggle = 0
-	} else if !hd.isprojectile && (c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0) {
+	} else if !hd.isprojectile && (gi.ikemenver[0] != 0 || gi.ikemenver[1] != 0) {
 		c.juggle = hd.air_juggle
 	}
 
@@ -8198,6 +8198,7 @@ func (c *Char) initConstants(gi *CharGlobalInfo) {
 	gi.constants["super.lifetoredlifemul"] = 0.75
 	gi.constants["default.legacygamedistancespec"] = 0
 	gi.constants["default.legacyfallyvelyaccel"] = 0
+	gi.constants["hitdef.cornerpush.legacydefaults"] = float32(Btoi(gi.ikemenver[0] == 0 && gi.ikemenver[1] == 0)) // True for Mugen characters
 	//gi.constants["default.ignoredefeatedenemies"] = 0
 	gi.constants["input.pauseonhitpause"] = 1
 	gi.constants["input.fbflipenemydistance"] = -1
