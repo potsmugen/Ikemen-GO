@@ -2315,12 +2315,7 @@ func (e *Explod) cueDraw() {
 
 	alp := e.alpha
 
-	// TODO: Interpolation should just use the same conventions instead of merging all angles under one parameter
 	rot := e.rot
-	if (facing < 0) != (e.vfacing < 0) {
-		rot.angle *= -1
-		rot.yangle *= -1
-	}
 
 	fLength := e.fLength
 	scale := e.scale
@@ -2328,6 +2323,12 @@ func (e *Explod) cueDraw() {
 
 	if e.interpolate {
 		e.Interpolate(&scale, &alp, &rot, &fLength, &xshear)
+	}
+
+	// Facing must be applied after interpolation
+	if (facing < 0) != (e.vfacing < 0) {
+		rot.angle *= -1
+		rot.yangle *= -1
 	}
 
 	if alp[0] < 0 {
