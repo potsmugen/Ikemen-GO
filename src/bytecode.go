@@ -4756,18 +4756,8 @@ func (be BytecodeExp) evalB(c *Char) bool {
 	return be.run(c).ToB()
 }
 
-// This isn't quite an evaluation yet, but the name is consistent this way
-func (be BytecodeExp) evalS() string {
-	if len(be) == 0 {
-		return ""
-	}
-	// The same unsafe pattern we already used
-	return *(*string)(unsafe.Pointer(&be))
-}
-
 // Evaluates the expression and returns the result as a string
-// TODO: Eventually we'll probably only need one between this and evalS
-func (be BytecodeExp) evalString(c *Char) string {
+func (be BytecodeExp) evalS(c *Char) string {
 	if len(be) == 0 {
 		return ""
 	}
@@ -6008,7 +5998,7 @@ func (sc helper) Run(c *Char, _ []int32) bool {
 		case helper_helpertype:
 			h.helperType = exp[0].evalI(c)
 		case helper_name:
-			h.name = exp[0].evalS()
+			h.name = exp[0].evalS(c)
 		case helper_clsnproxy:
 			h.isclsnproxy = exp[0].evalB(c)
 		case helper_postype:
@@ -6110,7 +6100,7 @@ func (sc helper) Run(c *Char, _ []int32) bool {
 		case helper_ownprojectile:
 			h.ownProjectile = exp[0].evalB(c)
 		case helper_map:
-			mapKey := exp[0].evalS()
+			mapKey := exp[0].evalS(c)
 			h.mapArray[mapKey] = MapValueOf(exp[1].run(c))
 		}
 		return true
@@ -6812,7 +6802,7 @@ func (sc explod) Run(c *Char, _ []int32) bool {
 				sys.appendToConsole(crun.warn() + "invalid explod window")
 			}
 		case explod_shader:
-			shader := exp[0].evalS()
+			shader := exp[0].evalPrefix(c)
 			if shader == "" || sys.isValidCustomShader(shader) {
 				e.customShader.name = shader
 			} else {
@@ -7428,7 +7418,7 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 				e.syncParams = sp
 			})
 		case explod_shader:
-			s := exp[0].evalS()
+			s := exp[0].evalPrefix(c)
 			modifiers = append(modifiers, func(e *Explod) { 
 				e.customShader.name = s
 			})
@@ -8669,7 +8659,7 @@ func (sc projectile) Run(c *Char, _ []int32) bool {
 		case projectile_projprojection:
 			p.projection = Projection(exp[0].evalI(c))
 		case projectile_shader:
-			p.customShader.name = exp[0].evalS()
+			p.customShader.name = exp[0].evalPrefix(c)
 		case projectile_shaderparam:
 			numParams := int(exp[0].evalI(c))
 			for j := 0; j < numParams; j++ {
@@ -9150,7 +9140,7 @@ func (sc modifyProjectile) Run(c *Char, _ []int32) bool {
 					p.fLength = exp[0].evalF(c)
 				})
 			case projectile_shader:
-				v1 := exp[0].evalS()
+				v1 := exp[0].evalPrefix(c)
 				eachProj(func(p *Projectile) {
 					p.customShader.name = v1
 				})
@@ -12181,7 +12171,7 @@ func (sc forceFeedback) Run(c *Char, _ []int32) bool {
 		switch paramID {
 		case forceFeedback_waveform:
 			// We're just gonna use this to hack the parameters in
-			wf := exp[0].evalS()
+			wf := exp[0].evalS(c)
 			switch wf {
 			case "off":
 				waveform = waveform_off
@@ -12278,7 +12268,7 @@ func (sc assertCommand) Run(c *Char, _ []int32) bool {
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
 		case assertCommand_name:
-			n = exp[0].evalS()
+			n = exp[0].evalS(c)
 		case assertCommand_buffertime:
 			bt = exp[0].evalI(c)
 		}
@@ -12426,7 +12416,7 @@ func (sc dialogue) Run(c *Char, _ []int32) bool {
 		case dialogue_force:
 			force = exp[0].evalB(c)
 		case dialogue_text:
-			sys.chars[crun.playerNo][0].appendDialogue(exp[0].evalS(), reset)
+			sys.chars[crun.playerNo][0].appendDialogue(exp[0].evalS(c), reset)
 			reset = false
 		}
 		return true
@@ -12623,7 +12613,7 @@ func (sc lifebarAction) Run(c *Char, _ []int32) bool {
 		case lifebarAction_time:
 			msg.resttime = exp[0].evalI(c)
 		case lifebarAction_text:
-			msg.text = exp[0].evalS()
+			msg.text = exp[0].evalS(c)
 		case lifebarAction_fontno:
 			msg.fontNo = exp[0].evalI(c)
 		case lifebarAction_fontbank:
@@ -12717,7 +12707,7 @@ func (sc mapSet) Run(c *Char, _ []int32) bool {
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
 		case mapSet_mapArray:
-			s = exp[0].evalS()
+			s = exp[0].evalS(c)
 		case mapSet_value:
 			value = exp[0].run(c)
 		case mapSet_sctrltype:
@@ -12771,33 +12761,33 @@ func (sc matchRestart) Run(c *Char, _ []int32) bool {
 				}
 			}
 		case matchRestart_stagedef:
-			s = exp[0].evalS()
+			s = exp[0].evalS(c)
 			sys.sel.sdefOverwrite = SearchFile(s, dirs, "stages/")
 			//sys.reloadStageFlg = true
 			reloadFlag = true
 		case matchRestart_p1def:
-			s = exp[0].evalS()
+			s = exp[0].evalS(c)
 			sys.sel.cdefOverwrite[0] = SearchFile(s, dirs, "chars/")
 		case matchRestart_p2def:
-			s = exp[0].evalS()
+			s = exp[0].evalS(c)
 			sys.sel.cdefOverwrite[1] = SearchFile(s, dirs, "chars/")
 		case matchRestart_p3def:
-			s = exp[0].evalS()
+			s = exp[0].evalS(c)
 			sys.sel.cdefOverwrite[2] = SearchFile(s, dirs, "chars/")
 		case matchRestart_p4def:
-			s = exp[0].evalS()
+			s = exp[0].evalS(c)
 			sys.sel.cdefOverwrite[3] = SearchFile(s, dirs, "chars/")
 		case matchRestart_p5def:
-			s = exp[0].evalS()
+			s = exp[0].evalS(c)
 			sys.sel.cdefOverwrite[4] = SearchFile(s, dirs, "chars/")
 		case matchRestart_p6def:
-			s = exp[0].evalS()
+			s = exp[0].evalS(c)
 			sys.sel.cdefOverwrite[5] = SearchFile(s, dirs, "chars/")
 		case matchRestart_p7def:
-			s = exp[0].evalS()
+			s = exp[0].evalS(c)
 			sys.sel.cdefOverwrite[6] = SearchFile(s, dirs, "chars/")
 		case matchRestart_p8def:
-			s = exp[0].evalS()
+			s = exp[0].evalS(c)
 			sys.sel.cdefOverwrite[7] = SearchFile(s, dirs, "chars/")
 		case matchRestart_preserveVars:
 			for i, p := range exp {
@@ -12942,7 +12932,7 @@ func (sc remapSprite) Run(c *Char, _ []int32) bool {
 				crun.remapSpr = make(RemapPreset)
 			}
 		case remapSprite_preset:
-			crun.remapSpritePreset(exp[0].evalS())
+			crun.remapSpritePreset(exp[0].evalS(c))
 		case remapSprite_source:
 			src[0] = int32(exp[0].evalI(c))
 			if len(exp) > 1 {
@@ -13033,7 +13023,7 @@ func (sc saveFile) Run(c *Char, _ []int32) bool {
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
 		case saveFile_path:
-			path = exp[0].evalS()
+			path = exp[0].evalS(c)
 		case saveFile_savedata:
 			savedata = exp[0].evalI(c)
 		case saveFile_maps:
@@ -13050,11 +13040,11 @@ func (sc saveFile) Run(c *Char, _ []int32) bool {
 
 	exactKeys := make([]string, len(mapsList))
 	for i, be := range mapsList {
-		exactKeys[i] = be.evalS()
+		exactKeys[i] = be.evalS(c)
 	}
 	includeSubstrings := make([]string, len(mapsIncludeList))
 	for i, be := range mapsIncludeList {
-		includeSubstrings[i] = be.evalS()
+		includeSubstrings[i] = be.evalS(c)
 	}
 
 	fullPath := filepath.Dir(c.gi().def) + "/" + path
@@ -13119,7 +13109,7 @@ func (sc loadFile) Run(c *Char, _ []int32) bool {
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
 		case saveFile_path:
-			path = exp[0].evalS()
+			path = exp[0].evalS(c)
 		case saveFile_savedata:
 			sctrlSavedata = exp[0].evalI(c)
 		case saveFile_maps:
@@ -13136,11 +13126,11 @@ func (sc loadFile) Run(c *Char, _ []int32) bool {
 
 	exactKeys := make([]string, len(mapsList))
 	for i, be := range mapsList {
-		exactKeys[i] = be.evalS()
+		exactKeys[i] = be.evalS(c)
 	}
 	includeSubstrings := make([]string, len(mapsIncludeList))
 	for i, be := range mapsIncludeList {
-		includeSubstrings[i] = be.evalS()
+		includeSubstrings[i] = be.evalS(c)
 	}
 
 	fullPath := filepath.Dir(c.gi().def) + "/" + path
@@ -13288,7 +13278,7 @@ func (sc shaderSet) Run(c *Char, _ []int32) bool {
 		case shaderSet_time:
 			st = exp[0].evalI(c)
 		case shaderSet_shader:
-			shader := exp[0].evalS()
+			shader := exp[0].evalPrefix(c)
 			if shader == "" || sys.isValidCustomShader(shader) {
 				crun.customShader.name = shader
 			} else {
@@ -13346,7 +13336,7 @@ func (sc storyboard) Run(c *Char, _ []int32) bool {
 	StateControllerBase(sc).run(c, func(id byte, exp []BytecodeExp) bool {
 		switch id {
 		case storyboard_path:
-			path := exp[0].evalS()
+			path := exp[0].evalS(c)
 			s, err := loadStoryboard(path)
 			if err != nil {
 				panic(err)
@@ -13793,7 +13783,7 @@ func (sc playBgm) Run(c *Char, _ []int32) bool {
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
 		case playBgm_source:
-			src := exp[1].evalS()
+			src := exp[1].evalS(c)
 			switch MusicSource(exp[0].evalI(c)) {
 			case MS_Match:
 				bgm, loop, volume, loopstart, loopend, startposition, freqmul, loopcount = crun.gi().music.Read(src, sys.stage.def)
@@ -13810,7 +13800,7 @@ func (sc playBgm) Run(c *Char, _ []int32) bool {
 			}
 			play = bgm != ""
 		case playBgm_bgm:
-			bgm = exp[0].evalS()
+			bgm = exp[0].evalS(c)
 			if bgm == "" {
 				stop = true
 				play = false
@@ -14535,7 +14525,7 @@ func (sc createPlatform) Run(c *Char, _ []int32) bool {
 		case createPlatform_id:
 			plat.id = exp[0].evalI(c)
 		case createPlatform_name:
-			plat.name = exp[0].evalS()
+			plat.name = exp[0].evalS(c)
 		case createPlatform_pos:
 			plat.pos[0] = exp[0].evalF(c)
 			plat.pos[1] = exp[1].evalF(c)
@@ -15066,14 +15056,14 @@ func (sc modifyPlayer) Run(c *Char, _ []int32) bool {
 				}
 			}
 		case modifyPlayer_displayname:
-			dn := exp[0].evalS()
+			dn := exp[0].evalS(c)
 			sys.cgi[crun.playerNo].displayname = dn
 		case modifyPlayer_lifebarname:
-			ln := exp[0].evalS()
+			ln := exp[0].evalS(c)
 			sys.cgi[crun.playerNo].lifebarname = ln
 		case modifyPlayer_helpername:
 			if crun.helperIndex != 0 {
-				hn := exp[0].evalS()
+				hn := exp[0].evalS(c)
 				crun.name = hn
 			}
 		case modifyPlayer_helpervar_id:
@@ -15968,7 +15958,7 @@ func (sc mapReset) Run(c *Char, _ []int32) bool {
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
 		case mapReset_exclude:
-			str := exp[0].evalS()
+			str := exp[0].evalS(c)
 			exclude = append(exclude, str)
 		}
 		return true
