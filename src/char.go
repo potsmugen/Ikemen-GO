@@ -2452,7 +2452,7 @@ func (e *Explod) cueDraw() {
 	sd.window = ewin
 	sd.xshear = xshear
 	sd.customShader = CustomShaderRenderData{
-		name:   e.customShader.name,
+		name:   e.customShader.key,
 		params: e.customShader.params,
 		time:   e.customShader.time,
 		sTime:  e.customShader.sTime,
@@ -3315,7 +3315,7 @@ func (p *Projectile) cueDraw() {
 	sd.window = pwin
 	sd.xshear = p.xshear
 	sd.customShader = CustomShaderRenderData{
-		name:   p.customShader.name,
+		name:   p.customShader.key,
 		params: p.customShader.params,
 		time:   p.customShader.time,
 		sTime:  p.customShader.sTime,
@@ -3482,7 +3482,7 @@ type CharGlobalInfo struct {
 	attackBase              int32
 	defenceBase             int32
 	canMutateStage          bool // Determines if the stage should be included in save states
-	customShaders           []string
+	customShaders           map[string]string
 	//hitPauseToggleFlagCount int32
 }
 
@@ -3498,6 +3498,7 @@ func newCharGlobalInfo() CharGlobalInfo {
 		quotes:        [MaxQuotes]string{},
 		movelists:     make(map[int]string),
 		remapPreset:   make(map[string]RemapPreset),
+		customShaders: make(map[string]string),
 		portraitscale: 1,
 	}
 
@@ -4313,8 +4314,6 @@ func (c *Char) load(def string, gi *CharGlobalInfo) error {
 						}
 					}
 
-					gi.customShaders = append(gi.customShaders, shaderAlias)
-
 					LoadFile(&shaderPath, []string{def, "", "data/"}, "", func(filename string) error {
 						f, err := OpenFile(filename)
 						if err != nil {
@@ -4328,10 +4327,7 @@ func (c *Char) load(def string, gi *CharGlobalInfo) error {
 							return err
 						}
 
-						sys.mainThreadTask <- func() {
-							sys.shaderRefCount[shaderAlias] = 3
-							gfx.LoadCustomSpriteShader(shaderAlias, shaderData)
-						}
+						sys.loadCustomShader(gi.customShaders, shaderAlias, filename, shaderData)
 						return nil
 					})
 				}
@@ -13552,7 +13548,7 @@ func (c *Char) cueDraw() {
 		charSD.xshear = c.xshear
 		charSD.window = cwin
 		charSD.customShader = CustomShaderRenderData{
-			name:   c.customShader.name,
+			name:   c.customShader.key,
 			params: c.customShader.params,
 			time:   c.customShader.time,
 			sTime:  c.customShader.sTime,
