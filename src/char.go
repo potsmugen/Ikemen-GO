@@ -2313,11 +2313,12 @@ func (e *Explod) update() {
 				e.customShader.sTime++
 				e.customShader.tex1.step()
 				e.customShader.tex2.step()
-				if e.customShader.time > 0 {
-					e.customShader.time--
-				}
+
+				// Check expiry before stepping, so the shader lasts the full time
 				if e.customShader.time == 0 {
 					e.customShader.clear()
+				} else if e.customShader.time > 0 {
+					e.customShader.time--
 				}
 			}
 		}
@@ -3197,15 +3198,18 @@ func (p *Projectile) tick() {
 			if p.pausemovetime > 0 {
 				p.pausemovetime--
 			}
+
+			// Update shader effects
 			if p.customShader.name != "" {
 				p.customShader.sTime++
 				p.customShader.tex1.step()
 				p.customShader.tex2.step()
-				if p.customShader.time > 0 {
-					p.customShader.time--
-				}
+
+				// Check expiry before stepping, so the shader lasts the full time
 				if p.customShader.time == 0 {
 					p.customShader.clear()
+				} else if p.customShader.time > 0 {
+					p.customShader.time--
 				}
 			}
 			p.freezeflag = false
@@ -12344,8 +12348,11 @@ func (c *Char) actionPrepare() {
 			// Step custom shader
 			if c.customShader.time > 0 {
 				c.customShader.time--
+				// Clear immediately, unlike explods, due to different update order
+				// TODO: All of them could just use a customShader.step() function
+				// But that would make an eventual shaderVar(time) trigger less accurate
 				if c.customShader.time == 0 {
-					c.customShader = CustomShader{}
+					c.customShader.clear()
 				}
 			}
 			// Step movetime
