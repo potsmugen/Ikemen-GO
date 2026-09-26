@@ -6,6 +6,7 @@ import (
 	"image"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ikemen-engine/beep/v2"
@@ -23,6 +24,7 @@ type bgVideo struct {
 	audioBuffer     chan []float64 // interleaved L,R float64 samples
 	quit            chan struct{}  // signals the decode goroutine to exit
 	done            chan struct{}  // closed when the goroutine exits
+	quitOnce        sync.Once      // makes Close() safe to call more than once
 	audioStream     *reisen.AudioStream
 	videoStream     *reisen.VideoStream
 	media           *reisen.Media
@@ -203,6 +205,7 @@ func (bgv *bgVideo) Open(filename string, volume int, sm BgVideoScaleMode, sf Bg
 	bgv.errs = make(chan error)
 	bgv.quit = make(chan struct{})
 	bgv.done = make(chan struct{})
+	bgv.quitOnce = sync.Once{}
 
 	err = bgv.media.OpenDecode()
 	if err != nil {
@@ -773,7 +776,10 @@ func (bgv *bgVideo) Close() {
 	default:
 	}
 	// Signal goroutine to exit; cleanup happens there.
+	// Once guard: done may not be closed yet (goroutine still exiting, or never started)
 	if bgv.quit != nil {
-		close(bgv.quit)
+		bgv.quitOnce.Do(func() {
+			close(bgv.quit)
+		})
 	}
 }
