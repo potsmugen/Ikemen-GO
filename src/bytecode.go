@@ -6156,6 +6156,37 @@ func (sc ctrlSet) Run(c *Char, _ []int32) bool {
 	return false
 }
 
+type guardDef StateControllerBase
+
+const (
+	guardDef_flags byte = iota
+	guardDef_stateno
+	guardDef_redirectid
+)
+
+func (sc guardDef) Run(c *Char, _ []int32) bool {
+	crun := getRedirectedChar(c, StateControllerBase(sc), guardDef_redirectid, "GuardDef")
+	if crun == nil {
+		return false
+	}
+
+	// Start from a reset so that empty parameters do nothing but that
+	crun.guarddef.reset()
+
+	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
+		switch paramID {
+		case guardDef_flags:
+			crun.guarddef.flags = exp[0].evalI(c)
+			crun.guarddef.custom = true
+		case guardDef_stateno:
+			crun.guarddef.stateno = exp[0].evalI(c)
+			crun.guarddef.custom = true
+		}
+		return true
+	})
+	return false
+}
+
 type runState StateControllerBase
 
 const (
