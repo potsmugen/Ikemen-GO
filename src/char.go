@@ -18,7 +18,6 @@ const (
 	SCF_ctrl SystemCharFlag = 1 << iota
 	SCF_disabled
 	SCF_dizzy
-	SCF_guard
 	SCF_guardbreak
 	SCF_ko
 	SCF_over_alive // Has reached win or lose poses
@@ -3647,6 +3646,16 @@ type ForceFeedbackParams struct {
 	waveform          FFBWaveform
 }
 
+type GuardDef struct {
+	flags   int32
+	stateno int32
+	custom  bool
+}
+
+func (gd *GuardDef) reset() {
+	*gd = GuardDef{stateno: -1}
+}
+
 type Char struct {
 	name                string
 	palfx               *PalFX
@@ -3719,6 +3728,7 @@ type Char struct {
 	offset               [2]float32
 	stchtmp              bool
 	inguarddist          bool
+	guarddef             GuardDef
 	pushed               bool
 	hitdefContact        bool
 	atktmp               int8  // 1 hitdef can hit, 0 cannot hit, -1 other
@@ -11437,20 +11447,16 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile) (hitResult int32) 
 	// Check if the enemy can guard this attack
 	// Unguardable flag also affects projectiles
 	// https://github.com/ikemen-engine/Ikemen-GO/issues/2367
-	canguard := !c.asf(ASF_unguardable) && getter.scf(SCF_guard) &&
+	canguard := !c.asf(ASF_unguardable) && getter.guarddef.flags != 0 &&
 		(!getter.csf(CSF_gethit) || getter.ghv.guarded)
 
 	// Automatically choose high or low in case of auto guard
-	if canguard && getter.asf(ASF_autoguard) && getter.acttmp > 0 && !getter.csf(CSF_gethit) {
-		highflag := hd.guardflag&int32(HF_H) != 0
-		lowflag := hd.guardflag&int32(HF_L) != 0
-		if highflag != lowflag {
-			if lowflag && getter.ss.stateType == ST_S { // High to low
-				getter.ss.changeStateType(ST_C)
-			} else if highflag && getter.ss.stateType == ST_C { // Low to high
-				getter.ss.changeStateType(ST_S)
-			}
-		}
+	// Widens the native guard to both high and low attacks while on the ground
+	if canguard && getter.asf(ASF_autoguard) &&
+		getter.acttmp > 0 && !getter.csf(CSF_gethit) &&
+		!getter.guarddef.custom && // AutoGuard only works for native guard
+		(getter.ss.stateType == ST_S || getter.ss.stateType == ST_C) {
+		getter.guarddef.flags |= int32(HF_H | HF_L)
 	}
 
 	// Default hit type and kill flag to "hit" (1)
@@ -11459,15 +11465,21 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile) (hitResult int32) 
 	// If enemy is guarding the correct way, "hitResult" is set to "guard" (2)
 	if canguard {
 		// Guardflag checks
-		if hd.guardflag&int32(HF_H) != 0 && getter.ss.stateType == ST_S ||
-			hd.guardflag&int32(HF_L) != 0 && getter.ss.stateType == ST_C ||
-			hd.guardflag&int32(HF_A) != 0 && getter.ss.stateType == ST_A { // Statetype L is left out here
+		if hd.guardflag&getter.guarddef.flags != 0 {
 			// Switch kill flag to guard if attempting to guard correctly
 			getter.ghv.kill = hd.guard_kill
 			// We only switch to guard behavior if the enemy can survive guarding the attack
 			if getter.life > getter.computeDamage(float64(hd.guarddamage), hd.guard_kill, false, attackMul[0]*(float32(c.gi().attackBase)/100), c, true) ||
 				sys.gsf(GSF_globalnoko) || getter.asf(ASF_noko) || getter.asf(ASF_noguardko) {
 				hitResult = 2
+				// AutoGuard state selection
+				if !getter.guarddef.custom && getter.asf(ASF_autoguard) {
+					if hd.guardflag&int32(HF_L) != 0 && hd.guardflag&int32(HF_H) == 0 {
+						getter.guarddef.stateno = 152
+					} else if hd.guardflag&int32(HF_H) != 0 && hd.guardflag&int32(HF_L) == 0 {
+						getter.guarddef.stateno = 150
+					}
+				}
 			} else {
 				getter.ghv.guardko = true
 			}
@@ -12240,6 +12252,63 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile) (hitResult int32) 
 	return
 }
 
+func (c *Char) stateTypeAllowsGuard() bool {
+	// Check if AssertSpecial locks the current stateType
+	switch c.ss.stateType {
+	case ST_S:
+		return !c.asf(ASF_nostandguard)
+	case ST_C:
+		return !c.asf(ASF_nocrouchguard)
+	case ST_A:
+		return !c.asf(ASF_noairguard)
+	}
+	// StateType L is always locked
+	return false
+}
+
+func (c *Char) nativeGuardDef() (gd GuardDef) {
+	// Start fresh
+	gd.reset()
+
+	// Check if native guard is allowed
+	if !c.inGuardState() {
+		if !(c.stateTypeAllowsGuard() &&
+			c.ss.moveType == MT_I &&
+			(c.scf(SCF_ctrl) || c.ss.no == 52) &&
+			c.cmd != nil && (c.cmd[0].Buffer.Bb > 0 || c.asf(ASF_autoguard))) {
+			return
+		}
+	}
+
+	// Set GuardDef according to stateType
+	switch c.ss.stateType {
+	case ST_S:
+		gd = GuardDef{flags: int32(HF_H), stateno: 150}
+	case ST_C:
+		gd = GuardDef{flags: int32(HF_L), stateno: 152}
+	case ST_A:
+		gd = GuardDef{flags: int32(HF_A), stateno: 154}
+	}
+
+	return
+}
+
+// Logic to allow changing into state 120
+func (c *Char) shouldStartGuard() bool {
+	// In Mugen, characters *can* change into the guarding state while paused
+	// They can still block in Ikemen despite not being allowed to change state here
+	return !c.pauseBool &&
+		c.ctrl() &&
+		c.inguarddist &&
+		!c.inGuardState() &&
+		c.stateTypeAllowsGuard() &&
+		!c.asf(ASF_nohardcodedkeys) &&
+		(c.helperIndex == 0 || c.controller >= 0) &&
+		c.keyctrl[0] && c.cmd != nil && c.cmd[0].Buffer.Bb > 0
+	// Locking state 120 is AssertSpecial's responsibility. Let's not overload the logic
+	//!c.guarddef.custom && c.guarddef.flags != 0 &&
+}
+
 func (c *Char) actionPrepare() {
 	if c.minus != 3 || c.csf(CSF_destroy) || c.scf(SCF_disabled) {
 		return
@@ -12267,9 +12336,7 @@ func (c *Char) actionPrepare() {
 			// In Mugen, characters can perform basic actions even if they are KO
 			if !c.asf(ASF_nohardcodedkeys) {
 				if c.ctrl() {
-					if c.scf(SCF_guard) && c.inguarddist && !c.inGuardState() && c.ss.stateType != ST_L && c.cmd[0].Buffer.Bb > 0 {
-						c.changeState(120, -1, -1, "") // Start guarding
-					} else if !c.asf(ASF_nojump) && c.ss.stateType == ST_S && c.cmd[0].Buffer.Ub > 0 &&
+					if !c.asf(ASF_nojump) && c.ss.stateType == ST_S && c.cmd[0].Buffer.Ub > 0 &&
 						(!(sys.intro < 0 && sys.intro > -sys.fightScreen.round.over_waittime) || c.asf(ASF_postroundinput)) {
 						if c.ss.no != 40 {
 							c.changeState(40, -1, -1, "") // Jump
@@ -12293,7 +12360,7 @@ func (c *Char) actionPrepare() {
 							c.changeState(12, -1, -1, "") // Crouch to stand
 						}
 					} else if !c.asf(ASF_nowalk) && c.ss.stateType == ST_S &&
-						(c.cmd[0].Buffer.Fb > 0 != ((!c.inguarddist || c.prevNoStandGuard) && c.cmd[0].Buffer.Bb > 0)) {
+						(c.cmd[0].Buffer.Fb > 0 != ((!c.inguarddist || c.prevNoStandGuard) && c.cmd[0].Buffer.Bb > 0)) { // Only needed when SOCD is disabled
 						if c.ss.no != 20 {
 							c.changeState(20, -1, -1, "") // Walk
 						}
@@ -12311,6 +12378,7 @@ func (c *Char) actionPrepare() {
 			c.airJumpCount = 0
 		}
 		if !c.hitPause() {
+			c.guarddef.reset()
 			c.specialFlag = 0
 			c.setCSF(CSF_stagebound)
 			// Set default screenbound and playerpush
@@ -12495,30 +12563,20 @@ func (c *Char) actionRun() {
 		c.ss.sb.run(c)
 	}
 
-	// Guarding instructions
-	c.unsetSCF(SCF_guard)
-	if ((c.scf(SCF_ctrl) || c.ss.no == 52) &&
-		c.ss.moveType == MT_I || c.inGuardState()) && c.cmd != nil &&
-		(c.cmd[0].Buffer.Bb > 0 || c.asf(ASF_autoguard)) &&
-		(c.ss.stateType == ST_S && !c.asf(ASF_nostandguard) ||
-			c.ss.stateType == ST_C && !c.asf(ASF_nocrouchguard) ||
-			c.ss.stateType == ST_A && !c.asf(ASF_noairguard)) {
-		c.setSCF(SCF_guard)
+	// Set the native guard definition unless a state declared one with the guardDef sctrl
+	// This is the purple Clsn2 in debug mode
+	if !c.guarddef.custom {
+		c.guarddef = c.nativeGuardDef()
 	}
 
-	if !c.pauseBool {
-		if c.keyctrl[0] && c.cmd != nil {
-			if c.ctrl() && (c.controller >= 0 || c.helperIndex == 0) {
-				if !c.asf(ASF_nohardcodedkeys) {
-					if c.inguarddist && c.scf(SCF_guard) && !c.inGuardState() && c.cmd[0].Buffer.Bb > 0 {
-						c.changeState(120, -1, -1, "")
-						// In Mugen the characters *can* change to the guarding states during pauses
-						// They can still block in Ikemen despite not changing state here
-					}
-				}
-			}
-		}
+	// Change into guard start state
+	// The guard special flag and the guard state are two related but separate concepts
+	// Mugen doesn't do this at end of frame. Only beginning of frame
+	// However that leads to the case where the player has already returned to an idle state but still can't block
+	if c.shouldStartGuard() {
+		c.changeState(120, -1, -1, "")
 	}
+
 	// Run state +1
 	// Uses minus -4 because its properties are similar
 	c.minus = -4
@@ -12856,9 +12914,6 @@ func (c *Char) update() {
 			c.updateBinding()
 		}
 		if c.acttmp > 0 {
-			if c.inGuardState() {
-				c.setSCF(SCF_guard)
-			}
 			if c.anim != nil {
 				c.anim.UpdateSprite()
 			}
@@ -13117,15 +13172,10 @@ func (c *Char) tick() {
 			}
 		} else if c.ghv.guarded &&
 			(c.ghv.damage < c.life || sys.gsf(GSF_globalnoko) || c.asf(ASF_noko) || c.asf(ASF_noguardko)) {
-			switch c.ss.stateType {
-			// All of these state changes remove ctrl from the char
+			// This state change removes ctrl from the char
 			// Guarding is not affected by P2getP1state
-			case ST_S:
-				c.selfState(150, -1, -1, 0, "")
-			case ST_C:
-				c.selfState(152, -1, -1, 0, "")
-			default:
-				c.selfState(154, -1, -1, 0, "")
+			if guardState := c.guarddef.stateno; guardState >= 0 {
+				c.selfState(guardState, -1, -1, 0, "")
 			}
 		} else if c.ss.stateType == ST_L && c.pos[1] == 0 {
 			c.changeStateEx(5080, pn, -1, 0, "")
@@ -13298,10 +13348,10 @@ func (c *Char) cueDebugDraw() {
 					return &sys.debugc2mtk // Fully invincible
 				case inv:
 					return &sys.debugc2hb // Partially invincible
-				case c.inguarddist && c.scf(SCF_guard):
+				case c.inguarddist && c.guarddef.flags != 0:
 					return &sys.debugc2grd // Guarding
 					// Mugen does not check inguarddist here
-					// This shows that the inner workings of its SCF_guard are different from ours
+					// This shows that the inner workings of its guard flag are different from ours
 					// Maybe it is flagged during hit detection, much like inguarddist. Which isn't necessarily better
 				default:
 					return &sys.debugc2 // Normal

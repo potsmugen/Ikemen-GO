@@ -870,6 +870,22 @@ func (c *CharCompiler) ctrlSet(is IniSection, sc *StateControllerBase) (StateCon
 	return *ret, err
 }
 
+func (c *CharCompiler) guardDef(is IniSection, sc *StateControllerBase) (StateController, error) {
+	ret, err := (*guardDef)(sc), c.stateSec(is, func() error {
+		if err := c.paramValue(is, sc, "redirectid",
+			guardDef_redirectid, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.stateParam(is, "guardflag", false, func(data string) error {
+			return c.parseHitFlag(sc, guardDef_flags, data)
+		}); err != nil {
+			return err
+		}
+		return c.paramValue(is, sc, "stateno", guardDef_stateno, VT_Int, 1, false)
+	})
+	return *ret, err
+}
+
 func (c *CharCompiler) runState(is IniSection, sc *StateControllerBase) (StateController, error) {
 	// State +1 needs a special case, since internally it's state -10
 	// Only the literal form is translated. Inside an expression, like "ifelse(x, +1, 200)", it still means state 1
