@@ -68,6 +68,7 @@ func newCharCompiler() *CharCompiler {
 		"forcefeedback":      c.forceFeedback,
 		"gamemakeanim":       c.gameMakeAnim,
 		"gravity":            c.gravity,
+		"guarddef":           c.guardDef,
 		"helper":             c.helper,
 		"hitadd":             c.hitAdd,
 		"hitby":              c.hitBy,
