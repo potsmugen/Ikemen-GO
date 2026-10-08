@@ -877,7 +877,7 @@ func (c *CharCompiler) guardDef(is IniSection, sc *StateControllerBase) (StateCo
 			return err
 		}
 		if err := c.stateParam(is, "guardflag", false, func(data string) error {
-			return c.parseHitFlag(sc, guardDef_flags, data)
+			return c.parseHitFlagExpression(sc, guardDef_flags, data)
 		}); err != nil {
 			return err
 		}
@@ -1720,31 +1720,21 @@ func (c *CharCompiler) afterImageTime(is IniSection, sc *StateControllerBase) (S
 }
 
 func (c *CharCompiler) parseHitFlag(sc *StateControllerBase, id byte, data string) error {
-	var flg int32
-	for _, c := range data {
-		switch c {
-		case 'H', 'h':
-			flg |= int32(HF_H)
-		case 'L', 'l':
-			flg |= int32(HF_L)
-		case 'M', 'm':
-			flg |= int32(HF_H | HF_L)
-		case 'A', 'a':
-			flg |= int32(HF_A)
-		case 'F', 'f':
-			flg |= int32(HF_F)
-		case 'D', 'd':
-			flg |= int32(HF_D)
-		case 'P', 'p':
-			flg |= int32(HF_P)
-		case '-':
-			flg |= int32(HF_MNS)
-		case '+':
-			flg |= int32(HF_PLS)
-		}
-	}
-	sc.add(id, sc.iToExp(flg))
+	sc.add(id, sc.iToExp(hitFlagMask(data)))
 	return nil
+}
+
+func (c *CharCompiler) parseHitFlagExpression(sc *StateControllerBase, id byte, data string) error {
+	// Compile a string expression when possible
+	rest := data
+	cc := *c
+	be, err := cc.fullExpression(&rest, VT_String)
+	if err == nil {
+		sc.add(id, []BytecodeExp{be, sc.iToExp(1)[0]})
+		return nil
+	}
+	// Otherwise keep the legacy flag list parsing
+	return c.parseHitFlag(sc, id, data)
 }
 
 func (c *CharCompiler) hitDefSub(is IniSection, sc *StateControllerBase) error {
@@ -1759,12 +1749,12 @@ func (c *CharCompiler) hitDefSub(is IniSection, sc *StateControllerBase) error {
 		return err
 	}
 	if err := c.stateParam(is, "guardflag", false, func(data string) error {
-		return c.parseHitFlag(sc, hitDef_guardflag, data)
+		return c.parseHitFlagExpression(sc, hitDef_guardflag, data)
 	}); err != nil {
 		return err
 	}
 	if err := c.stateParam(is, "hitflag", false, func(data string) error {
-		return c.parseHitFlag(sc, hitDef_hitflag, data)
+		return c.parseHitFlagExpression(sc, hitDef_hitflag, data)
 	}); err != nil {
 		return err
 	}
@@ -2361,12 +2351,12 @@ func (c *CharCompiler) reversalDef(is IniSection, sc *StateControllerBase) (Stat
 			sc.add(reversalDef_reversal_attr, sc.iToExp(attr))
 		}
 		if err := c.stateParam(is, "reversal.guardflag", false, func(data string) error {
-			return c.parseHitFlag(sc, reversalDef_reversal_guardflag, data)
+			return c.parseHitFlagExpression(sc, reversalDef_reversal_guardflag, data)
 		}); err != nil {
 			return err
 		}
 		if err := c.stateParam(is, "reversal.guardflag.not", false, func(data string) error {
-			return c.parseHitFlag(sc, reversalDef_reversal_guardflag_not, data)
+			return c.parseHitFlagExpression(sc, reversalDef_reversal_guardflag_not, data)
 		}); err != nil {
 			return err
 		}
@@ -2393,12 +2383,12 @@ func (c *CharCompiler) modifyReversalDef(is IniSection, sc *StateControllerBase)
 			return err
 		}
 		if err := c.stateParam(is, "reversal.guardflag", false, func(data string) error {
-			return c.parseHitFlag(sc, modifyReversalDef_reversal_guardflag, data)
+			return c.parseHitFlagExpression(sc, modifyReversalDef_reversal_guardflag, data)
 		}); err != nil {
 			return err
 		}
 		if err := c.stateParam(is, "reversal.guardflag.not", false, func(data string) error {
-			return c.parseHitFlag(sc, modifyReversalDef_reversal_guardflag_not, data)
+			return c.parseHitFlagExpression(sc, modifyReversalDef_reversal_guardflag_not, data)
 		}); err != nil {
 			return err
 		}
@@ -3443,12 +3433,12 @@ func (c *CharCompiler) hitOverride(is IniSection, sc *StateControllerBase) (Stat
 			return err
 		}
 		if err := c.stateParam(is, "guardflag", false, func(data string) error {
-			return c.parseHitFlag(sc, hitOverride_guardflag, data)
+			return c.parseHitFlagExpression(sc, hitOverride_guardflag, data)
 		}); err != nil {
 			return err
 		}
 		if err := c.stateParam(is, "guardflag.not", false, func(data string) error {
-			return c.parseHitFlag(sc, hitOverride_guardflag_not, data)
+			return c.parseHitFlagExpression(sc, hitOverride_guardflag_not, data)
 		}); err != nil {
 			return err
 		}
