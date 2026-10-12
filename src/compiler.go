@@ -374,8 +374,8 @@ var triggerMap = map[string]int{
 	"animelemvar":        1,
 	"animlength":         1,
 	"animloopcount":      1,
-	"animprefix":         1,
 	"animplayerno":       1,
+	"animprefix":         1,
 	"atan2":              1,
 	"attack":             1,
 	"attackmul":          1,
@@ -2516,6 +2516,8 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			opc = OC_ex2_explodvar_animloopcount
 		case "animplayerno":
 			opc = OC_ex2_explodvar_animplayerno
+		case "animprefix":
+			opc = OC_ex2_explodvar_animprefix
 		case "animtime":
 			opc = OC_ex2_explodvar_animtime
 		case "spriteplayerno":
@@ -3592,18 +3594,20 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 
 			switch c.token {
 			case "x":
-				opc = OC_ex2_projvar_projxangle
+				opc = OC_ex2_projvar_angle_x
 			case "y":
-				opc = OC_ex2_projvar_projyangle
+				opc = OC_ex2_projvar_angle_y
 			case ")":
-				opc = OC_ex2_projvar_projangle
+				opc = OC_ex2_projvar_angle
 			default:
 				return bvNone(), Error(fmt.Sprint("Invalid ProjVar angle argument: %s", c.token))
 			}
 		case "anim":
-			opc = OC_ex2_projvar_projanim
+			opc = OC_ex2_projvar_anim
 		case "animelem":
 			opc = OC_ex2_projvar_animelem
+		case "animprefix":
+			opc = OC_ex2_projvar_animprefix
 		case "attr":
 			opc = OC_ex2_projvar_attr
 			isFlag = true
@@ -3684,9 +3688,9 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 
 			switch c.token {
 			case "x":
-				opc = OC_ex2_projvar_projscale_x
+				opc = OC_ex2_projvar_scale_x
 			case "y":
-				opc = OC_ex2_projvar_projscale_y
+				opc = OC_ex2_projvar_scale_y
 			default:
 				return bvNone(), Error(fmt.Sprint("Invalid ProjVar scale argument: %s", c.token))
 			}
@@ -3695,11 +3699,11 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 
 			switch c.token {
 			case "r":
-				opc = OC_ex2_projvar_projshadow_r
+				opc = OC_ex2_projvar_shadow_r
 			case "g":
-				opc = OC_ex2_projvar_projshadow_g
+				opc = OC_ex2_projvar_shadow_g
 			case "b":
-				opc = OC_ex2_projvar_projshadow_b
+				opc = OC_ex2_projvar_shadow_b
 			default:
 				return bvNone(), Error(fmt.Sprint("Invalid ProjVar shadow argument: %s", c.token))
 			}
@@ -3736,11 +3740,11 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 				return bvNone(), Error(fmt.Sprint("Invalid ProjVar velmul argument: %s", c.token))
 			}
 		case "xshear":
-			opc = OC_ex2_projvar_projxshear
+			opc = OC_ex2_projvar_xshear
 		default:
 			return bvNone(), Error(fmt.Sprint("Invalid ProjVar argument: %s", vname))
 		}
-		if opc != OC_ex2_projvar_projangle {
+		if opc != OC_ex2_projvar_angle {
 			c.token = c.tokenizer(in)
 
 			if err := c.checkClosingParenthesis(); err != nil {

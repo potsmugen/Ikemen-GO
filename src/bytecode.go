@@ -1013,6 +1013,7 @@ const (
 	OC_ex2_explodvar_animelemtime
 	OC_ex2_explodvar_animloopcount
 	OC_ex2_explodvar_animplayerno
+	OC_ex2_explodvar_animprefix
 	OC_ex2_explodvar_animtime
 	OC_ex2_explodvar_spriteplayerno
 	OC_ex2_explodvar_bindid
@@ -1042,7 +1043,12 @@ const (
 	OC_ex2_projvar_accel_x
 	OC_ex2_projvar_accel_y
 	OC_ex2_projvar_accel_z
+	OC_ex2_projvar_angle
+	OC_ex2_projvar_angle_x
+	OC_ex2_projvar_angle_y
+	OC_ex2_projvar_anim
 	OC_ex2_projvar_animelem
+	OC_ex2_projvar_animprefix
 	OC_ex2_projvar_attr
 	OC_ex2_projvar_drawpal_group
 	OC_ex2_projvar_drawpal_index
@@ -1055,10 +1061,6 @@ const (
 	OC_ex2_projvar_pos_x
 	OC_ex2_projvar_pos_y
 	OC_ex2_projvar_pos_z
-	OC_ex2_projvar_projangle
-	OC_ex2_projvar_projyangle
-	OC_ex2_projvar_projxangle
-	OC_ex2_projvar_projanim
 	OC_ex2_projvar_projcancelanim
 	OC_ex2_projvar_projedgebound
 	OC_ex2_projvar_projhitanim
@@ -1071,17 +1073,16 @@ const (
 	OC_ex2_projvar_projremanim
 	OC_ex2_projvar_projremove
 	OC_ex2_projvar_projremovetime
-	OC_ex2_projvar_projscale_x
-	OC_ex2_projvar_projscale_y
-	OC_ex2_projvar_projshadow_b
-	OC_ex2_projvar_projshadow_g
-	OC_ex2_projvar_projshadow_r
 	OC_ex2_projvar_projsprpriority
 	OC_ex2_projvar_projstagebound
-	OC_ex2_projvar_projxshear
 	OC_ex2_projvar_remvelocity_x
 	OC_ex2_projvar_remvelocity_y
 	OC_ex2_projvar_remvelocity_z
+	OC_ex2_projvar_scale_x
+	OC_ex2_projvar_scale_y
+	OC_ex2_projvar_shadow_b
+	OC_ex2_projvar_shadow_g
+	OC_ex2_projvar_shadow_r
 	OC_ex2_projvar_supermovetime
 	OC_ex2_projvar_teamside
 	OC_ex2_projvar_time
@@ -1091,6 +1092,7 @@ const (
 	OC_ex2_projvar_velmul_x
 	OC_ex2_projvar_velmul_y
 	OC_ex2_projvar_velmul_z
+	OC_ex2_projvar_xshear
 	OC_ex2_hitbyattr
 	OC_ex2_soundvar_group
 	OC_ex2_soundvar_number
@@ -4163,7 +4165,7 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 	case OC_ex2_explodvar_accel_x, OC_ex2_explodvar_accel_y, OC_ex2_explodvar_accel_z,
 		OC_ex2_explodvar_anim, OC_ex2_explodvar_animelem,
 		OC_ex2_explodvar_animelemtime, OC_ex2_explodvar_animloopcount,
-		OC_ex2_explodvar_animplayerno, OC_ex2_explodvar_animtime,
+		OC_ex2_explodvar_animplayerno, OC_ex2_explodvar_animprefix, OC_ex2_explodvar_animtime,
 		OC_ex2_explodvar_angle, OC_ex2_explodvar_angle_x, OC_ex2_explodvar_angle_y,
 		OC_ex2_explodvar_bindid, OC_ex2_explodvar_bindtime,
 		OC_ex2_explodvar_drawpal_group, OC_ex2_explodvar_drawpal_index, OC_ex2_explodvar_facing,
@@ -4203,6 +4205,12 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 				sys.bcStack.PushI(e.anim.loopcount)
 			case OC_ex2_explodvar_animplayerno:
 				sys.bcStack.PushI(int32(e.animPN) + 1)
+			case OC_ex2_explodvar_animprefix:
+				if e.anim_ffx == "" {
+					sys.bcStack.PushS("s")
+				} else {
+					sys.bcStack.PushS(e.anim_ffx)
+				}
 			case OC_ex2_explodvar_animtime:
 				sys.bcStack.PushI(e.anim.AnimTime())
 			case OC_ex2_explodvar_angle:
@@ -4269,22 +4277,23 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 		}
 	// ProjVar
 	case OC_ex2_projvar_accel_x, OC_ex2_projvar_accel_y, OC_ex2_projvar_accel_z,
-		OC_ex2_projvar_animelem, OC_ex2_projvar_attr, OC_ex2_projvar_drawpal_group,
-		OC_ex2_projvar_drawpal_index, OC_ex2_projvar_facing, OC_ex2_projvar_guardflag,
-		OC_ex2_projvar_highbound, OC_ex2_projvar_hitflag, OC_ex2_projvar_lowbound,
-		OC_ex2_projvar_pausemovetime, OC_ex2_projvar_pos_x, OC_ex2_projvar_pos_y,
-		OC_ex2_projvar_pos_z, OC_ex2_projvar_projanim, OC_ex2_projvar_projangle,
+		OC_ex2_projvar_angle, OC_ex2_projvar_angle_x, OC_ex2_projvar_angle_y,
+		OC_ex2_projvar_anim, OC_ex2_projvar_animelem, OC_ex2_projvar_animprefix,
+		OC_ex2_projvar_attr, OC_ex2_projvar_drawpal_group, OC_ex2_projvar_drawpal_index,
+		OC_ex2_projvar_facing, OC_ex2_projvar_guardflag, OC_ex2_projvar_highbound,
+		OC_ex2_projvar_hitflag, OC_ex2_projvar_lowbound, OC_ex2_projvar_pausemovetime,
+		OC_ex2_projvar_pos_x, OC_ex2_projvar_pos_y, OC_ex2_projvar_pos_z,
 		OC_ex2_projvar_projcancelanim, OC_ex2_projvar_projedgebound, OC_ex2_projvar_projhitanim,
 		OC_ex2_projvar_projhits, OC_ex2_projvar_projhitsmax, OC_ex2_projvar_projid,
 		OC_ex2_projvar_projlayerno, OC_ex2_projvar_projmisstime, OC_ex2_projvar_projpriority,
 		OC_ex2_projvar_projremanim, OC_ex2_projvar_projremove, OC_ex2_projvar_projremovetime,
-		OC_ex2_projvar_projscale_x, OC_ex2_projvar_projscale_y, OC_ex2_projvar_projshadow_b,
-		OC_ex2_projvar_projshadow_g, OC_ex2_projvar_projshadow_r, OC_ex2_projvar_projsprpriority,
-		OC_ex2_projvar_projstagebound, OC_ex2_projvar_projxangle, OC_ex2_projvar_projxshear,
-		OC_ex2_projvar_projyangle, OC_ex2_projvar_remvelocity_x, OC_ex2_projvar_remvelocity_y,
-		OC_ex2_projvar_remvelocity_z, OC_ex2_projvar_supermovetime, OC_ex2_projvar_teamside,
+		OC_ex2_projvar_projsprpriority, OC_ex2_projvar_projstagebound, OC_ex2_projvar_remvelocity_x,
+		OC_ex2_projvar_remvelocity_y, OC_ex2_projvar_remvelocity_z, OC_ex2_projvar_scale_x,
+		OC_ex2_projvar_scale_y, OC_ex2_projvar_shadow_b, OC_ex2_projvar_shadow_g,
+		OC_ex2_projvar_shadow_r, OC_ex2_projvar_supermovetime, OC_ex2_projvar_teamside,
 		OC_ex2_projvar_time, OC_ex2_projvar_vel_x, OC_ex2_projvar_vel_y,
-		OC_ex2_projvar_vel_z, OC_ex2_projvar_velmul_x, OC_ex2_projvar_velmul_y, OC_ex2_projvar_velmul_z:
+		OC_ex2_projvar_vel_z, OC_ex2_projvar_velmul_x, OC_ex2_projvar_velmul_y,
+		OC_ex2_projvar_velmul_z, OC_ex2_projvar_xshear:
 
 		// Common Inputs
 		flg := sys.bcStack.Pop()
@@ -4303,8 +4312,22 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 				sys.bcStack.PushF(p.accel[1] * p.localscl / oc.localscl)
 			case OC_ex2_projvar_accel_z:
 				sys.bcStack.PushF(p.accel[2] * p.localscl / oc.localscl)
+			case OC_ex2_projvar_angle:
+				sys.bcStack.PushF(p.rot.angle)
+			case OC_ex2_projvar_angle_x:
+				sys.bcStack.PushF(p.rot.xangle)
+			case OC_ex2_projvar_angle_y:
+				sys.bcStack.PushF(p.rot.yangle)
+			case OC_ex2_projvar_anim:
+				sys.bcStack.PushI(p.animNo)
 			case OC_ex2_projvar_animelem:
 				sys.bcStack.PushI(p.anim.curelem + 1)
+			case OC_ex2_projvar_animprefix:
+				if p.anim_ffx == "" {
+					sys.bcStack.PushS("s")
+				} else {
+					sys.bcStack.PushS(p.anim_ffx)
+				}
 			case OC_ex2_projvar_drawpal_group:
 				sys.bcStack.PushI(c.projDrawPal(p)[0])
 			case OC_ex2_projvar_drawpal_index:
@@ -4344,14 +4367,6 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 				sys.bcStack.PushF(p.pos[1] * p.localscl / oc.localscl)
 			case OC_ex2_projvar_pos_z:
 				sys.bcStack.PushF(p.pos[2] * p.localscl / oc.localscl)
-			case OC_ex2_projvar_projanim:
-				sys.bcStack.PushI(p.animNo)
-			case OC_ex2_projvar_projangle:
-				sys.bcStack.PushF(p.rot.angle)
-			case OC_ex2_projvar_projyangle:
-				sys.bcStack.PushF(p.rot.xangle)
-			case OC_ex2_projvar_projxangle:
-				sys.bcStack.PushF(p.rot.yangle)
 			case OC_ex2_projvar_projcancelanim:
 				sys.bcStack.PushI(p.cancelanim)
 			case OC_ex2_projvar_projedgebound:
@@ -4376,28 +4391,26 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 				sys.bcStack.PushI(p.remanim)
 			case OC_ex2_projvar_projremovetime:
 				sys.bcStack.PushI(p.removetime)
-			case OC_ex2_projvar_projscale_x:
-				sys.bcStack.PushF(p.scale[0])
-			case OC_ex2_projvar_projscale_y:
-				sys.bcStack.PushF(p.scale[1])
-			case OC_ex2_projvar_projshadow_b:
-				sys.bcStack.PushI(p.shadow[2])
-			case OC_ex2_projvar_projshadow_g:
-				sys.bcStack.PushI(p.shadow[1])
-			case OC_ex2_projvar_projshadow_r:
-				sys.bcStack.PushI(p.shadow[0])
 			case OC_ex2_projvar_projsprpriority:
 				sys.bcStack.PushI(p.sprpriority)
 			case OC_ex2_projvar_projstagebound:
 				sys.bcStack.PushI(int32(float32(p.stagebound) * p.localscl / oc.localscl))
-			case OC_ex2_projvar_projxshear:
-				sys.bcStack.PushF(p.xshear)
 			case OC_ex2_projvar_remvelocity_x:
 				sys.bcStack.PushF(p.remvelocity[0] * p.localscl / oc.localscl)
 			case OC_ex2_projvar_remvelocity_y:
 				sys.bcStack.PushF(p.remvelocity[1] * p.localscl / oc.localscl)
 			case OC_ex2_projvar_remvelocity_z:
 				sys.bcStack.PushF(p.remvelocity[2] * p.localscl / oc.localscl)
+			case OC_ex2_projvar_scale_x:
+				sys.bcStack.PushF(p.scale[0])
+			case OC_ex2_projvar_scale_y:
+				sys.bcStack.PushF(p.scale[1])
+			case OC_ex2_projvar_shadow_b:
+				sys.bcStack.PushI(p.shadow[2])
+			case OC_ex2_projvar_shadow_g:
+				sys.bcStack.PushI(p.shadow[1])
+			case OC_ex2_projvar_shadow_r:
+				sys.bcStack.PushI(p.shadow[0])
 			case OC_ex2_projvar_supermovetime:
 				sys.bcStack.PushI(p.supermovetime)
 			case OC_ex2_projvar_teamside:
@@ -4416,6 +4429,8 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 				sys.bcStack.PushF(p.velmul[1])
 			case OC_ex2_projvar_velmul_z:
 				sys.bcStack.PushF(p.velmul[2])
+			case OC_ex2_projvar_xshear:
+				sys.bcStack.PushF(p.xshear)
 			}
 		} else {
 			sys.bcStack.Push(BytecodeUndefined())
