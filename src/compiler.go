@@ -374,8 +374,8 @@ var triggerMap = map[string]int{
 	"animelemvar":        1,
 	"animlength":         1,
 	"animloopcount":      1,
-	"animprefix":         1,
 	"animplayerno":       1,
+	"animprefix":         1,
 	"atan2":              1,
 	"attack":             1,
 	"attackmul":          1,
@@ -2516,6 +2516,8 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			opc = OC_ex2_explodvar_animloopcount
 		case "animplayerno":
 			opc = OC_ex2_explodvar_animplayerno
+		case "animprefix":
+			opc = OC_ex2_explodvar_animprefix
 		case "animtime":
 			opc = OC_ex2_explodvar_animtime
 		case "spriteplayerno":
@@ -3604,6 +3606,8 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			opc = OC_ex2_projvar_projanim
 		case "animelem":
 			opc = OC_ex2_projvar_animelem
+		case "animprefix":
+			opc = OC_ex2_projvar_animprefix
 		case "attr":
 			opc = OC_ex2_projvar_attr
 			isFlag = true
