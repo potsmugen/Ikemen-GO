@@ -3677,6 +3677,7 @@ type Char struct {
 	animPN              int
 	spritePN            int
 	animNo              int32
+	animFfx             string
 	prevAnimNo          int32
 	life                int32
 	lifeMax             int32
@@ -5030,6 +5031,7 @@ func (c *Char) changeAnimEx(animNo int32, animPlayerNo int, spritePlayerNo int, 
 	c.anim.remap = c.remapSpr
 	c.prevAnimNo = c.animNo
 	c.animNo = animNo
+	c.animFfx = ffx
 
 	// Animation is valid, so we update these variables
 	// Common FX set playerNo to undefined
