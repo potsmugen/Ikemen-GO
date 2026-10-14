@@ -1165,7 +1165,7 @@ func (c *CharCompiler) oneArg(out *BytecodeExp, in *string,
 		bv = bvNone()
 	}
 	if rd && len(be) > 0 {
-		out.appendI32Op(OC_nordrun, int32(len(be)))
+		out.appendI32Op(OC_run_caller, int32(len(be)))
 	}
 	out.append(be...)
 	return bv, nil
@@ -1224,7 +1224,7 @@ func (c *CharCompiler) twoOptArg(out *BytecodeExp, in *string,
 	}
 
 	if rd && len(be) > 0 {
-		out.appendI32Op(OC_nordrun, int32(len(be)))
+		out.appendI32Op(OC_run_caller, int32(len(be)))
 	}
 
 	out.append(be...)
@@ -1342,31 +1342,31 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			}
 			be2.appendValue(bv2)
 			if rd {
-				out.appendI32Op(OC_nordrun, int32(len(be2)))
+				out.appendI32Op(OC_run_caller, int32(len(be2)))
 			}
 			out.append(be2...)
-			out.append(OC_st_)
+			out.append(OC_assign_)
 		}
 		switch [...]bool{sys, f} {
 		case [...]bool{false, false}:
 			oc = OC_var
 			if set {
-				oc = OC_st_var
+				oc = OC_assign_var
 			}
 		case [...]bool{false, true}:
 			oc = OC_fvar
 			if set {
-				oc = OC_st_fvar
+				oc = OC_assign_fvar
 			}
 		case [...]bool{true, false}:
 			oc = OC_sysvar
 			if set {
-				oc = OC_st_sysvar
+				oc = OC_assign_sysvar
 			}
 		case [...]bool{true, true}:
 			oc = OC_sysfvar
 			if set {
-				oc = OC_st_sysfvar
+				oc = OC_assign_sysfvar
 			}
 		}
 		out.append(oc)
@@ -1556,7 +1556,7 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		if stringExp != nil {
 			// The right side belongs to the caller, not the redirect target
 			if rd {
-				out.appendI32Op(OC_nordrun, int32(len(stringExp)))
+				out.appendI32Op(OC_run_caller, int32(len(stringExp)))
 			}
 			out.append(stringExp...)
 			value = -2
@@ -1674,7 +1674,7 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			}
 		}
 		if rd {
-			out.appendI32Op(OC_nordrun, int32(len(be1)))
+			out.appendI32Op(OC_run_caller, int32(len(be1)))
 		}
 		out.append(be1...)
 		if c.token != "," {
@@ -1742,7 +1742,7 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			be1.appendValue(BytecodeInt(0))
 		}
 		if rd {
-			out.appendI32Op(OC_nordrun, int32(len(be1)))
+			out.appendI32Op(OC_run_caller, int32(len(be1)))
 		}
 		out.append(be1...)
 		if c.token != "," {
@@ -1801,9 +1801,9 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 				return bvNone(), Error("'~' operator cannot be used within a trigger redirection")
 			}
 			out.append(be1...)
-			out.append(OC_not)
+			out.append(OC_bwnot)
 		} else {
-			out.not(&bv)
+			out.bwnot(&bv)
 		}
 		return bv, nil
 	case "!":
@@ -1934,7 +1934,7 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			be1.append(OC_pop)
 			be1.append(be3...)
 			if rd {
-				out.appendI32Op(OC_run, int32(len(be1)))
+				out.appendI32Op(OC_run_redir, int32(len(be1)))
 			}
 			out.append(be1...)
 		} else {
@@ -2127,7 +2127,7 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		be1.appendValue(bv2)
 		be1.appendValue(bv3)
 		if rd {
-			out.appendI32Op(OC_nordrun, int32(len(be1)))
+			out.appendI32Op(OC_run_caller, int32(len(be1)))
 		}
 		out.append(be1...)
 		out.append(OC_ex_, OC_ex_clsnoverlap)
@@ -2184,12 +2184,12 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		be1.appendValue(bv2)
 
 		if rd {
-			out.appendI32Op(OC_nordrun, int32(len(be1)))
+			out.appendI32Op(OC_run_caller, int32(len(be1)))
 		}
 
 		// Just in case anybody else bangs their head against a wall with redirects:
 		// it is imperative that the be1.append(opcodetype, opcode) comes after the
-		// rd out.appendI32Op(OC_nordrun, int32(len(be1)))
+		// rd out.appendI32Op(OC_run_caller, int32(len(be1)))
 		be1.append(OC_ex2_, opc)
 		out.append(be1...)
 	case "command", "selfcommand":
@@ -2220,9 +2220,9 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 				}
 				nameExp.appendValue(bv)
 			}
-			// The name belongs to the caller. nordrun also keeps the redirect alive for the command opcode
+			// The name belongs to the caller. OC_run_caller also keeps the redirect alive for the command opcode
 			if rd {
-				out.appendI32Op(OC_nordrun, int32(len(nameExp)))
+				out.appendI32Op(OC_run_caller, int32(len(nameExp)))
 			}
 			out.append(nameExp...)
 			out.append(opc)
@@ -2723,11 +2723,11 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		be1.appendValue(bv2)
 
 		if rd {
-			out.appendI32Op(OC_nordrun, int32(len(be1)))
+			out.appendI32Op(OC_run_caller, int32(len(be1)))
 		}
 		// Just in case anybody else bangs their head against a wall with redirects:
 		// it is imperative that the be1.append(opcodetype, opcode) comes after the
-		// rd out.appendI32Op(OC_nordrun, int32(len(be1)))
+		// rd out.appendI32Op(OC_run_caller, int32(len(be1)))
 		be1.append(OC_ex2_, opc)
 		out.append(be1...)
 	case "facing":
@@ -3522,7 +3522,7 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		be1.append(be2...)
 		be1.appendValue(bv3)
 		if rd {
-			out.appendI32Op(OC_nordrun, int32(len(be1)))
+			out.appendI32Op(OC_run_caller, int32(len(be1)))
 		}
 		out.append(be1...)
 		out.append(OC_ex2_, OC_ex2_projclsnoverlap)
@@ -3777,11 +3777,11 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		be1.append(be3...)
 
 		if rd {
-			out.appendI32Op(OC_nordrun, int32(len(be1)))
+			out.appendI32Op(OC_run_caller, int32(len(be1)))
 		}
 		// Just in case anybody else bangs their head against a wall with redirects:
 		// it is imperative that the be1.append(opcodetype, opcode) comes after the
-		// rd out.appendI32Op(OC_nordrun, int32(len(be1)))
+		// rd out.appendI32Op(OC_run_caller, int32(len(be1)))
 		be1.append(OC_ex2_, opc)
 		out.append(be1...)
 		if negate {
@@ -3895,11 +3895,11 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		be1.appendValue(bv1)
 
 		if rd {
-			out.appendI32Op(OC_nordrun, int32(len(be1)))
+			out.appendI32Op(OC_run_caller, int32(len(be1)))
 		}
 		// Just in case anybody else bangs their head against a wall with redirects:
 		// it is imperative that the be1.append(opcodetype, opcode) comes after the
-		// rd out.appendI32Op(OC_nordrun, int32(len(be1)))
+		// rd out.appendI32Op(OC_run_caller, int32(len(be1)))
 		be1.append(OC_ex2_, opc)
 		out.append(be1...)
 	case "stateno", "p2stateno":
@@ -4033,7 +4033,7 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		be1.append(be2...)
 		be1.appendValue(bv2)
 		if rd {
-			out.appendI32Op(OC_nordrun, int32(len(be1)))
+			out.appendI32Op(OC_run_caller, int32(len(be1)))
 		}
 		be1.append(OC_ex2_, opc)
 		out.append(be1...)
@@ -4300,14 +4300,14 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 		be1.appendValue(BytecodeInt(n))
 		// TODO: This probably has the same redirection issue old projectile triggers had
 		if rd {
-			out.appendI32Op(OC_nordrun, int32(len(be1)))
+			out.appendI32Op(OC_run_caller, int32(len(be1)))
 		}
 		out.append(be1...)
 		out.append(OC_animelemtime)
 		if err = c.evaluateComparison(&be, in, false); err != nil {
 			return bvNone(), err
 		}
-		out.append(OC_jsf8, OpCode(len(be)))
+		out.append(OC_jud8, OpCode(len(be)))
 		out.append(be...)
 		return bv, nil
 	case "timemod":
@@ -5244,18 +5244,18 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			// The key belongs to the caller, not the redirect target
 			// It's pushed before any := value, so the opcode pops the value first
 			if rd {
-				out.appendI32Op(OC_nordrun, int32(len(keyExp)))
+				out.appendI32Op(OC_run_caller, int32(len(keyExp)))
 			}
 			out.append(keyExp...)
 		}
 		// The index also belongs to the caller. It's pushed after the key and before any := value
-		stOp, exOp := OC_st_map, OC_ex_map
+		assignOp, exOp := OC_assign_map, OC_ex_map
 		if indexExp != nil {
 			if rd {
-				out.appendI32Op(OC_nordrun, int32(len(indexExp)))
+				out.appendI32Op(OC_run_caller, int32(len(indexExp)))
 			}
 			out.append(indexExp...)
-			stOp, exOp = OC_st_mapindexed, OC_ex_mapindexed
+			assignOp, exOp = OC_assign_mapindexed, OC_ex_mapindexed
 		}
 		c.token = c.tokenizer(in)
 		// Map assignment with := operator
@@ -5270,11 +5270,11 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			}
 			be2.appendValue(bv2)
 			if rd {
-				out.appendI32Op(OC_nordrun, int32(len(be2)))
+				out.appendI32Op(OC_run_caller, int32(len(be2)))
 			}
 			out.append(be2...)
-			out.append(OC_st_)
-			out.appendI32Op(stOp, keyIdx)
+			out.append(OC_assign_)
+			out.appendI32Op(assignOp, keyIdx)
 		} else {
 			out.append(OC_ex_)
 			out.appendI32Op(exOp, keyIdx)
@@ -5646,7 +5646,7 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			}
 			// If we're inside a redirect, force the whole expression to execute in the redirected context
 			if rd {
-				out.appendI32Op(OC_run, int32(len(oldblock)))
+				out.appendI32Op(OC_run_redir, int32(len(oldblock)))
 			}
 			out.append(oldblock...)
 			return bvNone(), nil
@@ -6022,15 +6022,15 @@ func (c *CharCompiler) expOneOp(out *BytecodeExp, in *string, ef expFunc,
 }
 
 func (c *CharCompiler) expAnd(out *BytecodeExp, in *string) (BytecodeValue, error) {
-	return c.expOneOp(out, in, c.expEqne, "&", out.and, OC_and)
+	return c.expOneOp(out, in, c.expEqne, "&", out.bwand, OC_bwand)
 }
 
 func (c *CharCompiler) expXor(out *BytecodeExp, in *string) (BytecodeValue, error) {
-	return c.expOneOp(out, in, c.expAnd, "^", out.xor, OC_xor)
+	return c.expOneOp(out, in, c.expAnd, "^", out.bwxor, OC_bwxor)
 }
 
 func (c *CharCompiler) expOr(out *BytecodeExp, in *string) (BytecodeValue, error) {
-	return c.expOneOp(out, in, c.expXor, "|", out.or, OC_or)
+	return c.expOneOp(out, in, c.expXor, "|", out.bwor, OC_bwor)
 }
 
 func (c *CharCompiler) expBoolAnd(out *BytecodeExp, in *string) (BytecodeValue, error) {
