@@ -11277,24 +11277,20 @@ func (c *Char) resolveHitTrade(getter *Char) (cHits, getterHits bool) {
 
 	// Hit vs Hit: both hit, unless that's impossible
 	// Then a random winner is picked, since otherwise the processing order would decide it
+	// E.g. "unhittable" on contact (throws by default): if it landed first, the other one couldn't land. Mugen: same
 	// Since the unhittabletime is what's behind needing to randomize throws, we check it instead of the throw attribute
-	// if (c.hitdef.p1stateno >= 0 || c.hitdef.attr&int32(AT_AT) != 0 && ghd.hitonce != 0) && countercheck(&c.hitdef) {
 	cNoTrade := c.hitdef.unhittabletime[0] > 0
 	getterNoTrade := getter.hitdef.unhittabletime[0] > 0
 	if cNoTrade || getterNoTrade {
 		return coinToss()
 	}
 
-	// Examples of scenarios where both landing is impossible:
-	// 1. "Unhittable" on contact (throws by default): if it landed first, the other one couldn't land
-	// Ikemen: coin toss. Mugen: same
-
 	return true, true
 }
 
 // Whether c's attack connects with getter, after resolving any hit trade between them
 // traded is true when both attacks hit each other
-// Each trade is decided once per frame. Stored results are checked first, since the first hit can change state (e.g. throws)
+// Each trade with a winner is decided once per frame. Stored results are checked first, since the first hit can change state (e.g. throws)
 // Known issues (rare):
 // - TODO: If the winner spends its hitonce on a closer target in its own pass, the loser is still blocked. The original code had the same issue
 // - Getter's juggle check runs before its own pass inherits juggle points (inheritJuggle), so it may use last frame's value
@@ -11769,8 +11765,8 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, traded bool) (hitR
 				ghv.forcestand = hd.forcestand != 0
 				ghv.forcecrouch = hd.forcecrouch != 0
 
-				// Overridden hits skip p2stateno, so don't mark them as p2getp1state
-				ghv.p2getp1state = hd.p2getp1state && !c.mhv.overridden
+				// Overridden hits and traded grabs skip p2stateno, so don't mark them as p2getp1state
+				ghv.p2getp1state = hd.p2getp1state && !c.mhv.overridden && !(traded && hd.p1stateno >= 0)
 
 				// For some reason Mugen only resets this one on hit
 				// Ikemen resets it either on guard or hit, which is more consistent with the others
