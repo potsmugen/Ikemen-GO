@@ -11437,8 +11437,6 @@ func (c *Char) hitspark(getter *Char, proj *Projectile,
 	}
 }
 
-// Traded: c and getter hit each other. Getting hit cancels the attacker's p1stateno, and any p2stateno that relies on it
-// Mugen: p2stateno is always entered, then a random player enters p1stateno if their move has one
 func (c *Char) hitResultCheck(getter *Char, proj *Projectile, traded bool) (hitResult int32) {
 
 	// Player hit check
@@ -11622,7 +11620,8 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, traded bool) (hitR
 		// Apply P2StateNo
 		// In Mugen, an undefined HitOverride stateno still invalidates P2StateNo
 		if !c.mhv.overridden {
-			// In a hit trade, skip a p2stateno whose p1stateno won't be entered
+			// In a hit trade the attacker won't enter p1stateno, so a p2stateno that relies on it is skipped
+			// Mugen: p2stateno is always entered
 			if Abs(hitResult) == 1 && hd.p2stateno >= 0 && !(traded && hd.p1stateno >= 0) {
 				pn := getter.playerNo
 				if hd.p2getp1state {
@@ -12233,7 +12232,8 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, traded bool) (hitR
 			getter.p1facing = 0
 		}
 		getter.ghv.facing = hd.p2facing
-		// In a hit trade nobody enters p1stateno
+		// In a hit trade the attacker was also hit, which cancels p1stateno
+		// Mugen: a random player enters p1stateno, if their move has one
 		if hd.p1stateno >= 0 && !traded && c.stateChange1(hd.p1stateno, hd.statePN) {
 			c.setCtrl(false)
 		}
