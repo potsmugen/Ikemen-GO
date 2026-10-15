@@ -3739,7 +3739,7 @@ type Char struct {
 	guarddef             GuardDef
 	pushed               bool
 	hitdefContact        bool
-	atktmp               int8  // 1 hitdef can hit, 0 cannot hit, -1 other
+	hitActive            bool  // Snapshot of attack state after states run. Used by hit detection
 	hittmp               int8  // 0 idle, 1 being hit, 2 falling, -1 reversaldef
 	acttmp               int8  // 1 unpaused, 0 default, -1 hitpause, -2 pause
 	minus                int8  // Essentially the current negative state
@@ -11101,7 +11101,7 @@ func (c *Char) attrCheck(getter *Char, ghd *HitDef, gstyp StateType) bool {
 			return false
 		}
 		// Check HitDef validity
-		if c.hitdef.attr <= 0 || c.atktmp == 0 {
+		if c.hitdef.attr <= 0 || !c.hitActive {
 			return false
 		}
 
@@ -11193,91 +11193,153 @@ func (c *Char) hasBoxHitBy() bool {
 	return false
 }
 
-// Check if the enemy's (c) HitDef should lose to the player's (getter), if applicable
-func (c *Char) hittableByChar(getter *Char, ghd *HitDef, gst StateType, proj bool) bool {
-
-	// Enemy (c) always wins if they can't be hit by the player's (getter) HitDef attributes at all
-	if !c.attrCheck(getter, ghd, gst) {
+// Cheap checks for whether c's attack can hit getter. Clsn and the getter's own attack are checked later
+// For a ReversalDef, "hit" means reversing the getter's HitDef
+func (c *Char) hitPrecheck(getter *Char) bool {
+	if !c.hitActive || c.hitdef.hitonce < 0 {
 		return false
 	}
 
-	// Enemy (c) always loses if their HitDef already hit the player (getter)
-	if c.hasTargetOfHitdef(getter.id) {
-		return true
+	// AffectTeam and TeamSide checks
+	if c.hitdef.affectteam != 0 && (getter.teamside != c.hitdef.teamside) != (c.hitdef.affectteam > 0) {
+		return false
 	}
 
-	// Enemy (c) always loses if they have an invalid HitDef or ReversalDef
-	if c.atktmp == 0 || (c.hitdef.attr <= 0 || c.ss.stateType == ST_L) && c.hitdef.reversal_attr <= 0 {
-		return true
+	// In Mugen, you can no longer hit a standing target if you don't have enough points
+	// In Mugen, you can juggle any enemy if they're not your target yet
+	// If IkemenVersion, the rules are a little more consistent
+	canJuggle := false
+	if c.asf(ASF_nojugglecheck) ||
+		c.juggle <= getter.ghv.getJuggle(c.id, c.gi().data.airjuggle) ||
+		(c.gi().ikemenver[0] != 0 || c.gi().ikemenver[1] != 0) && getter.hittmp < 2 ||
+		(c.gi().ikemenver[0] == 0 && c.gi().ikemenver[1] == 0 && !c.hasTarget(getter.id)) {
+		canJuggle = true
+	}
+	if !canJuggle {
+		return false
 	}
 
-	// Check if the enemy (c) can also hit the player (getter)
-	// Used to check for instance if a lower priority exchanges with a higher priority but the higher priority Clsn1 misses
-	// This could probably be a function that both players access instead of being handled like this
-	countercheck := func(hd *HitDef) bool {
-		if proj {
-			return false
-		} else {
-			return (getter.atktmp >= 0 || !c.hasTarget(getter.id)) &&
-				!getter.hasTargetOfHitdef(c.id) &&
-				getter.attrCheck(c, hd, c.ss.stateType) &&
-				c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true) &&
-				sys.zAxisOverlap(c.pos[2], c.hitdef.attack_depth[0], c.hitdef.attack_depth[1], c.localscl,
-					getter.pos[2], getter.depthPlayer[0], getter.depthPlayer[1], getter.localscl)
-		}
+	// Already hit by this HitDef, or already reversed by this ReversalDef
+	if c.hasTargetOfHitdef(getter.id) || c.hitdef.reversal_attr > 0 && getter.hasTargetOfHitdef(c.id) {
+		return false
 	}
 
-	// Enemy (c) ReversalDef check
+	// Getter can't be hit by the HitDef attributes at all
+	if !getter.attrCheck(c, &c.hitdef, c.ss.stateType) {
+		return false
+	}
+
+	// Select getter Z axis range
+	// HitDef checks attack depth vs player depth
+	// ReversalDef checks attack depth vs attack depth
+	getterDepth := getter.depthPlayer
 	if c.hitdef.reversal_attr > 0 {
-		if ghd.reversal_attr > 0 { // ReversalDef vs ReversalDef
-			if countercheck(&c.hitdef) {
-				c.atktmp = -1
-				return getter.atktmp < 0
-			}
-			return true
-		}
-		return !countercheck(&c.hitdef)
+		getterDepth = getter.hitdef.attack_depth
 	}
 
-	// Enemy (c) loses if player (getter) has ReversalDef
-	if ghd.reversal_attr > 0 {
-		return true
+	// Z axis check
+	return sys.zAxisOverlap(
+		c.pos[2], c.hitdef.attack_depth[0], c.hitdef.attack_depth[1], c.localscl,
+		getter.pos[2], getterDepth[0], getterDepth[1], getter.localscl,
+	)
+}
+
+// Decide which of two attacks that reach each other gets to hit
+func (c *Char) resolveHitTrade(getter *Char) (cHits, getterHits bool) {
+	coinToss := func() (bool, bool) {
+		win := Rand(0, 1) == 1
+		return win, !win
 	}
 
-	// Enemy (c) loses if their HitDef has lower priority
-	if c.hitdef.priority < ghd.priority {
-		return true
+	// ReversalDef beats HitDef. ReversalDef vs ReversalDef picks one at random
+	cRev, getterRev := c.hitdef.reversal_attr > 0, getter.hitdef.reversal_attr > 0
+	if cRev && getterRev {
+		return coinToss()
+	}
+	if cRev || getterRev {
+		return cRev, getterRev
 	}
 
-	// Enemy (c) HitDef has higher priority. Run counter check
-	if c.hitdef.priority > ghd.priority {
-		return !countercheck(&c.hitdef)
+	// Higher priority wins
+	if c.hitdef.priority != getter.hitdef.priority {
+		return c.hitdef.priority > getter.hitdef.priority, getter.hitdef.priority > c.hitdef.priority
 	}
 
 	// Both HitDefs have same priority. Check trade types
-	if ghd.priority == c.hitdef.priority {
-		switch {
-		case c.hitdef.prioritytype == TT_Dodge:
-			return !countercheck(&c.hitdef)
-		case ghd.prioritytype == TT_Dodge:
-			return !countercheck(&c.hitdef)
-		case ghd.prioritytype == TT_Miss:
-			return !countercheck(&c.hitdef)
-		case c.hitdef.prioritytype == TT_Hit:
-			// if (c.hitdef.p1stateno >= 0 || c.hitdef.attr&int32(AT_AT) != 0 && ghd.hitonce != 0) && countercheck(&c.hitdef) {
-			// Since the unhittabletime is what's behind needing to randomize throws, we will check it instead
-			if (c.hitdef.unhittabletime[0] > 0 && ghd.hitonce != 0) && countercheck(&c.hitdef) {
-				c.atktmp = -1
-				return getter.atktmp < 0 || Rand(0, 1) == 1
-			}
-			return true
-		default:
-			return true
-		}
+	// Dodge: nobody hits. Miss loses to Hit. Miss vs Miss: nobody hits
+	ct, gt := c.hitdef.prioritytype, getter.hitdef.prioritytype
+	if ct == TT_Dodge || gt == TT_Dodge {
+		return false, false
+	}
+	if ct == TT_Miss || gt == TT_Miss {
+		return gt == TT_Miss && ct != TT_Miss, ct == TT_Miss && gt != TT_Miss
 	}
 
-	// Other cases
-	return true
+	// Hit vs Hit: both hit, unless that's impossible
+	// Then a random winner is picked, since otherwise the processing order would decide it
+	// Since the unhittabletime is what's behind needing to randomize throws, we check it instead of the throw attribute
+	// if (c.hitdef.p1stateno >= 0 || c.hitdef.attr&int32(AT_AT) != 0 && ghd.hitonce != 0) && countercheck(&c.hitdef) {
+	cNoTrade := c.hitdef.unhittabletime[0] > 0 && c.hitdef.hitonce != 0 || c.hitdef.p1stateno >= 0 && c.hitdef.p2stateno >= 0
+	getterNoTrade := getter.hitdef.unhittabletime[0] > 0 && getter.hitdef.hitonce != 0 || getter.hitdef.p1stateno >= 0 && getter.hitdef.p2stateno >= 0
+	if cNoTrade || getterNoTrade {
+		return coinToss()
+	}
+
+	// Examples of scenarios where both landing is impossible:
+	// 1. "Unhittable" on contact and hits once (throws by default): if it landed first, the other one couldn't land
+	// Ikemen: coin toss. Mugen: same
+	// 2. p1stateno + p2stateno (hit-grabs and similar): if both hit, each player would be sent into the other's p2stateno,
+	// but neither would enter the p1stateno that's meant to control it
+	// Ikemen: coin toss; one sequence plays out and the other misses. Mugen: lets both hit, then a random player enters their p1stateno
+	// TODO: This second case is still not perfect. Both players should arguably deal damage
+	// TODO: Perhaps Mugen's method is better, but doing it requires refactoring
+
+	return true, true
+}
+
+// Whether c's attack connects with getter, after resolving any hit trade between them
+// traded is true when both attacks hit each other
+// Each trade is decided once per frame. Stored results are checked first, since the first hit can change state (e.g. throws)
+// Known issues (rare):
+// - TODO: If the winner spends its hitonce on a closer target in its own pass, the loser is still blocked. The original code had the same issue
+// - Getter's juggle check runs before its own pass inherits juggle points (inheritJuggle), so it may use last frame's value
+func (c *Char) hitConnects(getter *Char) (hits, traded bool) {
+	// Check if this pair was already decided this frame. Only winners are stored
+	// If nobody won (e.g. Dodge) the trade is simply decided again
+	cWon, getterWon := false, false
+	for _, p := range sys.hitTradeWinners {
+		if p == [2]int32{c.id, getter.id} {
+			cWon = true
+		}
+		if p == [2]int32{getter.id, c.id} {
+			getterWon = true
+		}
+	}
+	if cWon || getterWon {
+		return cWon, cWon && getterWon
+	}
+
+	if !c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true) {
+		return false, false
+	}
+
+	// No trade if either attack is invalid or getter can't hit back
+	// For instance, a lower priority exchanging with a higher priority whose Clsn1 misses is not a trade
+	cValid := c.hitdef.attr > 0 && c.ss.stateType != ST_L || c.hitdef.reversal_attr > 0
+	getterValid := getter.hitdef.attr > 0 && getter.ss.stateType != ST_L || getter.hitdef.reversal_attr > 0
+	if !cValid || !getterValid || !getter.hitPrecheck(c) ||
+		!getter.clsnCheck(c, 1, getter.hitdef.p2clsncheck, true) {
+		return true, false
+	}
+
+	cHits, getterHits := c.resolveHitTrade(getter)
+	if cHits {
+		sys.hitTradeWinners = append(sys.hitTradeWinners, [2]int32{c.id, getter.id})
+	}
+	if getterHits {
+		sys.hitTradeWinners = append(sys.hitTradeWinners, [2]int32{getter.id, c.id})
+	}
+	return cHits, cHits && getterHits
 }
 
 // Hitspark creation function
@@ -11384,7 +11446,10 @@ func (c *Char) hitspark(getter *Char, proj *Projectile,
 	}
 }
 
-func (c *Char) hitResultCheck(getter *Char, proj *Projectile) (hitResult int32) {
+// Traded: c and getter hit each other in a hit trade. Then:
+// Both have p1stateno: nobody enters it, since both were hit. Mugen: picks a random player, who enters p1stateno only if their move has one
+// Both have p2stateno: each player enters the other's p2stateno. Mugen: same
+func (c *Char) hitResultCheck(getter *Char, proj *Projectile, traded bool) (hitResult int32) {
 
 	// Player hit check
 	hd := &c.hitdef
@@ -11423,7 +11488,8 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile) (hitResult int32) 
 	}
 
 	// If using p1stateno but the char was already hit or is already changing states
-	if hd.p1stateno >= 0 && (c.csf(CSF_gethit) || c.stchtmp && c.ss.sb.playerNo != hd.statePN) {
+	// Skipped in a hit trade, where p1stateno is ignored, so that both hits land regardless of order
+	if hd.p1stateno >= 0 && !traded && (c.csf(CSF_gethit) || c.stchtmp && c.ss.sb.playerNo != hd.statePN) {
 		return 0
 	}
 
@@ -12176,7 +12242,8 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile) (hitResult int32) 
 			getter.p1facing = 0
 		}
 		getter.ghv.facing = hd.p2facing
-		if hd.p1stateno >= 0 && c.stateChange1(hd.p1stateno, hd.statePN) {
+		// In a hit trade nobody enters p1stateno
+		if hd.p1stateno >= 0 && !traded && c.stateChange1(hd.p1stateno, hd.statePN) {
 			c.setCtrl(false)
 		}
 		// Juggle points are subtracted if the target was falling either before or after the hit
@@ -12995,7 +13062,7 @@ func (c *Char) update() {
 		c.groundAngle = 0
 		// Hit detection should happen even during hitpause
 		// https://github.com/ikemen-engine/Ikemen-GO/issues/1660
-		c.atktmp = int8(Btoi(c.ss.moveType != MT_I || c.hitdef.reversal_attr > 0))
+		c.hitActive = c.ss.moveType != MT_I || c.hitdef.reversal_attr > 0
 		c.hoverIdx = -1
 		c.hoverKeepState = false
 		// Apply buffered SuperPause p2defmul
@@ -13323,9 +13390,9 @@ func (c *Char) cueDebugDraw() {
 			var debugType *DebugClsn
 			if c.scf(SCF_standby) {
 				debugType = &sys.debugc1stb
-			} else if c.atktmp != 0 && c.hitdef.reversal_attr > 0 {
+			} else if c.hitActive && c.hitdef.reversal_attr > 0 {
 				debugType = &sys.debugc1rev
-			} else if c.atktmp != 0 && c.hitdef.attr > 0 {
+			} else if c.hitActive && c.hitdef.attr > 0 {
 				debugType = &sys.debugc1hit
 			} else {
 				debugType = &sys.debugc1not
@@ -14134,7 +14201,7 @@ func (cl *CharList) hitDetectionPlayer(c *Char) {
 		return
 	}
 
-	if c.atktmp == 0 {
+	if !c.hitActive {
 		return
 	}
 
@@ -14216,39 +14283,8 @@ func (cl *CharList) hitDetectionPlayer(c *Char) {
 			}
 		}
 
-		// In Mugen, you can no longer hit a standing target if you don't have enough points
-		// In Mugen, you can juggle any enemy if they're not your target yet
-		// If IkemenVersion, the rules are a little more consistent
-		canJuggle := false
-		if c.asf(ASF_nojugglecheck) ||
-			c.juggle <= getter.ghv.getJuggle(c.id, c.gi().data.airjuggle) ||
-			(c.gi().ikemenver[0] != 0 || c.gi().ikemenver[1] != 0) && getter.hittmp < 2 ||
-			(c.gi().ikemenver[0] == 0 && c.gi().ikemenver[1] == 0 && !c.hasTarget(getter.id)) {
-			canJuggle = true
-		}
-
 		// If getter can't be hit by this Hitdef
-		if !canJuggle ||
-			c.hitdef.hitonce < 0 ||
-			c.hasTargetOfHitdef(getter.id) ||
-			c.hitdef.reversal_attr > 0 && getter.hasTargetOfHitdef(c.id) ||
-			!getter.hittableByChar(c, &c.hitdef, c.ss.stateType, false) {
-			continue
-		}
-
-		// Select getter Z axis range
-		// HitDef checks attack depth vs player depth
-		// ReversalDef checks attack depth vs attack depth
-		getterDepth := getter.depthPlayer
-		if c.hitdef.reversal_attr > 0 {
-			getterDepth = getter.hitdef.attack_depth
-		}
-
-		// Z axis check
-		if !sys.zAxisOverlap(
-			c.pos[2], c.hitdef.attack_depth[0], c.hitdef.attack_depth[1], c.localscl,
-			getter.pos[2], getterDepth[0], getterDepth[1], getter.localscl,
-		) {
+		if !c.hitPrecheck(getter) {
 			continue
 		}
 
@@ -14285,8 +14321,8 @@ func (cl *CharList) hitDetectionPlayer(c *Char) {
 			break
 		}
 
-		if c.clsnCheck(getter, 1, c.hitdef.p2clsncheck, true) {
-			if hitResult := c.hitResultCheck(getter, nil); hitResult != 0 {
+		if hits, traded := c.hitConnects(getter); hits {
+			if hitResult := c.hitResultCheck(getter, nil, traded); hitResult != 0 {
 				// Apply hit consequences specific to player vs player
 				// Check if MoveContact should be updated
 				// Hit type None should also set MoveHit here
@@ -14423,11 +14459,6 @@ func (cl *CharList) hitDetectionProjectile(getter *Char) {
 
 		ap_projhit := false
 
-		// Save root's atktmp var so we can temporarily modify it
-		// Maybe this is no longer necessary
-		//orgatktmp := c.atktmp
-		//c.atktmp = -1
-
 		for j := range sys.projs[i] {
 			p := sys.projs[i][j]
 
@@ -14523,7 +14554,7 @@ func (cl *CharList) hitDetectionProjectile(getter *Char) {
 			}
 
 			// Cancel a projectile with hitflag P
-			if getter.atktmp != 0 && (getter.hitdef.affectteam == 0 ||
+			if getter.hitActive && (getter.hitdef.affectteam == 0 ||
 				(p.hitdef.teamside != getter.teamside) == (getter.hitdef.affectteam > 0)) &&
 				getter.hitdef.hitflag&int32(HF_P) != 0 &&
 				getter.projClsnCheck(p, 1, 2, false) &&
@@ -14551,7 +14582,7 @@ func (cl *CharList) hitDetectionProjectile(getter *Char) {
 			if canJuggle && !(getter.stchtmp && (getter.csf(CSF_gethit) || getter.acttmp > 0)) &&
 				(!ap_projhit || p.hitdef.attr&int32(AT_AP) == 0) &&
 				(p.hitpause <= 0 || p.contactflag) && p.curmisstime <= 0 && p.hitdef.hitonce >= 0 &&
-				getter.hittableByChar(c, &p.hitdef, ST_N, true) {
+				getter.attrCheck(c, &p.hitdef, ST_N) {
 
 				// Save enemy's hittmp var so we can temporarily modify it
 				// Maybe this is no longer necessary
@@ -14564,7 +14595,7 @@ func (cl *CharList) hitDetectionProjectile(getter *Char) {
 					sys.zAxisOverlap(p.pos[2], p.hitdef.attack_depth[0], p.hitdef.attack_depth[1], p.localscl,
 						getter.pos[2], getter.depthPlayer[0], getter.depthPlayer[1], getter.localscl) {
 
-					if hitResult := c.hitResultCheck(getter, p); hitResult != 0 {
+					if hitResult := c.hitResultCheck(getter, p, false); hitResult != 0 {
 						// Apply hit consequences specific to projectile vs player
 						p.contactflag = true
 						if Abs(hitResult) == 1 {
@@ -14587,9 +14618,6 @@ func (cl *CharList) hitDetectionProjectile(getter *Char) {
 				//getter.hittmp = orghittmp
 			}
 		}
-
-		// Restore root's atktmp var
-		//c.atktmp = orgatktmp
 	}
 }
 
@@ -15011,6 +15039,9 @@ func (cl *CharList) collisionDetection() {
 	for _, c := range cl.runOrder {
 		c.unsetCSF(CSF_gethit)
 	}
+
+	// Reset hit detection scratch lists
+	sys.hitTradeWinners = sys.hitTradeWinners[:0]
 
 	// Player hit detection
 	for _, idx := range sortedOrder {
