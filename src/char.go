@@ -11279,20 +11279,15 @@ func (c *Char) resolveHitTrade(getter *Char) (cHits, getterHits bool) {
 	// Then a random winner is picked, since otherwise the processing order would decide it
 	// Since the unhittabletime is what's behind needing to randomize throws, we check it instead of the throw attribute
 	// if (c.hitdef.p1stateno >= 0 || c.hitdef.attr&int32(AT_AT) != 0 && ghd.hitonce != 0) && countercheck(&c.hitdef) {
-	cNoTrade := c.hitdef.unhittabletime[0] > 0 && c.hitdef.hitonce != 0 || c.hitdef.p1stateno >= 0 && c.hitdef.p2stateno >= 0
-	getterNoTrade := getter.hitdef.unhittabletime[0] > 0 && getter.hitdef.hitonce != 0 || getter.hitdef.p1stateno >= 0 && getter.hitdef.p2stateno >= 0
+	cNoTrade := c.hitdef.unhittabletime[0] > 0
+	getterNoTrade := getter.hitdef.unhittabletime[0] > 0
 	if cNoTrade || getterNoTrade {
 		return coinToss()
 	}
 
 	// Examples of scenarios where both landing is impossible:
-	// 1. "Unhittable" on contact and hits once (throws by default): if it landed first, the other one couldn't land
+	// 1. "Unhittable" on contact (throws by default): if it landed first, the other one couldn't land
 	// Ikemen: coin toss. Mugen: same
-	// 2. p1stateno + p2stateno (hit-grabs and similar): if both hit, each player would be sent into the other's p2stateno,
-	// but neither would enter the p1stateno that's meant to control it
-	// Ikemen: coin toss; one sequence plays out and the other misses. Mugen: lets both hit, then a random player enters their p1stateno
-	// TODO: This second case is still not perfect. Both players should arguably deal damage
-	// TODO: Perhaps Mugen's method is better, but doing it requires refactoring
 
 	return true, true
 }
@@ -11446,9 +11441,8 @@ func (c *Char) hitspark(getter *Char, proj *Projectile,
 	}
 }
 
-// Traded: c and getter hit each other in a hit trade. Then:
-// Both have p1stateno: nobody enters it, since both were hit. Mugen: picks a random player, who enters p1stateno only if their move has one
-// Both have p2stateno: each player enters the other's p2stateno. Mugen: same
+// Traded: c and getter hit each other. Getting hit cancels the attacker's p1stateno, and any p2stateno that relies on it
+// Mugen: p2stateno is always entered, then a random player enters p1stateno if their move has one
 func (c *Char) hitResultCheck(getter *Char, proj *Projectile, traded bool) (hitResult int32) {
 
 	// Player hit check
@@ -11488,7 +11482,7 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, traded bool) (hitR
 	}
 
 	// If using p1stateno but the char was already hit or is already changing states
-	// Skipped in a hit trade, where p1stateno is ignored, so that both hits land regardless of order
+	// Skipped in a hit trade so that both hits land regardless of order
 	if hd.p1stateno >= 0 && !traded && (c.csf(CSF_gethit) || c.stchtmp && c.ss.sb.playerNo != hd.statePN) {
 		return 0
 	}
@@ -11632,7 +11626,8 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, traded bool) (hitR
 		// Apply P2StateNo
 		// In Mugen, an undefined HitOverride stateno still invalidates P2StateNo
 		if !c.mhv.overridden {
-			if Abs(hitResult) == 1 && hd.p2stateno >= 0 {
+			// In a hit trade, skip a p2stateno whose p1stateno won't be entered
+			if Abs(hitResult) == 1 && hd.p2stateno >= 0 && !(traded && hd.p1stateno >= 0) {
 				pn := getter.playerNo
 				if hd.p2getp1state {
 					pn = hd.statePN
