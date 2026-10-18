@@ -4061,7 +4061,7 @@ func (c *Char) prepareNextRound() {
 			c.palfx = newPalFX()
 		}
 		if c.teamside == -1 {
-			c.setSCF(SCF_standby)
+			c.setSCF(SCF_standby, true)
 		}
 	} else {
 		c.palfx = nil
@@ -5141,44 +5141,16 @@ func (c *Char) validatePlayerNo(pn int, pname, scname string) bool {
 }
 */
 
-func (c *Char) setCtrl(ctrl bool) {
-	if ctrl {
-		c.setSCF(SCF_ctrl)
-	} else {
-		c.unsetSCF(SCF_ctrl)
-	}
-}
-
-func (c *Char) setDizzy(set bool) {
-	if set {
-		c.setSCF(SCF_dizzy)
-	} else {
-		c.unsetSCF(SCF_dizzy)
-	}
-}
-
-func (c *Char) setGuardBreak(set bool) {
-	if set {
-		c.setSCF(SCF_guardbreak)
-	} else {
-		c.unsetSCF(SCF_guardbreak)
-	}
-}
-
 func (c *Char) scf(scf SystemCharFlag) bool {
 	return c.systemFlag&scf != 0
 }
 
-func (c *Char) setSCF(scf SystemCharFlag) {
-	c.systemFlag |= scf
-	// Clear enemy lists if changing flags that affect them
-	if c.isPlayerType() && (scf == SCF_disabled || scf == SCF_over_ko || scf == SCF_standby) {
-		sys.charList.enemyNearChanged = true
+func (c *Char) setSCF(scf SystemCharFlag, on bool) {
+	if on {
+		c.systemFlag |= scf
+	} else {
+		c.systemFlag &^= scf
 	}
-}
-
-func (c *Char) unsetSCF(scf SystemCharFlag) {
-	c.systemFlag &^= scf
 	// Clear enemy lists if changing flags that affect them
 	if c.isPlayerType() && (scf == SCF_disabled || scf == SCF_over_ko || scf == SCF_standby) {
 		sys.charList.enemyNearChanged = true
@@ -5189,19 +5161,11 @@ func (c *Char) csf(csf CharSpecialFlag) bool {
 	return c.specialFlag&csf != 0
 }
 
-func (c *Char) setCSF(csf CharSpecialFlag) {
-	c.specialFlag |= csf
-}
-
-func (c *Char) unsetCSF(csf CharSpecialFlag) {
-	c.specialFlag &^= csf
-}
-
-func (c *Char) toggleCSF(csf CharSpecialFlag, on bool) {
+func (c *Char) setCSF(csf CharSpecialFlag, on bool) {
 	if on {
-		c.setCSF(csf)
+		c.specialFlag |= csf
 	} else {
-		c.unsetCSF(csf)
+		c.specialFlag &^= csf
 	}
 }
 
@@ -5209,12 +5173,12 @@ func (c *Char) asf(asf AssertSpecialFlag) bool {
 	return c.assertFlag&asf != 0
 }
 
-func (c *Char) setASF(asf AssertSpecialFlag) {
-	c.assertFlag |= asf
-}
-
-func (c *Char) unsetASF(asf AssertSpecialFlag) {
-	c.assertFlag &^= asf
+func (c *Char) setASF(asf AssertSpecialFlag, on bool) {
+	if on {
+		c.assertFlag |= asf
+	} else {
+		c.assertFlag &^= asf
+	}
 }
 
 func (c *Char) parent(log bool) *Char {
@@ -7018,7 +6982,7 @@ func (c *Char) changeStateEx(no int32, pn int, anim, ctrl int32, ffx string) {
 	}
 
 	if ctrl >= 0 {
-		c.setCtrl(ctrl != 0)
+		c.setSCF(SCF_ctrl, ctrl != 0)
 	}
 
 	if c.stateChange1(no, pn) && sys.changeStateNest == 0 && c.minus == 0 {
@@ -7156,7 +7120,7 @@ func (c *Char) destroy() {
 
 	sys.charList.delete(c)
 	c.helperIndex = -1
-	c.setCSF(CSF_destroy)
+	c.setCSF(CSF_destroy, true)
 }
 
 // Mugen clears the helper ID here, before fully removing the helper (c.helperID = 0)
@@ -7166,7 +7130,7 @@ func (c *Char) destroySelf(recursive, removeexplods, removetexts bool) bool {
 		return false
 	}
 
-	c.setCSF(CSF_destroy)
+	c.setCSF(CSF_destroy, true)
 
 	if removeexplods {
 		c.removeExplod(-1, -1)
@@ -8075,7 +8039,7 @@ func (c *Char) setWidth(fw, bw float32) {
 	c.sizeWidth[1] = c.baseWidthBack()*coordRatio + bw
 
 	//c.updateSizeBox()
-	c.setCSF(CSF_width)
+	c.setCSF(CSF_width, true)
 }
 
 func (c *Char) setHeight(th, bh float32) {
@@ -8085,7 +8049,7 @@ func (c *Char) setHeight(th, bh float32) {
 	c.sizeHeight[1] = c.baseHeightBottom()*coordRatio + bh
 
 	//c.updateSizeBox()
-	c.setCSF(CSF_height)
+	c.setCSF(CSF_height, true)
 }
 
 func (c *Char) setDepth(td, bd float32) {
@@ -8094,19 +8058,19 @@ func (c *Char) setDepth(td, bd float32) {
 	c.depthPlayer[0] = c.baseDepthTop()*coordRatio + td
 	c.depthPlayer[1] = c.baseDepthBottom()*coordRatio + bd
 
-	c.setCSF(CSF_depth)
+	c.setCSF(CSF_depth, true)
 }
 
 func (c *Char) setWidthEdge(fe, be float32) {
 	// TODO: confirm if these don't need "coordRatio"
 	c.edgeWidth = [2]float32{fe, be}
-	c.setCSF(CSF_widthedge)
+	c.setCSF(CSF_widthedge, true)
 }
 
 func (c *Char) setDepthEdge(tde, bde float32) {
 	c.edgeDepth[0] = tde
 	c.edgeDepth[1] = bde
-	c.setCSF(CSF_depthedge)
+	c.setCSF(CSF_depthedge, true)
 }
 */
 
@@ -8789,7 +8753,7 @@ func (c *Char) targetState(tar []int32, state int32) {
 		}
 		for _, tid := range tar {
 			if t := sys.playerID(tid); t != nil {
-				t.setCtrl(false)
+				t.setSCF(SCF_ctrl, false)
 				t.stateChange1(state, pn)
 			}
 		}
@@ -11650,7 +11614,7 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, hitTraded bool) (h
 					// In Mugen, using p2stateno forces movetype to H
 					// https://github.com/ikemen-engine/Ikemen-GO/issues/2466
 					getter.ss.changeMoveType(MT_H)
-					getter.setCtrl(false)
+					getter.setSCF(SCF_ctrl, false)
 					p2s = true
 					getter.hoverIdx = -1
 				}
@@ -12002,7 +11966,7 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, hitTraded bool) (h
 			getter.stchtmp = false
 		}
 		// Flag enemy as getting hit
-		getter.setCSF(CSF_gethit)
+		getter.setCSF(CSF_gethit, true)
 		getter.ghv.frame = true
 
 		// P2 Friction
@@ -12254,7 +12218,7 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, hitTraded bool) (h
 		// In a hit trade the attacker was also hit, which cancels p1stateno
 		// Mugen: a random player enters p1stateno, if their move has one
 		if hd.p1stateno >= 0 && !hitTraded && c.stateChange1(hd.p1stateno, hd.statePN) {
-			c.setCtrl(false)
+			c.setSCF(SCF_ctrl, false)
 		}
 		// Juggle points are subtracted if the target was falling either before or after the hit
 		// https://github.com/ikemen-engine/Ikemen-GO/issues/2287
@@ -12454,10 +12418,10 @@ func (c *Char) actionPrepare() {
 			// Set default screenbound and playerpush
 			if c.isPlayerType() {
 				if c.alive() || c.ss.no != 5150 || c.numPartner() == 0 {
-					c.setCSF(CSF_screenbound | CSF_depthbound | CSF_movecamera_x | CSF_movecamera_y | CSF_movecamera_z)
+					c.setCSF(CSF_screenbound | CSF_depthbound | CSF_movecamera_x | CSF_movecamera_y | CSF_movecamera_z, true)
 				}
 				if sys.roundState() > 0 && sys.roundState() < 4 && (c.alive() || c.numPartner() == 0) {
-					c.setCSF(CSF_playerpush)
+					c.setCSF(CSF_playerpush, true)
 				}
 			}
 			// Reset player pushing properties
@@ -12514,7 +12478,7 @@ func (c *Char) actionPrepare() {
 		c.inputShift = c.inputShift[:0]
 
 		// This AssertSpecial flag is special in that it must always reset regardless of hitpause
-		c.unsetASF(ASF_animatehitpause)
+		c.setASF(ASF_animatehitpause, false)
 
 		// This variable is necessary because NoStandGuard is reset before the walking instructions are checked
 		// https://github.com/ikemen-engine/Ikemen-GO/issues/1966
@@ -12524,7 +12488,7 @@ func (c *Char) actionPrepare() {
 		// The flags in this block are to be reset even during hitpause
 		// Exception for WinMugen chars, where they persisted during hitpause
 		if c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0 || c.stWgi().mugenver[0] == 1 || !c.hitPause() {
-			c.unsetCSF(CSF_angledraw)
+			c.setCSF(CSF_angledraw, false)
 			c.angleDrawScale = [2]float32{1, 1}
 			c.angleDrawPivot = [2]float32{0, 0}
 			c.trans = TT_default
@@ -12593,7 +12557,7 @@ func (c *Char) actionPrepare() {
 	c.dropTargets()
 	// Enable autoguard. This placement gives it similar properties to other AssertSpecial flags
 	if sys.cfg.Options.AutoGuard {
-		c.setASF(ASF_autoguard)
+		c.setASF(ASF_autoguard, true)
 	}
 }
 
@@ -12883,8 +12847,8 @@ func (c *Char) actionFinish() {
 				}
 			}
 			// Set KO flag and force KO states if necessary
-			c.setSCF(SCF_ko)
-			c.unsetSCF(SCF_ctrl) // This can be seen in Mugen when you F1 a character with ctrl && movetype = H
+			c.setSCF(SCF_ko, true)
+			c.setSCF(SCF_ctrl, false) // This can be seen in Mugen when you F1 a character with ctrl && movetype = H
 			if !c.stchtmp && c.helperIndex == 0 && c.ss.moveType != MT_H {
 				c.ghv.fallflag = true
 				c.selfState(5030, -1, -1, 0, "")
@@ -12895,10 +12859,10 @@ func (c *Char) actionFinish() {
 
 	// Over flags (char is finished for the round)
 	if c.alive() && c.life > 0 && !sys.roundEnded() {
-		c.unsetSCF(SCF_over_alive | SCF_over_ko)
+		c.setSCF(SCF_over_alive | SCF_over_ko, false)
 	}
 	if c.ss.no == 5150 && !c.scf(SCF_over_ko) { // Actual KO is not required in Mugen
-		c.setSCF(SCF_over_ko)
+		c.setSCF(SCF_over_ko, true)
 	}
 
 	// Signal that "actionFinish" has finished
@@ -14144,7 +14108,7 @@ func (cl *CharList) updateRunOrder() {
 
 	// Reset priority flags as they are only needed during this function
 	for _, c := range cl.runOrder {
-		c.unsetASF(ASF_runfirst | ASF_runlast)
+		c.setASF(ASF_runfirst | ASF_runlast, false)
 	}
 }
 
@@ -14573,7 +14537,7 @@ func (cl *CharList) hitDetectionProjectile(getter *Char) {
 				sys.zAxisOverlap(getter.pos[2], getter.hitdef.attack_depth[0], getter.hitdef.attack_depth[1], getter.localscl,
 					p.pos[2], p.hitdef.attack_depth[0], p.hitdef.attack_depth[1], p.localscl) {
 				if getter.hitdef.p1stateno >= 0 && getter.stateChange1(getter.hitdef.p1stateno, getter.hitdef.statePN) {
-					getter.setCtrl(false)
+					getter.setSCF(SCF_ctrl, false)
 				}
 				p.flagProjCancel()
 				getter.hitdefContact = true
@@ -15049,7 +15013,7 @@ func (cl *CharList) collisionDetection() {
 	// This used to be in hitDetectionPlayer(), but because that now iterates attackers instead of targets it needs to be outside
 	// Might be better placed in some other function. But putting it here ensures it happens at the right time
 	for _, c := range cl.runOrder {
-		c.unsetCSF(CSF_gethit)
+		c.setCSF(CSF_gethit, false)
 	}
 
 	// Reset hit detection scratch lists
