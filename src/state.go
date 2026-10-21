@@ -55,7 +55,7 @@ type GameState struct {
 	statsState  statsRollbackState
 	scoreRounds [][2]float32
 	sel         Select
-	//stringPool      [MaxPlayerNo]StringPool // Only mutated while compiling
+	//stringPool      [MaxPlayerNo]StringPool // Grows while compiling and at runtime. Rollback can skip it since indexes never outlive an expression
 	dialogueFlg bool
 
 	// FightScreen
