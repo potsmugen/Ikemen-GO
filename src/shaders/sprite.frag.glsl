@@ -1,7 +1,17 @@
+// Ikemen GO sprite shader
+// Custom sprite shaders #include "sprite.frag.glsl", get the sprite coordinate with ikemenSpriteUV()
+// and the normal sprite color with ikemenSpriteColor(uv)
+// Shaders that use the GrabPass declare bgl_RenderedTexture themselves, since naming it enables the back buffer copy
+// The engine compiles this file itself with IKEMEN_ENGINE_SPRITE defined, which adds main()
+// Vulkan build command for the engine's copy:
+//   glslc -fshader-stage=frag -std=450core -DIKEMEN_ENGINE_SPRITE sprite.frag.glsl -o sprite.frag.spv
+// Vulkan build command for a custom shader:
+//   glslc -fshader-stage=frag -std=450core -I <folder of this file> custom.frag -o custom.frag.spv
+
 #if __VERSION__ >= 450
 	// VULKAN PATH
 	#define COMPAT_TEXTURE texture
-	layout(binding = 1) uniform UniformBufferObject  {
+	layout(binding = 1) uniform UniformBufferObject {
 		vec4 x1x2x4x3;
 		vec4 tint;
 		vec3 add;
@@ -9,13 +19,22 @@
 		float alpha, gray, hue;
 		int mask;
 		bool isFlat, isRgba, isTrapez, neg;
+		float iTime;
+		vec2 iResolution;
+		float aspectRatio;
+		float sTime;
 	};
 	layout(push_constant, std430) uniform u {
 		vec4 spriteUV;
 		vec4 palUV;
+		vec4 tex1UV;
+		vec4 tex2UV;
+		float param[16];
 	};
 	layout(binding = 2) uniform sampler2D tex;
 	layout(binding = 3) uniform sampler2D pal;
+	layout(binding = 5) uniform sampler2D tex1;
+	layout(binding = 6) uniform sampler2D tex2;
 	layout(location = 0) in vec2 texcoord;
 	layout(location = 0) out vec4 FragColor;
 #else
@@ -38,10 +57,15 @@
 	uniform bool isFlat, isRgba, isTrapez, neg;
 	uniform vec4 spriteUV;
 	uniform vec4 palUV;
+	uniform float iTime, sTime, aspectRatio;
+	uniform vec2 iResolution;
+	uniform vec4 tex1UV, tex2UV;
+	uniform float param[16];
+	uniform sampler2D tex1, tex2;
 	COMPAT_VARYING vec2 texcoord;
 #endif
 
-vec3 rgb2hsv(vec3 c)
+vec3 ikemenRgbToHsv(vec3 c)
 {
     vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
     vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
@@ -52,20 +76,26 @@ vec3 rgb2hsv(vec3 c)
     return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
 }
 
-vec3 hsv2rgb(vec3 c)
+vec3 ikemenHsvToRgb(vec3 c)
 {
     vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
     vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
-vec3 hue_shift(vec3 color, float dhue) {
-	vec3 colorhsv = rgb2hsv(color);
+vec3 ikemenHueShift(vec3 color, float dhue) {
+	vec3 colorhsv = ikemenRgbToHsv(color);
 	colorhsv.x = mod(colorhsv.x+dhue, 1.0);
-	return hsv2rgb(colorhsv);
+	return ikemenHsvToRgb(colorhsv);
 }
 
-void main(void) {
+// Sprite-local coordinate, 0-1 across the sprite even when it's packed in an atlas
+vec2 ikemenSpriteUV() {
+	return (texcoord - spriteUV.xy) / (spriteUV.zw - spriteUV.xy);
+}
+
+// The engine's sprite color at a sprite-local coordinate
+vec4 ikemenSpriteColor(vec2 uv) {
 	vec4 c;
 	vec3 neg_base = vec3(1.0);
 	vec3 final_add = add;
@@ -80,21 +110,19 @@ void main(void) {
 		final_add *= c.a;
 		final_mul.rgb *= alpha;
 	} else {
-		vec2 uv = texcoord;
-		uv[0] = clamp(uv[0],spriteUV[0],spriteUV[2]-0.0001);
-		uv[1] = clamp(uv[1],spriteUV[1],spriteUV[3]-0.0001);
 		if (isTrapez) {
-			float y = (uv.y - spriteUV[1]) / (spriteUV[3] - spriteUV[1]);
-			vec2 bounds = mix(x1x2x4x3.zw, x1x2x4x3.xy, y);
+			vec2 bounds = mix(x1x2x4x3.zw, x1x2x4x3.xy, clamp(uv.y, 0.0, 1.0));
 			float gap = bounds[1] - bounds[0];
 			#ifdef GL_ES
 				if (abs(gap) < 0.0001) gap = 0.0001;
 			#endif
-			float x = (gl_FragCoord.x - bounds[0]) / gap;
-			uv.x = clamp(x,0,1) * (spriteUV[2] - spriteUV[0]) + spriteUV[0];
+			uv.x = clamp((gl_FragCoord.x - bounds[0]) / gap, 0.0, 1.0);
 		}
 
-		c = COMPAT_TEXTURE(tex, uv);
+		// Map into the sprite's atlas area, clamped so sampling can't reach neighboring sprites
+		vec2 atlasUV = mix(spriteUV.xy, spriteUV.zw, uv);
+		atlasUV = clamp(atlasUV, spriteUV.xy, spriteUV.zw - 0.0001);
+		c = COMPAT_TEXTURE(tex, atlasUV);
 
 		// Select with or without palette
 		if (isRgba) {
@@ -112,7 +140,7 @@ void main(void) {
 	// Apply PalFX
 	// Hue
 	if (hue != 0.0) {
-		c.rgb = hue_shift(c.rgb, hue);
+		c.rgb = ikemenHueShift(c.rgb, hue);
 	}
 	// Invertall
 	if (neg) {
@@ -131,5 +159,12 @@ void main(void) {
 		c.rgb = mix(c.rgb, tint.rgb * c.a, tint.a);
 	}
 
-	FragColor = c;
+	return c;
 }
+
+#ifdef IKEMEN_ENGINE_SPRITE
+void main(void) {
+	vec2 uv = ikemenSpriteUV();
+	FragColor = ikemenSpriteColor(uv);
+}
+#endif

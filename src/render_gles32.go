@@ -120,6 +120,7 @@ func (s *ShaderProgram_GLES32) RegisterTextures(names ...string) {
 
 func (r *Renderer_GLES32) compileShader(shaderType uint32, src string) (uint32, error) {
 	shader := gl.CreateShader(shaderType)
+	src = expandShaderIncludes(src)
 
 	// 1. SMART HEADER INJECTION
 	// GLES 3.0+ drivers REQUIRE the version to be the very first line.
@@ -836,7 +837,8 @@ func (r *Renderer_GLES32) Init() {
 	r.bindBuffer(gl.ARRAY_BUFFER, 0)
 
 	// Sprite shader
-	r.spriteShader, _ = r.newShaderProgram(vertShader, fragShader, "", "Main Shader", true)
+	// The define adds main() and the engine-only layout
+	r.spriteShader, _ = r.newShaderProgram(vertShader, "#define IKEMEN_ENGINE_SPRITE\n"+fragShader, "", "Main Shader", true)
 	r.spriteShader.RegisterAttributes("position", "uv")
 	r.spriteShader.RegisterUniforms("modelview", "projection", "x1x2x4x3",
 		"alpha", "tint", "mask", "neg", "gray", "add", "mult", "isFlat", "isRgba", "isTrapez", "hue",

@@ -104,7 +104,7 @@ func (s *ShaderProgram_GL33) RegisterTextures(names ...string) {
 func (r *Renderer_GL33) compileShader(shaderType uint32, src string) (shader uint32, err error) {
 	shader = gl.CreateShader(shaderType)
 
-	src = "#version 330 core\n" + src + "\x00"
+	src = "#version 330 core\n" + expandShaderIncludes(src) + "\x00"
 	s, free := gl.Strs(src)
 	defer free()
 
@@ -731,7 +731,8 @@ func (r *Renderer_GL33) Init() {
 	r.bindBuffer(gl.ARRAY_BUFFER, 0)
 
 	// Sprite shader
-	r.spriteShader, _ = r.newShaderProgram(vertShader, fragShader, "", "Main Shader", true)
+	// The define adds main() and the engine-only layout
+	r.spriteShader, _ = r.newShaderProgram(vertShader, "#define IKEMEN_ENGINE_SPRITE\n"+fragShader, "", "Main Shader", true)
 	r.spriteShader.RegisterAttributes("position", "uv")
 	r.spriteShader.RegisterUniforms("modelview", "projection", "x1x2x4x3",
 		"alpha", "tint", "mask", "neg", "gray", "add", "mult", "isFlat", "isRgba", "isTrapez", "hue",
