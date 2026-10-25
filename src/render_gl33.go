@@ -2014,18 +2014,27 @@ func (r *Renderer_GL33) SetUniformFvSub(loc int32, values []float32) {
 	}
 }
 
+func (r *Renderer_GL33) uniformLoc(name string) int32 {
+	loc, ok := r.currentProgram.uniforms[name]
+	if !ok {
+		// Would otherwise write to location 0. Only engine code picks these names
+		panic(fmt.Sprintf("Uniform '%s' not registered", name))
+	}
+	return loc
+}
+
 func (r *Renderer_GL33) SetUniformI(name string, val int) {
-	loc := r.currentProgram.uniforms[name]
+	loc := r.uniformLoc(name)
 	r.SetUniformISub(loc, int32(val))
 }
 
 func (r *Renderer_GL33) SetUniformF(name string, values ...float32) {
-	loc := r.currentProgram.uniforms[name]
+	loc := r.uniformLoc(name)
 	r.SetUniformFSub(loc, values...)
 }
 
 func (r *Renderer_GL33) SetUniformFv(name string, values []float32) {
-	loc := r.currentProgram.uniforms[name]
+	loc := r.uniformLoc(name)
 	r.SetUniformFvSub(loc, values)
 }
 
@@ -2165,7 +2174,11 @@ func (r *Renderer_GL33) SetActiveTexture0() {
 // Every program skips redundant binds. Sprite shader also uses a LRU system that allows it to use all texture slots for caching
 func (r *Renderer_GL33) SetTextureSub(uMap map[string]int32, tMap map[string]int, name string, tex Texture) {
 	t := tex.(*Texture_GL33)
-	loc := uMap[name]
+	loc, ok := uMap[name]
+	if !ok {
+		// Would otherwise write to location 0. Only engine code picks these names
+		panic(fmt.Sprintf("Texture uniform '%s' not registered", name))
+	}
 	switch name {
 	case "tex":
 		if loc, ok := uMap["spriteUV"]; ok && loc >= 0 {
