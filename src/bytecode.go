@@ -12258,6 +12258,7 @@ func (sc bindToParent) Run(c *Char, _ []int32) bool {
 	redirscale := c.localscl / crun.localscl
 	var x, y, z float32 = 0, 0, 0
 	var time int32 = 1
+	var facing float32 = 0
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
@@ -12265,9 +12266,9 @@ func (sc bindToParent) Run(c *Char, _ []int32) bool {
 			time = exp[0].evalI(c)
 		case bindToParent_facing:
 			if f := exp[0].evalI(c); f < 0 {
-				crun.bindFacing = -1
+				facing = -1
 			} else if f > 0 {
-				crun.bindFacing = 1
+				facing = 1
 			}
 		case bindToParent_pos:
 			x = exp[0].evalF(c) * redirscale
@@ -12289,6 +12290,7 @@ func (sc bindToParent) Run(c *Char, _ []int32) bool {
 	crun.bindPos[0] = x
 	crun.bindPos[1] = y
 	crun.bindPos[2] = z
+	crun.bindFacing = facing
 	crun.setBindToId(p, false)
 	crun.setBindTime(time)
 	return false
@@ -12305,6 +12307,7 @@ func (sc bindToRoot) Run(c *Char, _ []int32) bool {
 	redirscale := c.localscl / crun.localscl
 	var x, y, z float32 = 0, 0, 0
 	var time int32 = 1
+	var facing float32 = 0
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
@@ -12312,9 +12315,9 @@ func (sc bindToRoot) Run(c *Char, _ []int32) bool {
 			time = exp[0].evalI(c)
 		case bindToParent_facing:
 			if f := exp[0].evalI(c); f < 0 {
-				crun.bindFacing = -1
+				facing = -1
 			} else if f > 0 {
-				crun.bindFacing = 1
+				facing = 1
 			}
 		case bindToParent_pos:
 			x = exp[0].evalF(c) * redirscale
@@ -12336,6 +12339,7 @@ func (sc bindToRoot) Run(c *Char, _ []int32) bool {
 	crun.bindPos[0] = x
 	crun.bindPos[1] = y
 	crun.bindPos[2] = z
+	crun.bindFacing = facing
 	crun.setBindToId(r, false)
 	crun.setBindTime(time)
 	return false
