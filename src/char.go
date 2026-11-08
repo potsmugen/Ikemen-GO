@@ -8128,6 +8128,10 @@ func (c *Char) isTargetBound() bool {
 	return c.bindIsTarget && c.bindToId >= 0
 }
 
+func (c *Char) isTargetBoundTo(id int32) bool {
+	return c.isTargetBound() && c.bindToId == id
+}
+
 func (c *Char) initConstants(gi *CharGlobalInfo) {
 	gi.data.init()
 	gi.attackBase = 100
@@ -8825,7 +8829,10 @@ func (c *Char) targetDrop(excludeid int32, excludechar int32, keepone bool) {
 				if t.id == excludechar {
 					tg = append(tg, tid)
 				} else {
-					t.gethitBindClear()
+					// Only clear a bind from this char. Other players may still be binding this target
+					if t.isTargetBoundTo(c.id) {
+						t.resetBind()
+					}
 					t.ghv.dropPlayerId(c.id)
 				}
 			}
@@ -8842,7 +8849,10 @@ func (c *Char) targetDrop(excludeid int32, excludechar int32, keepone bool) {
 				if t.ghv.hitid == excludeid {
 					tg = append(tg, tid)
 				} else {
-					t.gethitBindClear()
+					// Only clear a bind from this char. Other players may still be binding this target
+					if t.isTargetBoundTo(c.id) {
+						t.resetBind()
+					}
 					t.ghv.dropPlayerId(c.id)
 				}
 			}
@@ -8859,7 +8869,7 @@ func (c *Char) targetDrop(excludeid int32, excludechar int32, keepone bool) {
 			if i == r {
 				c.targets = append(c.targets, tid)
 			} else if t := sys.playerID(tid); t != nil {
-				if t.isTargetBound() {
+				if t.isTargetBoundTo(c.id) {
 					if c.csf(CSF_gethit) {
 						t.selfState(5050, -1, -1, -1, "")
 					}
