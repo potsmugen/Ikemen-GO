@@ -7096,7 +7096,7 @@ func (c *Char) destroy() {
 			// If this target is still bound to the helper, force it to SelfState
 			// This placement is more reliable than doing it from the target
 			// https://github.com/ikemen-engine/Ikemen-GO/issues/3766
-			if t.bindToId == c.id {
+			if t.bindToId == c.id || t.boundById == c.id {
 				t.selfState(5050, -1, -1, -1, "")
 				t.gethitBindClear()
 				sys.appendToConsole(t.warn() + fmt.Sprintf("SelfState from being bound to destroyed helper: %v (%v)", c.name, c.id))
@@ -8126,12 +8126,13 @@ func (c *Char) gethitAnimtype() Reaction {
 	}
 }
 
+// Also true on the frame after a target bind ends
 func (c *Char) isTargetBound() bool {
-	return c.bindIsTarget && c.bindToId >= 0
+	return c.boundById >= 0
 }
 
 func (c *Char) isTargetBoundTo(id int32) bool {
-	return c.isTargetBound() && c.bindToId == id
+	return c.isTargetBound() && c.boundById == id
 }
 
 func (c *Char) initConstants(gi *CharGlobalInfo) {
@@ -10235,19 +10236,13 @@ func (c *Char) setBindToId(to *Char, isTargetBind bool) {
 	//}
 
 	// Prevent mutual binding
-	if to.bindToId == c.id {
+	if to.bindToId == c.id || to.boundById == c.id {
 		to.resetBind()
 	}
 }
 
 func (c *Char) updateBinding() {
-	// Clear leftover bindToId
-	// This clears TargetBind and thus getHitVar(isbound)
-	// https://github.com/ikemen-engine/Ikemen-GO/issues/3882
 	// TODO: Maybe there's a way to merge all the bind code instead of treating helper and target binds so differently
-	if c.bindTime == 0 && c.bindToId > 0 {
-		c.resetBind()
-	}
 
 	// If no bind is active
 	if c.bindToId < 0 || c.bindTime == 0 {
@@ -11709,7 +11704,7 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, hitTraded bool) (h
 				}
 			}
 		}
-		if getter.bindToId == c.id {
+		if getter.bindToId == c.id || getter.boundById == c.id {
 			getter.resetBind()
 		}
 		if hd.KeepState && ghvset {
@@ -11966,7 +11961,7 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, hitTraded bool) (h
 				} else {
 					getter.bindPos[2] = float32(math.NaN())
 				}
-			} else if getter.bindToId == c.id {
+			} else if getter.bindToId == c.id || getter.boundById == c.id {
 				getter.resetBind()
 			}
 			// Save other gethitvars that don't directly affect gameplay
@@ -12828,8 +12823,14 @@ func (c *Char) actionRun() {
 		//	c.updateBinding()
 		//}
 		for _, tid := range c.targets {
-			if t := sys.playerID(tid); t != nil && t.bindToId == c.id {
-				t.updateBinding()
+			if t := sys.playerID(tid); t != nil {
+				if t.bindToId == c.id {
+					t.updateBinding()
+				} else if t.boundById == c.id {
+					// The bind ended last frame. Clear getHitVar(isbound) now, like Mugen
+					// https://github.com/ikemen-engine/Ikemen-GO/issues/3882
+					t.boundById = -1
+				}
 			}
 		}
 	}
@@ -12924,6 +12925,10 @@ func (c *Char) track() {
 		charright := c.interPos[0]*c.localscl + edgeright*c.localscl
 		canmove := c.acttmp > 0 && !c.csf(CSF_posfreeze) && (c.bindTime == 0 || math.IsNaN(float64(c.bindPos[0])))
 		bindToCharacter := sys.playerID(c.bindToId)
+		// Keep following the binder on the frame after a target bind ends
+		if bindToCharacter == nil {
+			bindToCharacter = sys.playerID(c.boundById)
+		}
 		if charleft < sys.cam.leftest {
 			sys.cam.leftest = charleft
 			if canmove {
@@ -13165,16 +13170,20 @@ func (c *Char) tick() {
 				c.selfState(5050, -1, -1, -1, "")
 				c.gethitBindClear()
 			} else if !bt.pause() {
-				// We step the timer but don't clear the bind yet, because that makes getHitVar(isbound) clear too soon
-				// https://github.com/ikemen-engine/Ikemen-GO/issues/3882
 				c.bindTime--
+				// End the bind but keep getHitVar(isbound) until the binder's next update, or it clears too soon
+				// https://github.com/ikemen-engine/Ikemen-GO/issues/3882
+				if c.bindTime == 0 {
+					boundById := c.boundById
+					c.resetBind()
+					c.boundById = boundById
+				}
 			}
 		} else {
 			if !c.pause() {
 				c.bindTime--
 				// Unlike TargetBind, we clear this one immediately
 				// Fixes BindToRoot/BindToParent of 1 immediately after PosSets (MUGEN 1.0/1.1 behavior)
-				// This must not run for target binds so that they end the same time as MUGEN's do.
 				if c.bindTime == 0 {
 					c.resetBind()
 				}
