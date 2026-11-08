@@ -3033,6 +3033,10 @@ func (c *CharCompiler) playerBind(is IniSection, sc *StateControllerBase) (State
 			playerBind_time, VT_Int, 1, false); err != nil {
 			return err
 		}
+		if err := c.paramValue(is, sc, "facing",
+			playerBind_facing, VT_Int, 1, false); err != nil {
+			return err
+		}
 		if err := c.paramValue(is, sc, "pos",
 			playerBind_pos, VT_Float, 3, false); err != nil {
 			return err
