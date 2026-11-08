@@ -8820,26 +8820,9 @@ func (c *Char) targetVelAddZ(tar []int32, z float32) {
 	}
 }
 
-func (c *Char) targetDrop(excludeid int32, excludechar int32, keepone bool) {
+// TargetDrop sctrl. Drops targets by hit ID
+func (c *Char) targetDrop(excludeid int32, keepone bool) {
 	var tg []int32
-	// Keep the player with this "player ID". Used with "HitOnce" attacks such as throws
-	if keepone && excludechar > 0 {
-		for _, tid := range c.targets {
-			if t := sys.playerID(tid); t != nil {
-				if t.id == excludechar {
-					tg = append(tg, tid)
-				} else {
-					// Only clear a bind from this char. Other players may still be binding this target
-					if t.isTargetBoundTo(c.id) {
-						t.resetBind()
-					}
-					t.ghv.dropPlayerId(c.id)
-				}
-			}
-		}
-		c.targets = tg
-		return
-	}
 	// Keep the players with this "hit ID". Used with "TargetDrop" state controller
 	if excludeid < 0 {
 		tg = c.targets
@@ -10405,6 +10388,28 @@ func (c *Char) gethitBindClear() {
 	if c.isTargetBound() {
 		c.resetBind()
 	}
+}
+
+// Drop all targets except keepId when a HitOnce attack hits or this char is KO'd
+// Unlike TargetDrop, targets bound to this char always go to state 5050
+func (c *Char) releaseTargets(keepId int32) {
+	var tg []int32
+	for _, tid := range c.targets {
+		t := sys.playerID(tid)
+		if t == nil {
+			continue
+		}
+		if tid == keepId {
+			tg = append(tg, tid)
+			continue
+		}
+		if t.isTargetBoundTo(c.id) {
+			t.selfState(5050, -1, -1, -1, "")
+			t.resetBind()
+		}
+		t.ghv.dropPlayerId(c.id)
+	}
+	c.targets = tg
 }
 
 // Drop targets that no longer fit the requirements
@@ -12157,7 +12162,7 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, hitTraded bool) (h
 	if getter.hoverIdx < 0 {
 		// HitOnce drops all targets except the current one
 		if !isProjectile && hd.hitonce > 0 {
-			c.targetDrop(-1, getter.id, true)
+			c.releaseTargets(getter.id)
 		}
 
 		// Juggle points inheriting
@@ -12866,6 +12871,7 @@ func (c *Char) actionFinish() {
 			// Set KO flag and force KO states if necessary
 			c.setSCF(SCF_ko, true)
 			c.setSCF(SCF_ctrl, false) // This can be seen in Mugen when you F1 a character with ctrl && movetype = H
+			c.releaseTargets(-1)
 			if !c.stchtmp && c.helperIndex == 0 && c.ss.moveType != MT_H {
 				c.ghv.fallflag = true
 				c.selfState(5030, -1, -1, 0, "")
