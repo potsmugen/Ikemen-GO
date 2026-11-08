@@ -3019,6 +3019,29 @@ func (c *CharCompiler) targetBind(is IniSection, sc *StateControllerBase) (State
 	return *ret, err
 }
 
+func (c *CharCompiler) playerBind(is IniSection, sc *StateControllerBase) (StateController, error) {
+	ret, err := (*playerBind)(sc), c.stateSec(is, func() error {
+		if err := c.paramValue(is, sc, "redirectid",
+			playerBind_redirectid, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "id",
+			playerBind_id, VT_Int, 1, true); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "time",
+			playerBind_time, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "pos",
+			playerBind_pos, VT_Float, 3, false); err != nil {
+			return err
+		}
+		return nil
+	})
+	return *ret, err
+}
+
 func (c *CharCompiler) bindToTarget(is IniSection, sc *StateControllerBase) (StateController, error) {
 	ret, err := (*bindToTarget)(sc), c.stateSec(is, func() error {
 		if err := c.paramValue(is, sc, "redirectid",
@@ -4250,6 +4273,33 @@ func (c *CharCompiler) bindToParent(is IniSection, sc *StateControllerBase) (Sta
 func (c *CharCompiler) bindToRoot(is IniSection, sc *StateControllerBase) (StateController, error) {
 	ret, err := (*bindToRoot)(sc), c.stateSec(is, func() error {
 		return c.bindToParentSub(is, sc)
+	})
+	return *ret, err
+}
+
+func (c *CharCompiler) bindToPlayer(is IniSection, sc *StateControllerBase) (StateController, error) {
+	ret, err := (*bindToPlayer)(sc), c.stateSec(is, func() error {
+		if err := c.paramValue(is, sc, "redirectid",
+			bindToPlayer_redirectid, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "id",
+			bindToPlayer_id, VT_Int, 1, true); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "time",
+			bindToPlayer_time, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "facing",
+			bindToPlayer_facing, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "pos",
+			bindToPlayer_pos, VT_Float, 3, false); err != nil {
+			return err
+		}
+		return nil
 	})
 	return *ret, err
 }
