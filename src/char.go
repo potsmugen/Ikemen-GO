@@ -3614,7 +3614,8 @@ type CharSystemVar struct {
 	bindPos               [3]float32
 	bindPosAdd            [3]float32
 	bindFacing            float32
-	bindIsTarget          bool // TargetBind, BindToTarget or HitDef snap, as opposed to BindToParent/BindToRoot
+	bindIsTarget          bool  // TargetBind, BindToTarget or HitDef snap, as opposed to BindToParent/BindToRoot
+	boundById             int32 // Player that binds this one as its target, for getHitVar(isbound)
 	hitPauseTime          int32
 	rot                   Rotation
 	xshear                float32
@@ -4051,6 +4052,7 @@ func (c *Char) prepareNextRound() {
 	c.sysFvarRangeSet(0, math.MaxInt32, 0)
 	c.CharSystemVar = CharSystemVar{
 		bindToId:              -1,
+		boundById:             -1,
 		angleDrawScale:        [2]float32{1, 1},
 		trans:                 TT_default,
 		alpha:                 [2]int32{255, 0},
@@ -9205,6 +9207,7 @@ func (c *Char) distX(opp *Char, oc *Char) float32 {
 	cpos := c.pos[0] * c.localscl
 	opos := opp.pos[0] * opp.localscl
 	// Update distance while bound. Mugen chars only
+	// Mugen applies binds after the binder moves, so P2Dist while bound returns the value from 1 frame later
 	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
 		if c.bindToId > 0 && !math.IsNaN(float64(c.bindPos[0])) {
 			if bt := sys.playerID(c.bindToId); bt != nil {
@@ -9228,6 +9231,7 @@ func (c *Char) distY(opp *Char, oc *Char) float32 {
 	cpos := c.pos[1] * c.localscl
 	opos := opp.pos[1] * opp.localscl
 	// Update distance while bound. Mugen chars only
+	// Mugen applies binds after the binder moves, so P2Dist while bound returns the value from 1 frame later
 	if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
 		if c.bindToId > 0 && !math.IsNaN(float64(c.bindPos[1])) {
 			if bt := sys.playerID(c.bindToId); bt != nil {
@@ -10206,11 +10210,18 @@ func (c *Char) resetBind() {
 	c.bindToId = -1
 	c.bindFacing = 0
 	c.bindIsTarget = false
+	c.boundById = -1
 }
 
 func (c *Char) setBindToId(to *Char, isTargetBind bool) {
 	c.bindToId = to.id
 	c.bindIsTarget = isTargetBind
+	// Mugen only sets getHitVar(isbound) when the target has movetype H
+	if isTargetBind {
+		c.boundById = to.id
+	} else {
+		c.boundById = -1
+	}
 
 	// Target binds are all we need to correct with this logic.
 	// By the time this gets to the updateBinding() method, it's going to
