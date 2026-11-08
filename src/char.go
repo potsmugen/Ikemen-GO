@@ -3614,6 +3614,7 @@ type CharSystemVar struct {
 	bindPos               [3]float32
 	bindPosAdd            [3]float32
 	bindFacing            float32
+	bindIsTarget          bool // TargetBind, BindToTarget or HitDef snap, as opposed to BindToParent/BindToRoot
 	hitPauseTime          int32
 	rot                   Rotation
 	xshear                float32
@@ -8124,7 +8125,7 @@ func (c *Char) gethitAnimtype() Reaction {
 }
 
 func (c *Char) isTargetBound() bool {
-	return c.ghv.idMatch(c.bindToId)
+	return c.bindIsTarget && c.bindToId >= 0
 }
 
 func (c *Char) initConstants(gi *CharGlobalInfo) {
@@ -9216,9 +9217,9 @@ func (c *Char) distX(opp *Char, oc *Char) float32 {
 			if bt := sys.playerID(c.bindToId); bt != nil {
 				f := bt.facing
 				// We only need to correct for target binds (and snaps)
-				if Abs(c.bindFacing) == 2 {
-					f = c.bindFacing / 2
-				}
+				//if Abs(c.bindFacing) == 2 {
+				//	f = c.bindFacing / 2
+				//}
 				cpos = bt.pos[0]*bt.localscl + f*(c.bindPos[0]+c.bindPosAdd[0])*c.localscl
 			}
 		}
@@ -10211,10 +10212,12 @@ func (c *Char) resetBind() {
 	c.bindTime = 0
 	c.bindToId = -1
 	c.bindFacing = 0
+	c.bindIsTarget = false
 }
 
 func (c *Char) setBindToId(to *Char, isTargetBind bool) {
 	c.bindToId = to.id
+	c.bindIsTarget = isTargetBind
 
 	// Target binds are all we need to correct with this logic.
 	// By the time this gets to the updateBinding() method, it's going to
@@ -10222,9 +10225,10 @@ func (c *Char) setBindToId(to *Char, isTargetBind bool) {
 	// facing at that point. So as weird as it may be to default
 	// to 0 here, this behavior does seem to be what MUGEN
 	// actually does for helpers.
-	if c.bindFacing == 0 && isTargetBind {
-		c.bindFacing = to.facing * 2
-	}
+	// Disabled because targetBind() and HitDef snap reset bindFacing to 0 right after, so this no longer has an effect
+	//if c.bindFacing == 0 && isTargetBind {
+	//	c.bindFacing = to.facing * 2
+	//}
 
 	// Prevent mutual binding
 	if to.bindToId == c.id {
@@ -10276,9 +10280,9 @@ func (c *Char) bindToPlayer(bt *Char) {
 	if !math.IsNaN(float64(c.bindPos[0])) {
 		f := bt.facing
 		// We only need to correct for target binds (and snaps)
-		if Abs(c.bindFacing) == 2 {
-			f = c.bindFacing / 2
-		}
+		//if Abs(c.bindFacing) == 2 {
+		//	f = c.bindFacing / 2
+		//}
 		newX := bt.pos[0]*bt.localscl/c.localscl + f*(c.bindPos[0]+c.bindPosAdd[0])
 		c.setPosX(newX, true)
 		c.interPos[0] += bt.interPos[0] - bt.pos[0]
