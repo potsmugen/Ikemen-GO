@@ -3509,7 +3509,8 @@ func (be BytecodeExp) run_ex(c *Char, i *int, oc *Char) {
 	case OC_ex_gethitvar_guarded:
 		sys.bcStack.PushB(c.ghv.guarded)
 	case OC_ex_gethitvar_isbound:
-		sys.bcStack.PushB(c.boundBy.id >= 0)
+		bt, _ := c.getBinder()
+		sys.bcStack.PushB(bt != nil)
 	case OC_ex_gethitvar_fall:
 		sys.bcStack.PushB(c.ghv.fallflag)
 	case OC_ex_gethitvar_fall_damage:
@@ -6407,19 +6408,19 @@ func (sc posSet) Run(c *Char, _ []int32) bool {
 		case posSet_x:
 			x := sys.cam.Pos[0]/crun.localscl + exp[0].evalF(c)*redirscale
 			crun.setPosX(x, true)
-			if b := crun.bindOnAxis(0); b != nil && b.id > 0 && sys.playerID(b.id) != nil {
+			if b, _ := crun.bindOnAxis(0); b != nil {
 				b.posAdd[0] = x
 			}
 		case posSet_y:
 			y := exp[0].evalF(c)*redirscale + crun.groundLevel + crun.platformPosY
 			crun.setPosY(y, true)
-			if b := crun.bindOnAxis(1); b != nil && b.id > 0 && sys.playerID(b.id) != nil {
+			if b, _ := crun.bindOnAxis(1); b != nil {
 				b.posAdd[1] = y
 			}
 		case posSet_z:
 			z := exp[0].evalF(c) * redirscale
 			crun.setPosZ(z, true)
-			if b := crun.bindOnAxis(2); b != nil && b.id > 0 && sys.playerID(b.id) != nil {
+			if b, _ := crun.bindOnAxis(2); b != nil {
 				b.posAdd[2] = z
 			}
 		}
@@ -6443,19 +6444,19 @@ func (sc posAdd) Run(c *Char, _ []int32) bool {
 		case posSet_x:
 			x := exp[0].evalF(c) * redirscale
 			crun.addX(x)
-			if b := crun.bindOnAxis(0); b != nil && b.id > 0 && sys.playerID(b.id) != nil {
+			if b, _ := crun.bindOnAxis(0); b != nil {
 				b.posAdd[0] = x
 			}
 		case posSet_y:
 			y := exp[0].evalF(c) * redirscale
 			crun.addY(y)
-			if b := crun.bindOnAxis(1); b != nil && b.id > 0 && sys.playerID(b.id) != nil {
+			if b, _ := crun.bindOnAxis(1); b != nil {
 				b.posAdd[1] = y
 			}
 		case posSet_z:
 			z := exp[0].evalF(c) * redirscale
 			crun.addZ(z)
-			if b := crun.bindOnAxis(2); b != nil && b.id > 0 && sys.playerID(b.id) != nil {
+			if b, _ := crun.bindOnAxis(2); b != nil {
 				b.posAdd[2] = z
 			}
 		}
@@ -10636,8 +10637,7 @@ func (sc playerBind) Run(c *Char, _ []int32) bool {
 		return false
 	}
 
-	scl := crun.localscl / t.localscl
-	crun.bindPlayer(t, time, facing, x*scl, y*scl, z*scl, false)
+	crun.bindPlayer(t, time, facing, x, y, z, false)
 	return false
 }
 
