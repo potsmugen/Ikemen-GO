@@ -3975,6 +3975,8 @@ func (c *Char) clearState() {
 	c.ghv.reset(c)
 	c.ghv.clearOff()
 	c.mhv.clear()
+	c.clearTargets()
+	c.bindTo.clear()
 	for i := range c.hitby {
 		c.hitby[i].clear()
 	}
@@ -4143,9 +4145,7 @@ func (c *Char) prepareNextRound() {
 	}
 
 	c.enemyNearP2Clear()
-	c.clearTargets()
 	c.cpucmd = -1
-	c.customShader.clear()
 }
 
 // Return Char Global Info normally
