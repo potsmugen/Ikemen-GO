@@ -3651,12 +3651,13 @@ const (
 )
 
 // Each char follows at most one other player, through bindTo. Each new bind overwrites the last
-// If that player has this char as a target, the bind is considered a grab. See targetBinder()
+// A bind made by the binder itself (TargetBind, BindToTarget, HitDef snap) is a grab. See targetBinder()
 // Grabs have special properties like copying velocity, getHitVar(isbound), state 5050, etc
 // Mugen instead stores self binds on the bound player and target binds on the binder, so both can be active and several binders can hold one char
 // We keep only one because a char can't be in two places, and Mugen's overlapping binds already resolve to the last one applied anyway
 type CharBind struct {
 	id           int32
+	isGrab       bool       // Set when the binder made the bind, instead of the bound char
 	time         int32
 	pos          [3]float32 // In the bound char's coordinate space
 	posAdd       [3]float32 // PosSet/PosAdd this frame. Only distX/distY read it. See https://github.com/ikemen-engine/Ikemen-GO/pull/799
@@ -10217,12 +10218,12 @@ func (c *Char) setBindTo(to *Char, time int32, facing float32, pos [3]float32) {
 	}
 	// Keep posAdd only if the anchor is the same
 	if c.bindTo.id != to.id {
-		c.bindTo.posAdd = [3]float32{}
+		c.bindTo = CharBind{id: to.id}
 	}
-	c.bindTo.id = to.id
+	c.bindTo.isGrab = false
 	c.bindTo.time = time
-	c.bindTo.facing = facing
 	c.bindTo.pos = pos
+	c.bindTo.facing = facing
 }
 
 // Bind another char to this one
@@ -10237,11 +10238,12 @@ func (c *Char) bindOther(t *Char, time int32, facing float32, pos [3]float32) {
 	if t.bindTo.id != c.id {
 		t.bindTo = CharBind{id: c.id}
 	}
+	t.bindTo.isGrab = true
 	t.bindTo.time = time
-	t.bindTo.facing = facing
 	// Convert the offsets to the bound char's local scale
 	ls := c.localscl / t.localscl
 	t.bindTo.pos = [3]float32{pos[0] * ls, pos[1] * ls, pos[2] * ls}
+	t.bindTo.facing = facing
 }
 
 // Release every bind to this char
@@ -10270,12 +10272,11 @@ func (c *Char) activeBinder() *Char {
 	return nil
 }
 
-// The player this char follows, if that player also has this char as a target
-// This is what tells a TargetBind or HitDef snap apart from other binds
+// The player this char follows, if that player made the bind (TargetBind, BindToTarget, HitDef snap)
 func (c *Char) targetBinder() *Char {
 	// No bind time check on purpose, so it stays true at time 0 until the bind is cleared the next frame
 	// This makes getHitVar(isbound) linger, like in Mugen
-	if bc := sys.playerID(c.bindTo.id); bc != nil && bc.hasTarget(c.id) {
+	if bc := sys.playerID(c.bindTo.id); bc != nil && c.bindTo.isGrab {
 		return bc
 	}
 	return nil
@@ -10444,10 +10445,9 @@ func (c *Char) clearTargetBind() {
 	}
 }
 
-// Callers only pass this char's targets, so a bind to this char is a target bind
 // Reads bindTo directly so a bind on its linger frame also sends the target to 5050, like Mugen
 func (c *Char) releaseBoundTarget(t *Char, log bool) {
-	if t.bindTo.id != c.id {
+	if t.bindTo.id != c.id || !t.bindTo.isGrab {
 		return
 	}
 	// This is the only place a bound target is sent to state 5050
@@ -11804,8 +11804,8 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile, hitTraded bool) (h
 				}
 			}
 		}
-		// Only the attacker's target bind on the getter. Mugen keeps self binds through hits
-		if c.hasTarget(getter.id) {
+		// Only the attacker's grab on the getter. Mugen keeps self binds through hits
+		if getter.bindTo.isGrab {
 			getter.unbindFrom(c.id)
 		}
 		if hd.KeepState && ghvset {
@@ -12914,7 +12914,7 @@ func (c *Char) actionRun() {
 	if !c.csf(CSF_destroy) {
 		for _, tid := range c.targets {
 			t := sys.playerID(tid)
-			if t == nil || t.bindTo.id != c.id {
+			if t == nil || t.bindTo.id != c.id || !t.bindTo.isGrab {
 				continue
 			}
 			if t.bindTo.time == 0 {
