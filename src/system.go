@@ -1881,6 +1881,8 @@ func (s *System) palfxvar2(x int32, y int32) float32 {
 			n = pfx.eColor
 		case 2:
 			n = pfx.eHue
+		case 3:
+			n = pfx.eScroll
 		default:
 			n = 0
 		}

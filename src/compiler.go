@@ -3358,6 +3358,8 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			out.append(OC_ex2_palfxvar_color)
 		case "hue":
 			out.append(OC_ex2_palfxvar_hue)
+		case "scroll":
+			out.append(OC_ex2_palfxvar_scroll)
 		case "invertall":
 			out.append(OC_ex2_palfxvar_invertall)
 		case "invertblend":
@@ -3380,6 +3382,8 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			out.append(OC_ex2_palfxvar_bg_color)
 		case "bg.hue":
 			out.append(OC_ex2_palfxvar_bg_hue)
+		case "bg.scroll":
+			out.append(OC_ex2_palfxvar_bg_scroll)
 		case "bg.invertall":
 			out.append(OC_ex2_palfxvar_bg_invertall)
 		case "all.time":
@@ -3400,6 +3404,8 @@ func (c *CharCompiler) expValue(out *BytecodeExp, in *string,
 			out.append(OC_ex2_palfxvar_all_color)
 		case "all.hue":
 			out.append(OC_ex2_palfxvar_all_hue)
+		case "all.scroll":
+			out.append(OC_ex2_palfxvar_all_scroll)
 		case "all.invertall":
 			out.append(OC_ex2_palfxvar_all_invertall)
 		case "all.invertblend":
